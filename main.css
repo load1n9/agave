@@ -1,0 +1,18 @@
+body {
+    background-color: #36393e;
+}
+#c {
+    border-radius: 10px;
+    box-shadow: -1px 4px 13px 0px #282b30;
+}
+
+.btn {
+    margin-top: 10px;
+    margin-left: 30px;
+}
+
+#data {
+    color: white;
+    text-align:  center;
+    vertical-align: middle;
+}

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agave</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/5.0.0-alpha2/css/bootstrap.min.css"
+        integrity="sha384-DhY6onE6f3zzKbjUPRc2hOzGAdEf4/Dz+WJwBvEYL/lkkIsI3ihufq9hk9K4lVoK" crossorigin="anonymous">
+    <link rel="stylesheet" href="main.css">
+</head>
+
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/3.6.1/fabric.js"></script>
+    <script src="main.js"></script>
+    <div class="container">
+        <div id="data"></div>
+        <canvas id="c" width="1110%" height="600%"></canvas>
+
+        <input type="file" class="btn btn-primary form-control-file" onchange="addImage(event)">
+        <button type="button" class="btn btn-primary" onclick="addRect()">Add Rect</button>
+            <form class="form-floating">
+                <input type="text" class="form-control" id="setx" placeholder="0" onchange="updateX()">
+                <input type="text" class="form-control" id="sety" placeholder="0" onchange="updateY()">
+            </form>
+        
+    </div>
+</body>
+
+</html>

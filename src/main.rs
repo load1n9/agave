@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate agave_os;
-use agave_os::{print, println};
+use agave_os::println;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
@@ -11,8 +11,5 @@ pub extern "C" fn _start() -> ! {
     agave_os::init();
 
     println!("It did not crash!");
-    agave_os::halt_loop(); 
-    // loop {
-    //     print!("😒");
-    // }
+    agave_os::halt_loop();
 }

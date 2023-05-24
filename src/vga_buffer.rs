@@ -152,10 +152,14 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
+pub fn set_color(color: Color, background: Color) {
+    WRITER.lock().color_code = ColorCode::new(color, background);
+}
+
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    WRITER.lock().color_code = ColorCode::new(Color::LightRed, Color::Black);
+    set_color(Color::LightRed, Color::Black);
     println!("{}", info);
-    WRITER.lock().color_code = ColorCode::new(Color::LightCyan, Color::Black);
-    halt_loop(); 
+    set_color(Color::LightCyan, Color::Black);
+    halt_loop();
 }

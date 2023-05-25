@@ -6,7 +6,9 @@ extern crate alloc;
 extern crate bootloader;
 extern crate x86_64;
 use agave_os::println;
-use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
+use agave_os::task::executor::Executor;
+use agave_os::task::keyboard;
+use agave_os::task::Task;
 use bootloader::{entry_point, BootInfo};
 use x86_64::VirtAddr;
 
@@ -23,30 +25,19 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
-    // new
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
-    let heap_value = Box::new(41);
-    println!("heap_value at {:p}", heap_value);
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(example_task()));
+    executor.spawn(Task::new(keyboard::print_keypresses()));
+    executor.run();
+}
 
-    let mut vec = Vec::new();
-    for i in 0..500 {
-        vec.push(i);
-    }
-    println!("vec at {:p}", vec.as_slice());
+async fn async_number() -> u32 {
+    42
+}
 
-    let reference_counted = Rc::new(vec![1, 2, 3]);
-    let cloned_reference = reference_counted.clone();
-    println!(
-        "current ref count is {}",
-        Rc::strong_count(&cloned_reference)
-    );
-    core::mem::drop(reference_counted);
-    println!(
-        "ref count is {} now",
-        Rc::strong_count(&cloned_reference)
-    );
-
-    println!("didn't crash?");
-    agave_os::halt_loop();
+async fn example_task() {
+    let number = async_number().await;
+    println!("async number: {}", number);
 }

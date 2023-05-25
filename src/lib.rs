@@ -1,4 +1,5 @@
 #![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
 #![no_std]
 
 extern crate alloc;

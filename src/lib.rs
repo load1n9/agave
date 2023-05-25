@@ -1,6 +1,9 @@
 #![feature(abi_x86_interrupt)]
 #![no_std]
 
+extern crate alloc;
+
+pub mod allocator;
 pub mod exit;
 pub mod gdt;
 pub mod interrupts;

@@ -16,8 +16,8 @@ pub async fn example_exec() {
 
     let mut store = Store::new(&engine, 42);
     let host_hello = Func::wrap(&mut store, |caller: Caller<'_, HostState>, param: i32| {
-        println!("Got {} from WebAssembly", param);
-        println!("My host state is: {}", caller.data());
+        println!("Received {} from WebAssembly", param);
+        println!("host state: {}", caller.data());
     });
 
     let mut linker = <Linker<HostState>>::new(&engine);

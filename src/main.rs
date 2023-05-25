@@ -52,7 +52,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     );
 
     let _result: anyhow::Result<()> = try {
-        let spawner = Spawner::new(10000);
+        let spawner = Spawner::new(100);
         let mut executor = Executor::new(spawner.clone());
         spawner.add(agave_os::wasm::example_exec());
         spawner.add(keyboard::print_keypresses());

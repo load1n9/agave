@@ -4,7 +4,7 @@ pub mod bump;
 pub mod fixed_size_block;
 pub mod linked_list;
 
-use self::fixed_size_block::FixedSizeBlockAllocator;
+use self::bump::BumpAllocator;
 use self::x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
@@ -13,7 +13,7 @@ use self::x86_64::{
 };
 
 #[global_allocator]
-static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
+static ALLOCATOR: Locked<BumpAllocator> = Locked::new(BumpAllocator::new());
 
 pub struct Locked<A> {
     inner: spin::Mutex<A>,

@@ -37,11 +37,12 @@ pub fn copy_files(verbose: bool) {
 
     copy_file("/ini/banner.txt", include_bytes!("../../dsk/ini/banner.txt"), verbose);
     copy_file("/ini/boot.sh", include_bytes!("../../dsk/ini/boot.sh"), verbose);
+    copy_file("/ini/setup.sh", include_bytes!("../../dsk/ini/setup.sh"), verbose);
     copy_file("/ini/shell.sh", include_bytes!("../../dsk/ini/shell.sh"), verbose);
     copy_file("/ini/version.txt", include_bytes!("../../dsk/ini/version.txt"), verbose);
 
     create_dir("/ini/palettes", verbose);
-    copy_file("/ini/palettes/gruvbox-dark.csv", include_bytes!("../../dsk/ini/palettes/gruvbox-dark.csv"), verbose);
+    copy_file("/ini/palettes/agave-dark.csv", include_bytes!("../../dsk/ini/palettes/agave-dark.csv"), verbose);
     copy_file("/ini/palettes/gruvbox-light.csv", include_bytes!("../../dsk/ini/palettes/gruvbox-light.csv"), verbose);
 
     create_dir("/ini/fonts", verbose);
@@ -83,14 +84,12 @@ pub fn copy_files(verbose: bool) {
 
     create_dir("/var/www", verbose);
     copy_file("/var/www/index.html", include_bytes!("../../dsk/var/www/index.html"), verbose);
-    copy_file("/var/www/moros.png", include_bytes!("../../dsk/var/www/moros.png"), verbose);
-    copy_file("/var/www/moros.css", include_bytes!("../../dsk/var/www/moros.css"), verbose);
 }
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let csi_color = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Welcome to MOROS v{} installation program!{}", csi_color, env!("CARGO_PKG_VERSION"), csi_reset);
+    println!("{}Welcome to your favorite Agave v{} installation program!{}", csi_color, env!("CARGO_PKG_VERSION"), csi_reset);
     println!();
 
     let mut has_confirmed = false;
@@ -133,9 +132,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
 
         println!();
-        println!("{}Installation successful!{}", csi_color, csi_reset);
+        println!("{}Agave is now successfully installed!{}", csi_color, csi_reset);
         println!();
-        println!("Quit the console or reboot to apply changes");
+        println!("Quit the console or reboot to apply changes (or use CTRL+D)");
     }
 
     Ok(())

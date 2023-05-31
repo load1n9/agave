@@ -6,7 +6,6 @@ use x86_64::registers::control::Cr3;
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, Translate};
 use x86_64::{PhysAddr, VirtAddr};
 
-// NOTE: mutable but changed only once during initialization
 pub static mut PHYS_MEM_OFFSET: u64 = 0;
 pub static mut MEMORY_MAP: Option<&MemoryMap> = None;
 pub static MEMORY_SIZE: AtomicU64 = AtomicU64::new(0);

@@ -1,1 +1,1 @@
-MOROS v{x.x.x}
+AGAVE v{x.x.x}

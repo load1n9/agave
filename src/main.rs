@@ -34,8 +34,10 @@ fn user_boot() {
         } else {
             println!("MFS is not mounted to '/'");
         }
-        println!("Running console in diskless mode");
-        usr::shell::main(&["shell"]).ok();
+        println!("Running in diskless mode type `install` to install to disk");
+        sys::fs::mount_mem();
+        sys::fs::format_mem();
+        usr::shell::main(&["shell", ]).ok();
     }
 }
 

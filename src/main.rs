@@ -1,63 +1,46 @@
 #![no_std]
 #![no_main]
-#![feature(try_blocks)]
 
-extern crate agave_os;
 extern crate alloc;
-extern crate anyhow;
-extern crate bootloader;
-extern crate x86_64;
-use agave_os::println;
-use agave_os::sys::task::executor::Executor;
-use agave_os::sys::task::executor::Spawner;
-use agave_os::sys::task::keyboard;
+
 use bootloader::{entry_point, BootInfo};
-use x86_64::VirtAddr;
+use core::panic::PanicInfo;
+use agave_os::{sys, usr, print, println, debug, hlt_loop};
 
-entry_point!(kernel_main);
+entry_point!(main);
 
-static LOGO: &str = r"
-________   ________   ________   ___      ___  _______      
-|\   __  \ |\   ____\ |\   __  \ |\  \    /  /||\  ___ \     
-\ \  \|\  \\ \  \___| \ \  \|\  \\ \  \  /  / /\ \   __/|    
- \ \   __  \\ \  \  ___\ \   __  \\ \  \/  / /  \ \  \_|/__  
-  \ \  \ \  \\ \  \|\  \\ \  \ \  \\ \    / /    \ \  \_|\ \ 
-   \ \__\ \__\\ \_______\\ \__\ \__\\ \__/ /      \ \_______\
-    \|__|\|__| \|_______| \|__|\|__| \|__|/        \|_______|
-                                                             
-                                                             
-                                                                                          
-";
+fn main(boot_info: &'static BootInfo) -> ! {
+    agave_os::init(boot_info);
+    print!("\x1b[?25h"); // Enable cursor
+    loop {
+        if let Some(cmd) = option_env!("agave_os_CMD") {
+            let prompt = usr::shell::prompt_string(true);
+            println!("{}{}", prompt, cmd);
+            usr::shell::exec(cmd).ok();
+            sys::acpi::shutdown();
+        } else {
+            user_boot();
+        }
+    }
+}
 
-fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use agave_os::sys::allocator;
-    use agave_os::sys::memory::{self, BootInfoFrameAllocator};
+fn user_boot() {
+    let script = "/ini/boot.sh";
+    if sys::fs::File::open(script).is_some() {
+        usr::shell::main(&["shell", script]).ok();
+    } else {
+        if sys::fs::is_mounted() {
+            println!("Could not find '{}'", script);
+        } else {
+            println!("MFS is not mounted to '/'");
+        }
+        println!("Running console in diskless mode");
+        usr::shell::main(&["shell"]).ok();
+    }
+}
 
-    agave_os::init();
-
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
-
-    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
-
-    agave_os::vga::set_color(
-        agave_os::api::vga::Color::LightGreen,
-        agave_os::api::vga::Color::Black,
-    );
-    println!("{}", LOGO);
-    agave_os::vga::set_color(
-        agave_os::api::vga::Color::LightCyan,
-        agave_os::api::vga::Color::Black,
-    );
-
-    let _result: anyhow::Result<()> = try {
-        let spawner = Spawner::new(100);
-        let mut executor = Executor::new(spawner.clone());
-        spawner.add(agave_os::sys::wasm::example_exec());
-        spawner.add(keyboard::print_keypresses());
-        // spawner.add(kernel::task::mouse::process());
-        println!("Still running somehow");
-        executor.run();
-    };
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    debug!("{}", info);
+    hlt_loop();
 }

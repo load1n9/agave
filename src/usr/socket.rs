@@ -58,7 +58,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
     }).collect();
     if prompt {
-        println!("MOROS Socket v0.1.0\n");
+        println!("Agave Socket v0.1.0\n");
     }
 
     let required_args_count = if listen { 2 } else { 3 };

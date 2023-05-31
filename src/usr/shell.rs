@@ -371,8 +371,8 @@ fn cmd_unset(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
 
 fn cmd_version(_args: &[&str]) -> Result<(), ExitCode> {
     println!(
-        "MOROS v{}",
-        option_env!("MOROS_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+        "Agave v{}",
+        option_env!("AGAVE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
     );
     Ok(())
 }

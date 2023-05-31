@@ -1,9 +1,9 @@
 #![no_std]
 #![no_main]
 
-use moros::api::syscall;
-use moros::api::process::ExitCode;
-use moros::entry_point;
+use agave_os::api::syscall;
+use agave_os::api::process::ExitCode;
+use agave_os::entry_point;
 
 entry_point!(main);
 

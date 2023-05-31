@@ -65,7 +65,7 @@ fn help_summary() -> Result<(), ExitCode> {
 fn help_edit() -> Result<(), ExitCode> {
     let csi_color = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("MOROS text editor is a very simple editor inspired by Pico, Nano, and Micro.");
+    println!("Agave text editor is a very simple editor inspired by Pico, Nano, and Micro.");
     println!();
     println!("{}Commands:{}", csi_color, csi_reset);
     let commands = [

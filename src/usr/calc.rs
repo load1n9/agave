@@ -107,7 +107,7 @@ fn parse_eval(line: &str) -> Result<f64, String> {
 }
 
 fn repl() -> Result<(), ExitCode> {
-    println!("MOROS Calc v0.1.0\n");
+    println!("Agave Calc v0.1.0\n");
     let csi_color = Style::color("Cyan");
     let csi_error = Style::color("LightRed");
     let csi_reset = Style::reset();

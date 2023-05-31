@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-use moros::api::syscall;
-use moros::entry_point;
+use agave_os::api::syscall;
+use agave_os::entry_point;
 
 entry_point!(main);
 

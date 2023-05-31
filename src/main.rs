@@ -8,9 +8,9 @@ extern crate anyhow;
 extern crate bootloader;
 extern crate x86_64;
 use agave_os::println;
-use agave_os::task::executor::Executor;
-use agave_os::task::executor::Spawner;
-use agave_os::task::keyboard;
+use agave_os::sys::task::executor::Executor;
+use agave_os::sys::task::executor::Spawner;
+use agave_os::sys::task::keyboard;
 use bootloader::{entry_point, BootInfo};
 use x86_64::VirtAddr;
 
@@ -30,8 +30,8 @@ ________   ________   ________   ___      ___  _______
 ";
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use agave_os::allocator;
-    use agave_os::memory::{self, BootInfoFrameAllocator};
+    use agave_os::sys::allocator;
+    use agave_os::sys::memory::{self, BootInfoFrameAllocator};
 
     agave_os::init();
 
@@ -41,20 +41,20 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
-    agave_os::vga_buffer::set_color(
-        agave_os::vga_buffer::Color::LightGreen,
-        agave_os::vga_buffer::Color::Black,
+    agave_os::vga::set_color(
+        agave_os::vga::Color::LightGreen,
+        agave_os::vga::Color::Black,
     );
     println!("{}", LOGO);
-    agave_os::vga_buffer::set_color(
-        agave_os::vga_buffer::Color::LightCyan,
-        agave_os::vga_buffer::Color::Black,
+    agave_os::vga::set_color(
+        agave_os::vga::Color::LightCyan,
+        agave_os::vga::Color::Black,
     );
 
     let _result: anyhow::Result<()> = try {
         let spawner = Spawner::new(100);
         let mut executor = Executor::new(spawner.clone());
-        spawner.add(agave_os::wasm::example_exec());
+        spawner.add(agave_os::sys::wasm::example_exec());
         spawner.add(keyboard::print_keypresses());
         // spawner.add(kernel::task::mouse::process());
         println!("Still running somehow");

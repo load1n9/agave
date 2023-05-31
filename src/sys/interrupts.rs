@@ -4,7 +4,8 @@ extern crate pic8259;
 extern crate spin;
 extern crate x86_64;
 
-use crate::{gdt, halt_loop, print, println};
+use crate::sys::gdt;
+use crate::{halt_loop, print, println};
 
 use self::lazy_static::lazy_static;
 use self::pic8259::ChainedPics;

@@ -5,21 +5,14 @@
 
 extern crate alloc;
 
-pub mod allocator;
-pub mod exit;
-pub mod gdt;
-pub mod interrupts;
-pub mod memory;
-pub mod serial;
-pub mod task;
-pub mod vga_buffer;
-pub mod wasm;
+pub mod sys;
+pub mod vga;
 
 /// Initialize the kernel
 pub fn init() {
-    gdt::init();
-    interrupts::init_idt();
-    unsafe { interrupts::PICS.lock().initialize() };
+    sys::gdt::init();
+    sys::interrupts::init_idt();
+    unsafe { sys::interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
 }
 

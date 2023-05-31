@@ -1,4 +1,5 @@
-use super::println;
+use crate::println;
+
 //use wasmi::{Engine, Module};
 use wasmi::*;
 
@@ -9,7 +10,7 @@ pub fn read_wasm_string(offset: u32, length: u32, wasm_mem: &[u8]) -> &str {
 
 pub async fn example_exec() {
     let engine = Engine::default();
-    let wasm = include_bytes!("../bin/test.wasm");
+    let wasm = include_bytes!("../../bin/test.wasm");
     let module = Module::new(&engine, &wasm[..]).unwrap();
 
     type HostState = u32;

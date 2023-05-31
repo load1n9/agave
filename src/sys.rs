@@ -6,3 +6,4 @@ pub mod memory;
 pub mod serial;
 pub mod task;
 pub mod wasm;
+pub mod cpu;

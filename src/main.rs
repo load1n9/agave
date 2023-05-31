@@ -42,13 +42,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
     agave_os::vga::set_color(
-        agave_os::vga::Color::LightGreen,
-        agave_os::vga::Color::Black,
+        agave_os::api::vga::Color::LightGreen,
+        agave_os::api::vga::Color::Black,
     );
     println!("{}", LOGO);
     agave_os::vga::set_color(
-        agave_os::vga::Color::LightCyan,
-        agave_os::vga::Color::Black,
+        agave_os::api::vga::Color::LightCyan,
+        agave_os::api::vga::Color::Black,
     );
 
     let _result: anyhow::Result<()> = try {

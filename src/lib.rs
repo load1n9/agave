@@ -6,6 +6,7 @@
 extern crate alloc;
 
 pub mod sys;
+pub mod api;
 pub mod vga;
 
 /// Initialize the kernel

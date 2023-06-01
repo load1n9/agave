@@ -51,20 +51,11 @@ pub fn copy_files(verbose: bool) {
     copy_file("/ini/fonts/zap-vga-8x16.psf", include_bytes!("../../dsk/ini/fonts/zap-vga-8x16.psf"), verbose);
 
     create_dir("/lib/lisp", verbose);
-    copy_file("/lib/lisp/core.lsp", include_bytes!("../../dsk/lib/lisp/core.lsp"), verbose);
-    copy_file("/lib/lisp/alias.lsp", include_bytes!("../../dsk/lib/lisp/alias.lsp"), verbose);
-    //copy_file("/lib/lisp/legacy.lsp", include_bytes!("../../dsk/lib/lisp/legacy.lsp"), verbose);
 
     copy_file("/tmp/alice.txt", include_bytes!("../../dsk/tmp/alice.txt"), verbose);
     copy_file("/tmp/machines.txt", include_bytes!("../../dsk/tmp/machines.txt"), verbose);
 
     create_dir("/tmp/lisp", verbose);
-    copy_file("/tmp/lisp/colors.lsp", include_bytes!("../../dsk/tmp/lisp/colors.lsp"), verbose);
-    copy_file("/tmp/lisp/factorial.lsp", include_bytes!("../../dsk/tmp/lisp/factorial.lsp"), verbose);
-    copy_file("/tmp/lisp/fibonacci.lsp", include_bytes!("../../dsk/tmp/lisp/fibonacci.lsp"), verbose);
-    copy_file("/tmp/lisp/geotime.lsp", include_bytes!("../../dsk/tmp/lisp/geotime.lsp"), verbose);
-    copy_file("/tmp/lisp/pi.lsp", include_bytes!("../../dsk/tmp/lisp/pi.lsp"), verbose);
-    copy_file("/tmp/lisp/sum.lsp", include_bytes!("../../dsk/tmp/lisp/sum.lsp"), verbose);
 
     create_dir("/tmp/life", verbose);
     copy_file("/tmp/life/centinal.cells", include_bytes!("../../dsk/tmp/life/centinal.cells"), verbose);

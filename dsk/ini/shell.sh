@@ -20,10 +20,10 @@ alias mem  memory
 alias kbd  keyboard
 
 # Unix compatibility
-# alias cd   goto
-# alias cp   copy
-# alias echo print
-# alias exit quit
-# alias ls   list
-# alias mv   move
-# alias rm   delete
+alias cd   goto
+alias cp   copy
+alias echo print
+alias exit quit
+alias ls   list
+alias mv   move
+alias rm   delete

@@ -1,7 +1,7 @@
 [bits 64]
 
 section .data
-msg: db 27, "[93m", "MOROS has reached its fate, the system is now halting.", 27, "[0m", 10
+msg: db 27, "[93m", "AGAVE has reached its fate, the system is now halting.", 27, "[0m", 10
 len: equ $-msg
 
 global _start

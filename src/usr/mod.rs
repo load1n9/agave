@@ -32,3 +32,4 @@ pub mod time;
 pub mod user;
 pub mod vga;
 pub mod write;
+pub mod wasm;

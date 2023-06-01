@@ -532,6 +532,7 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "vga" => usr::vga::main(&args),
         "write" => usr::write::main(&args),
         "panic" => panic!("{}", args[1..].join(" ")),
+        "run" => usr::wasm::example_exec(&args),
         _ => {
             let mut path = fs::realpath(args[0]);
             if path.len() > 1 {

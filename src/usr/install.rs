@@ -1,10 +1,10 @@
-use crate::{api, sys, usr};
 use crate::api::console::Style;
 use crate::api::fs;
 use crate::api::fs::DeviceType;
 use crate::api::io;
 use crate::api::process::ExitCode;
 use crate::api::syscall;
+use crate::{api, sys, usr};
 
 use alloc::format;
 use alloc::string::String;
@@ -24,8 +24,22 @@ pub fn copy_files(verbose: bool) {
     copy_file("/bin/halt", include_bytes!("../../dsk/bin/halt"), verbose);
     copy_file("/bin/hello", include_bytes!("../../dsk/bin/hello"), verbose);
     copy_file("/bin/print", include_bytes!("../../dsk/bin/print"), verbose);
-    copy_file("/bin/reboot", include_bytes!("../../dsk/bin/reboot"), verbose);
+    copy_file(
+        "/bin/reboot",
+        include_bytes!("../../dsk/bin/reboot"),
+        verbose,
+    );
     copy_file("/bin/sleep", include_bytes!("../../dsk/bin/sleep"), verbose);
+    copy_file(
+        "/bin/test.wasm",
+        include_bytes!("../../dsk/bin/test.wasm"),
+        verbose,
+    );
+    copy_file(
+        "/bin/test.wat",
+        include_bytes!("../../dsk/bin/test.wat"),
+        verbose,
+    );
 
     create_dir("/dev/clk", verbose); // Clocks
     create_dev("/dev/clk/uptime", DeviceType::Uptime, verbose);
@@ -35,59 +49,160 @@ pub fn copy_files(verbose: bool) {
     create_dev("/dev/random", DeviceType::Random, verbose);
     create_dev("/dev/console", DeviceType::Console, verbose);
 
-    copy_file("/ini/banner.txt", include_bytes!("../../dsk/ini/banner.txt"), verbose);
-    copy_file("/ini/boot.sh", include_bytes!("../../dsk/ini/boot.sh"), verbose);
-    copy_file("/ini/setup.sh", include_bytes!("../../dsk/ini/setup.sh"), verbose);
-    copy_file("/ini/shell.sh", include_bytes!("../../dsk/ini/shell.sh"), verbose);
-    copy_file("/ini/version.txt", include_bytes!("../../dsk/ini/version.txt"), verbose);
+    copy_file(
+        "/ini/banner.txt",
+        include_bytes!("../../dsk/ini/banner.txt"),
+        verbose,
+    );
+    copy_file(
+        "/ini/boot.sh",
+        include_bytes!("../../dsk/ini/boot.sh"),
+        verbose,
+    );
+    copy_file(
+        "/ini/setup.sh",
+        include_bytes!("../../dsk/ini/setup.sh"),
+        verbose,
+    );
+    copy_file(
+        "/ini/shell.sh",
+        include_bytes!("../../dsk/ini/shell.sh"),
+        verbose,
+    );
+    copy_file(
+        "/ini/version.txt",
+        include_bytes!("../../dsk/ini/version.txt"),
+        verbose,
+    );
 
     create_dir("/ini/palettes", verbose);
-    copy_file("/ini/palettes/agave-dark.csv", include_bytes!("../../dsk/ini/palettes/agave-dark.csv"), verbose);
-    copy_file("/ini/palettes/gruvbox-light.csv", include_bytes!("../../dsk/ini/palettes/gruvbox-light.csv"), verbose);
+    copy_file(
+        "/ini/palettes/agave-dark.csv",
+        include_bytes!("../../dsk/ini/palettes/agave-dark.csv"),
+        verbose,
+    );
+    copy_file(
+        "/ini/palettes/gruvbox-light.csv",
+        include_bytes!("../../dsk/ini/palettes/gruvbox-light.csv"),
+        verbose,
+    );
 
     create_dir("/ini/fonts", verbose);
     //copy_file("/ini/fonts/lat15-terminus-8x16.psf", include_bytes!("../../dsk/ini/fonts/lat15-terminus-8x16.psf"), verbose);
-    copy_file("/ini/fonts/zap-light-8x16.psf", include_bytes!("../../dsk/ini/fonts/zap-light-8x16.psf"), verbose);
-    copy_file("/ini/fonts/zap-vga-8x16.psf", include_bytes!("../../dsk/ini/fonts/zap-vga-8x16.psf"), verbose);
+    copy_file(
+        "/ini/fonts/zap-light-8x16.psf",
+        include_bytes!("../../dsk/ini/fonts/zap-light-8x16.psf"),
+        verbose,
+    );
+    copy_file(
+        "/ini/fonts/zap-vga-8x16.psf",
+        include_bytes!("../../dsk/ini/fonts/zap-vga-8x16.psf"),
+        verbose,
+    );
 
     create_dir("/lib/lisp", verbose);
 
-    copy_file("/tmp/alice.txt", include_bytes!("../../dsk/tmp/alice.txt"), verbose);
-    copy_file("/tmp/machines.txt", include_bytes!("../../dsk/tmp/machines.txt"), verbose);
+    copy_file(
+        "/tmp/alice.txt",
+        include_bytes!("../../dsk/tmp/alice.txt"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/machines.txt",
+        include_bytes!("../../dsk/tmp/machines.txt"),
+        verbose,
+    );
 
     create_dir("/tmp/lisp", verbose);
 
     create_dir("/tmp/life", verbose);
-    copy_file("/tmp/life/centinal.cells", include_bytes!("../../dsk/tmp/life/centinal.cells"), verbose);
-    copy_file("/tmp/life/flower-of-eden.cells", include_bytes!("../../dsk/tmp/life/flower-of-eden.cells"), verbose);
-    copy_file("/tmp/life/garden-of-eden.cells", include_bytes!("../../dsk/tmp/life/garden-of-eden.cells"), verbose);
-    copy_file("/tmp/life/glider-gun.cells", include_bytes!("../../dsk/tmp/life/glider-gun.cells"), verbose);
-    copy_file("/tmp/life/pentadecathlon.cells", include_bytes!("../../dsk/tmp/life/pentadecathlon.cells"), verbose);
-    copy_file("/tmp/life/queen-bee-shuttle.cells", include_bytes!("../../dsk/tmp/life/queen-bee-shuttle.cells"), verbose);
-    copy_file("/tmp/life/ship-in-a-bottle.cells", include_bytes!("../../dsk/tmp/life/ship-in-a-bottle.cells"), verbose);
-    copy_file("/tmp/life/thunderbird.cells", include_bytes!("../../dsk/tmp/life/thunderbird.cells"), verbose);
-    copy_file("/tmp/life/wing.cells", include_bytes!("../../dsk/tmp/life/wing.cells"), verbose);
+    copy_file(
+        "/tmp/life/centinal.cells",
+        include_bytes!("../../dsk/tmp/life/centinal.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/flower-of-eden.cells",
+        include_bytes!("../../dsk/tmp/life/flower-of-eden.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/garden-of-eden.cells",
+        include_bytes!("../../dsk/tmp/life/garden-of-eden.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/glider-gun.cells",
+        include_bytes!("../../dsk/tmp/life/glider-gun.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/pentadecathlon.cells",
+        include_bytes!("../../dsk/tmp/life/pentadecathlon.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/queen-bee-shuttle.cells",
+        include_bytes!("../../dsk/tmp/life/queen-bee-shuttle.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/ship-in-a-bottle.cells",
+        include_bytes!("../../dsk/tmp/life/ship-in-a-bottle.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/thunderbird.cells",
+        include_bytes!("../../dsk/tmp/life/thunderbird.cells"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/life/wing.cells",
+        include_bytes!("../../dsk/tmp/life/wing.cells"),
+        verbose,
+    );
 
     create_dir("/tmp/beep", verbose);
-    copy_file("/tmp/beep/tetris.sh", include_bytes!("../../dsk/tmp/beep/tetris.sh"), verbose);
-    copy_file("/tmp/beep/starwars.sh", include_bytes!("../../dsk/tmp/beep/starwars.sh"), verbose);
-    copy_file("/tmp/beep/mario.sh", include_bytes!("../../dsk/tmp/beep/mario.sh"), verbose);
+    copy_file(
+        "/tmp/beep/tetris.sh",
+        include_bytes!("../../dsk/tmp/beep/tetris.sh"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/beep/starwars.sh",
+        include_bytes!("../../dsk/tmp/beep/starwars.sh"),
+        verbose,
+    );
+    copy_file(
+        "/tmp/beep/mario.sh",
+        include_bytes!("../../dsk/tmp/beep/mario.sh"),
+        verbose,
+    );
 
     create_dir("/var/www", verbose);
-    copy_file("/var/www/index.html", include_bytes!("../../dsk/var/www/index.html"), verbose);
+    copy_file(
+        "/var/www/index.html",
+        include_bytes!("../../dsk/var/www/index.html"),
+        verbose,
+    );
 }
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let csi_color = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Welcome to your favorite Agave v{} installation program!{}", csi_color, env!("CARGO_PKG_VERSION"), csi_reset);
+    println!(
+        "{}Welcome to your favorite Agave v{} installation program!{}",
+        csi_color,
+        env!("CARGO_PKG_VERSION"),
+        csi_reset
+    );
     println!();
 
     let mut has_confirmed = false;
     for &arg in args {
         match arg {
             "-y" | "--yes" => has_confirmed = true,
-            _ => continue
+            _ => continue,
         }
     }
     if !has_confirmed {
@@ -123,7 +238,10 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
 
         println!();
-        println!("{}Agave is now successfully installed!{}", csi_color, csi_reset);
+        println!(
+            "{}Agave is now successfully installed!{}",
+            csi_color, csi_reset
+        );
         println!();
         println!("Quit the console or reboot to apply changes (or use CTRL+D)");
     }

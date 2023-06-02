@@ -40,7 +40,10 @@ rand = { version = "0.8.5", default-features = false }
 rand_hc = "0.3.1"
 vte = "0.11.0"
 object = { version = "0.30.3", default-features = false, features = ["read"] }
-wasmi = { version = "0.29", default-features = false }
+wasmi = { version = "0.30.0", default-features = false}
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+hashbrown = { version = "0.13.2", features = ["nightly"] }
+wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 raw-cpuid = "11.0.1"
 sha2 = { version = "0.10.6", default-features = false, features = [
     "force-soft"

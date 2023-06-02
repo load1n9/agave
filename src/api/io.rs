@@ -1,7 +1,7 @@
 use crate::api::syscall;
 
-use alloc::vec;
 use alloc::string::{String, ToString};
+use alloc::vec;
 
 pub struct Stdin;
 pub struct Stdout;
@@ -10,6 +10,13 @@ pub struct Stderr;
 impl Stdin {
     fn new() -> Self {
         Self {}
+    }
+
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize, ()> {
+        match syscall::read(0, buf) {
+            Some(res) => Ok(res),
+            None => Err(()),
+        }
     }
 
     pub fn read_char(&self) -> Option<char> {
@@ -42,6 +49,13 @@ impl Stdout {
     pub fn write(&self, s: &str) {
         syscall::write(1, s.as_bytes());
     }
+
+    pub fn write_all(&self, s: &[u8]) -> Result<usize, ()> {
+        match syscall::write(1, s) {
+            Some(res) => Ok(res),
+            None => Err(()),
+        }
+    }
 }
 
 impl Stderr {
@@ -51,6 +65,13 @@ impl Stderr {
 
     pub fn write(&self, s: &str) {
         syscall::write(2, s.as_bytes());
+    }
+
+    pub fn write_all(&self, s: &[u8]) -> Result<usize, ()> {
+        match syscall::write(2, s) {
+            Some(res) => Ok(res),
+            None => Err(()),
+        }
     }
 }
 

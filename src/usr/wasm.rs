@@ -1,9 +1,7 @@
 use alloc::{format, string::ToString};
-//use wasmi::{Engine, Module};
-use wasmi::*;
 
 use crate::{
-    api::{console::Style, fs, process::ExitCode},
+    api::{console::Style, fs, process::ExitCode, wasm::WasmInstance},
     sys,
 };
 
@@ -34,29 +32,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let pathname = format!("{}{}", &sys::process::dir(), filename);
 
     if let Ok(buf) = fs::read_to_bytes(&pathname) {
-        let engine = Engine::default();
-        let wasm = buf;
-        let module = Module::new(&engine, &wasm[..]).unwrap();
-
-        type HostState = u32;
-
-        let mut store = Store::new(&engine, 42);
-        let host_hello = Func::wrap(&mut store, |caller: Caller<'_, HostState>, param: i32| {
-            println!("Received {} from WebAssembly", param);
-            println!("host state: {}", caller.data());
-        });
-
-        let mut linker = <Linker<HostState>>::new(&engine);
-
-        linker.define("host", "hello", host_hello).unwrap();
-        let instance = linker
-            .instantiate(&mut store, &module)
-            .unwrap()
-            .start(&mut store)
-            .unwrap();
-        let hello = instance.get_typed_func::<(), ()>(&store, "hello").unwrap();
-
-        hello.call(&mut store, ()).unwrap();
+        let mut instance = WasmInstance::new(buf);
+        instance.start();
         Ok(())
     } else {
         error!("File not found '{}'", pathname);

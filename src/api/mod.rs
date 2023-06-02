@@ -78,4 +78,5 @@ pub mod syscall;
 pub mod time;
 pub mod unit;
 pub mod vga;
-// TODO: add mod wildcard
+pub mod wasi;
+pub mod wasm;

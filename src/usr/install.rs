@@ -36,6 +36,16 @@ pub fn copy_files(verbose: bool) {
         verbose,
     );
     copy_file(
+        "/bin/wasi_test.wasm",
+        include_bytes!("../../dsk/bin/wasi_test.wasm"),
+        verbose,
+    );
+    copy_file(
+        "/bin/wasi_test.wat",
+        include_bytes!("../../dsk/bin/wasi_test.wat"),
+        verbose,
+    );
+    copy_file(
         "/bin/test.wat",
         include_bytes!("../../dsk/bin/test.wat"),
         verbose,

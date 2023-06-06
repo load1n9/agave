@@ -39,6 +39,16 @@ impl Stdin {
             String::new()
         }
     }
+
+    pub fn read_to_string(&self) -> String {
+        let mut buf = vec![0; 256];
+        if let Some(bytes) = syscall::read(0, &mut buf) {
+            buf.resize(bytes, 0);
+            String::from_utf8_lossy(&buf).to_string()
+        } else {
+            String::new()
+        }
+    }
 }
 
 impl Stdout {
@@ -79,7 +89,15 @@ pub fn stdin() -> Stdin {
     Stdin::new()
 }
 
+pub fn empty() -> Stdin {
+    Stdin::new()
+}
+
 pub fn stdout() -> Stdout {
+    Stdout::new()
+}
+
+pub fn sync() -> Stdout {
     Stdout::new()
 }
 

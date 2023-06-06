@@ -1,6 +1,5 @@
-
 use alloc::vec::Vec;
-use wasmi::{Engine, Func, Instance, Linker, Module, Store, Caller};
+use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
 
 use crate::api::wasi::ctx::WasiCtx;
 
@@ -29,11 +28,19 @@ impl WasmInstance {
             println!("Received {} from WebAssembly", param);
             println!("host state: {}", caller.data());
         });
+
+        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, HostState>, param: i32| {
+            crate::api::wasi::syscalls::proc_exit((param as usize).into());
+        });
+
         // linker
         //     .define("wasi_unstable", "args_get", args_get)
         //     .unwrap();
 
         linker.define("host", "hello", host_hello).unwrap();
+        linker
+            .define("wasi_unstable", "proc_exit", proc_exit)
+            .unwrap();
 
         let instance = linker
             .instantiate(&mut store, &module)
@@ -50,7 +57,10 @@ impl WasmInstance {
         //     .get_typed_func::<(), ()>(&self.store, "_start")
         //     .unwrap();
         // start.call(&mut self.store, ()).unwrap();
-        let hello = self.instance.get_typed_func::<(), ()>(&self.store, "hello").unwrap();
+        let hello = self
+            .instance
+            .get_typed_func::<(), ()>(&self.store, "hello")
+            .unwrap();
 
         hello.call(&mut self.store, ()).unwrap();
     }

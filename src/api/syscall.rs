@@ -3,6 +3,7 @@ use crate::syscall;
 use crate::sys::syscall::number::*;
 use crate::sys::fs::FileInfo;
 
+/// exit the current process with the given exit code
 pub fn exit(code: ExitCode) {
     unsafe { syscall!(EXIT, code as usize) };
 }

@@ -1,2 +1,2 @@
-pub mod mouse;
 pub mod keycodes;
+pub mod mouse;

@@ -66,29 +66,29 @@ pub fn from_ansi(code: u8) -> Color {
         95 => Color::Pink,
         96 => Color::LightCyan,
         97 => Color::White,
-        _  => Color::Black, // Error
+        _ => Color::Black, // Error
     }
 }
 
 impl Color {
     pub fn to_vga_reg(&self) -> u8 {
         match self {
-            Color::Black      => 0x00,
-            Color::Blue       => 0x01,
-            Color::Green      => 0x02,
-            Color::Cyan       => 0x03,
-            Color::Red        => 0x04,
-            Color::Magenta    => 0x05,
-            Color::Brown      => 0x14,
-            Color::LightGray  => 0x07,
-            Color::DarkGray   => 0x38,
-            Color::LightBlue  => 0x39,
+            Color::Black => 0x00,
+            Color::Blue => 0x01,
+            Color::Green => 0x02,
+            Color::Cyan => 0x03,
+            Color::Red => 0x04,
+            Color::Magenta => 0x05,
+            Color::Brown => 0x14,
+            Color::LightGray => 0x07,
+            Color::DarkGray => 0x38,
+            Color::LightBlue => 0x39,
             Color::LightGreen => 0x3A,
-            Color::LightCyan  => 0x3B,
-            Color::LightRed   => 0x3C,
-            Color::Pink       => 0x3D,
-            Color::Yellow     => 0x3E,
-            Color::White      => 0x3F,
+            Color::LightCyan => 0x3B,
+            Color::LightRed => 0x3C,
+            Color::Pink => 0x3D,
+            Color::Yellow => 0x3E,
+            Color::White => 0x3F,
         }
     }
 }

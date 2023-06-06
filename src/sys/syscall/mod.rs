@@ -7,15 +7,9 @@ use crate::sys::fs::FileInfo;
 
 use core::arch::asm;
 
-/*
- * Dispatching system calls
- */
-
 pub fn dispatcher(n: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) -> usize {
     match n {
-        number::EXIT => {
-            service::exit(ExitCode::from(arg1)) as usize
-        }
+        number::EXIT => service::exit(ExitCode::from(arg1)) as usize,
         number::SLEEP => {
             service::sleep(f64::from_bits(arg1 as u64));
             0
@@ -23,13 +17,15 @@ pub fn dispatcher(n: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) 
         number::DELETE => {
             let ptr = sys::process::ptr_from_addr(arg1 as u64);
             let len = arg2;
-            let path = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
+            let path =
+                unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
             service::delete(path) as usize
         }
         number::INFO => {
             let ptr = sys::process::ptr_from_addr(arg1 as u64);
             let len = arg2;
-            let path = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
+            let path =
+                unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
             let info = unsafe { &mut *(arg3 as *mut FileInfo) };
             service::info(path, info) as usize
         }
@@ -37,7 +33,8 @@ pub fn dispatcher(n: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) 
             let ptr = sys::process::ptr_from_addr(arg1 as u64);
             let len = arg2;
             let flags = arg3;
-            let path = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
+            let path =
+                unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(ptr, len)) };
             service::open(path, flags) as usize
         }
         number::READ => {
@@ -67,16 +64,16 @@ pub fn dispatcher(n: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) 
         number::SPAWN => {
             let path_ptr = sys::process::ptr_from_addr(arg1 as u64);
             let path_len = arg2;
-            let path = unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts(path_ptr, path_len)) };
+            let path = unsafe {
+                core::str::from_utf8_unchecked(core::slice::from_raw_parts(path_ptr, path_len))
+            };
 
             let args_ptr = arg3;
             let args_len = arg4;
 
             service::spawn(path, args_ptr, args_len) as usize
         }
-        number::STOP => {
-            service::stop(arg1)
-        }
+        number::STOP => service::stop(arg1),
         _ => {
             unimplemented!();
         }
@@ -143,19 +140,25 @@ pub unsafe fn syscall4(n: usize, arg1: usize, arg2: usize, arg3: usize, arg4: us
 
 #[macro_export]
 macro_rules! syscall {
-    ($n:expr) => (
-        $crate::sys::syscall::syscall0(
-            $n as usize));
-    ($n:expr, $a1:expr) => (
-        $crate::sys::syscall::syscall1(
-            $n as usize, $a1 as usize));
-    ($n:expr, $a1:expr, $a2:expr) => (
-        $crate::sys::syscall::syscall2(
-            $n as usize, $a1 as usize, $a2 as usize));
-    ($n:expr, $a1:expr, $a2:expr, $a3:expr) => (
-        $crate::sys::syscall::syscall3(
-            $n as usize, $a1 as usize, $a2 as usize, $a3 as usize));
-    ($n:expr, $a1:expr, $a2:expr, $a3:expr, $a4:expr) => (
+    ($n:expr) => {
+        $crate::sys::syscall::syscall0($n as usize)
+    };
+    ($n:expr, $a1:expr) => {
+        $crate::sys::syscall::syscall1($n as usize, $a1 as usize)
+    };
+    ($n:expr, $a1:expr, $a2:expr) => {
+        $crate::sys::syscall::syscall2($n as usize, $a1 as usize, $a2 as usize)
+    };
+    ($n:expr, $a1:expr, $a2:expr, $a3:expr) => {
+        $crate::sys::syscall::syscall3($n as usize, $a1 as usize, $a2 as usize, $a3 as usize)
+    };
+    ($n:expr, $a1:expr, $a2:expr, $a3:expr, $a4:expr) => {
         $crate::sys::syscall::syscall4(
-            $n as usize, $a1 as usize, $a2 as usize, $a3 as usize, $a4 as usize));
+            $n as usize,
+            $a1 as usize,
+            $a2 as usize,
+            $a3 as usize,
+            $a4 as usize,
+        )
+    };
 }

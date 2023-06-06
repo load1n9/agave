@@ -1,9 +1,14 @@
 use lazy_static::lazy_static;
-use x86_64::VirtAddr;
-use x86_64::instructions::segmentation::{CS, DS, Segment};
+#[cfg(feature = "x86_64")]
+use x86_64::instructions::segmentation::{Segment, CS, DS};
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::tables::load_tss;
+#[cfg(feature = "x86_64")]
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector};
+#[cfg(feature = "x86_64")]
 use x86_64::structures::tss::TaskStateSegment;
+#[cfg(feature = "x86_64")]
+use x86_64::VirtAddr;
 
 const STACK_SIZE: usize = 1024 * 8;
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
@@ -43,7 +48,16 @@ lazy_static! {
         let user_code = gdt.add_entry(Descriptor::user_code_segment());
         let user_data = gdt.add_entry(Descriptor::user_data_segment());
 
-        (gdt, Selectors { tss, code, data, user_code, user_data })
+        (
+            gdt,
+            Selectors {
+                tss,
+                code,
+                data,
+                user_code,
+                user_data,
+            },
+        )
     };
 }
 

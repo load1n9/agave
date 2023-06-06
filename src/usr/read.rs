@@ -1,9 +1,9 @@
-use crate::{api, sys, usr};
 use crate::api::console;
 use crate::api::console::Style;
 use crate::api::fs;
-use crate::api::syscall;
 use crate::api::process::ExitCode;
+use crate::api::syscall;
+use crate::{api, sys, usr};
 
 use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
@@ -20,19 +20,11 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     }
     let mut path = args[1];
 
-    // The commands `read /usr/alice/` and `read /usr/alice` are equivalent,
-    // but `read /` should not be modified.
     if path.len() > 1 {
         path = path.trim_end_matches('/');
     }
 
-    // TODO: Create device drivers for `/net` hardcoded commands
     if path.starts_with("/net/") {
-        // Examples:
-        // > read /net/http/example.com/articles
-        // > read /net/http/example.com:8080/articles/index.html
-        // > read /net/daytime/time.nist.gov
-        // > read /net/tcp/time.nist.gov:13
         let parts: Vec<_> = path.split('/').collect();
         if parts.len() < 4 {
             eprintln!("Usage: read /net/http/<host>/<path>");
@@ -71,7 +63,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         } else if info.is_dir() {
             usr::list::main(args)
         } else if info.is_device() {
-            // TODO: Improve device file usage
             let is_char_device = info.size() == 4;
             let is_float_device = info.size() == 8;
             let is_eof_device = info.size() > 8;
@@ -124,7 +115,10 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} read {}<path>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} read {}<path>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
     println!();
     println!("{}Paths:{}", csi_title, csi_reset);
     println!("  {0}<dir>/{1}     Read directory", csi_option, csi_reset);

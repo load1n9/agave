@@ -1,9 +1,9 @@
-use crate::{sys, usr};
-use crate::api::console::Style;
 use crate::api::clock;
+use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::api::random;
 use crate::api::syscall;
+use crate::{sys, usr};
 use alloc::string::{String, ToString};
 use alloc::vec;
 use core::str::{self, FromStr};
@@ -19,8 +19,15 @@ struct URL {
     pub path: String,
 }
 
-enum SessionState { Connect, Request, Response }
-enum ResponseState { Headers, Body }
+enum SessionState {
+    Connect,
+    Request,
+    Response,
+}
+enum ResponseState {
+    Headers,
+    Body,
+}
 
 impl URL {
     pub fn parse(url: &str) -> Option<Self> {
@@ -78,7 +85,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     error!("Invalid option '{}'", args[i]);
                     return Err(ExitCode::UsageError);
                 } else if host.is_empty() {
-                    host = args[i].trim_start_matches("http://").trim_start_matches("https://");
+                    host = args[i]
+                        .trim_start_matches("http://")
+                        .trim_start_matches("https://");
                 } else if path.is_empty() {
                     path = args[i];
                 } else {
@@ -108,9 +117,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         IpAddress::from_str(&url.host).expect("invalid address format")
     } else {
         match usr::host::resolve(&url.host) {
-            Ok(ip_addr) => {
-                ip_addr
-            }
+            Ok(ip_addr) => ip_addr,
             Err(e) => {
                 error!("Could not resolve host: {:?}", e);
                 return Err(ExitCode::Failure);
@@ -161,7 +168,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 SessionState::Request if socket.may_send() => {
                     let http_get = "GET ".to_string() + &url.path + " HTTP/1.1\r\n";
                     let http_host = "Host: ".to_string() + &url.host + "\r\n";
-                    let http_ua = "User-Agent: MOROS/".to_string() + env!("CARGO_PKG_VERSION") + "\r\n";
+                    let http_ua =
+                        "User-Agent: MOROS/".to_string() + env!("CARGO_PKG_VERSION") + "\r\n";
                     let http_connection = "Connection: close\r\n".to_string();
                     if is_verbose {
                         print!("{}", csi_verbose);
@@ -175,54 +183,58 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     socket.send_slice(http_get.as_ref()).expect("cannot send");
                     socket.send_slice(http_host.as_ref()).expect("cannot send");
                     socket.send_slice(http_ua.as_ref()).expect("cannot send");
-                    socket.send_slice(http_connection.as_ref()).expect("cannot send");
+                    socket
+                        .send_slice(http_connection.as_ref())
+                        .expect("cannot send");
                     socket.send_slice(b"\r\n").expect("cannot send");
                     SessionState::Response
                 }
                 SessionState::Response if socket.can_recv() => {
-                    socket.recv(|data| {
-                        last_received_at = clock::realtime();
-                        let n = data.len();
-                        let mut i = 0;
-                        while i < n {
-                            match response_state {
-                                ResponseState::Headers => {
-                                    let mut j = i;
-                                    while j < n {
-                                        if data[j] == b'\n' {
-                                            break;
+                    socket
+                        .recv(|data| {
+                            last_received_at = clock::realtime();
+                            let n = data.len();
+                            let mut i = 0;
+                            while i < n {
+                                match response_state {
+                                    ResponseState::Headers => {
+                                        let mut j = i;
+                                        while j < n {
+                                            if data[j] == b'\n' {
+                                                break;
+                                            }
+                                            j += 1;
                                         }
-                                        j += 1;
-                                    }
-                                    let line = String::from_utf8_lossy(&data[i..j]); // TODO: check i == j
-                                    if is_verbose {
-                                        if i == 0 {
-                                            print!("{}", csi_verbose);
-                                        }
-                                        println!("< {}", line);
-                                    }
-                                    if line.trim().is_empty() {
+                                        let line = String::from_utf8_lossy(&data[i..j]); // TODO: check i == j
                                         if is_verbose {
-                                            print!("{}", csi_reset);
+                                            if i == 0 {
+                                                print!("{}", csi_verbose);
+                                            }
+                                            println!("< {}", line);
                                         }
-                                        response_state = ResponseState::Body;
+                                        if line.trim().is_empty() {
+                                            if is_verbose {
+                                                print!("{}", csi_reset);
+                                            }
+                                            response_state = ResponseState::Body;
+                                        }
+                                        i = j + 1;
                                     }
-                                    i = j + 1;
-                                }
-                                ResponseState::Body => {
-                                    syscall::write(1, &data[i..n]);
-                                    break;
+                                    ResponseState::Body => {
+                                        syscall::write(1, &data[i..n]);
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                        (data.len(), ())
-                    }).unwrap();
+                            (data.len(), ())
+                        })
+                        .unwrap();
                     SessionState::Response
                 }
                 SessionState::Response if !socket.may_recv() => {
                     break;
                 }
-                _ => session_state
+                _ => session_state,
             };
 
             if let Some(wait_duration) = iface.poll_delay(timestamp, &sockets) {
@@ -239,10 +251,19 @@ fn help() -> Result<(), ExitCode> {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} http {}<options> <url>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} http {}<options> <url>{1}",
+        csi_title, csi_reset, csi_option
+    );
     println!();
     println!("{}Options:{}", csi_title, csi_reset);
-    println!("  {0}-v{1}, {0}--verbose{1}              Increase verbosity", csi_option, csi_reset);
-    println!("  {0}-t{1}, {0}--timeout <seconds>{1}    Request timeout", csi_option, csi_reset);
+    println!(
+        "  {0}-v{1}, {0}--verbose{1}              Increase verbosity",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-t{1}, {0}--timeout <seconds>{1}    Request timeout",
+        csi_option, csi_reset
+    );
     Ok(())
 }

@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use uart_16550::SerialPort;
 use vte::{Params, Parser, Perform};
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
 
 lazy_static! {
@@ -14,13 +15,13 @@ lazy_static! {
 }
 
 pub struct Serial {
-    port: SerialPort
+    port: SerialPort,
 }
 
 impl Serial {
     fn new(addr: u16) -> Self {
         Self {
-            port: unsafe { SerialPort::new(addr) }
+            port: unsafe { SerialPort::new(addr) },
         }
     }
 
@@ -52,23 +53,25 @@ impl fmt::Write for Serial {
 impl Perform for Serial {
     fn csi_dispatch(&mut self, params: &Params, _: &[u8], _: bool, c: char) {
         match c {
-            'h' => { // Enable
+            'h' => {
+                // Enable
                 for param in params.iter() {
                     match param[0] {
                         12 => sys::console::enable_echo(),
                         _ => return,
                     }
                 }
-            },
-            'l' => { // Disable
+            }
+            'l' => {
+                // Disable
                 for param in params.iter() {
                     match param[0] {
                         12 => sys::console::disable_echo(),
                         _ => return,
                     }
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 }
@@ -76,7 +79,10 @@ impl Perform for Serial {
 #[doc(hidden)]
 pub fn print_fmt(args: fmt::Arguments) {
     interrupts::without_interrupts(|| {
-        SERIAL.lock().write_fmt(args).expect("Could not print to serial");
+        SERIAL
+            .lock()
+            .write_fmt(args)
+            .expect("Could not print to serial");
     })
 }
 
@@ -87,7 +93,8 @@ pub fn init() {
 
 fn interrupt_handler() {
     let b = SERIAL.lock().read_byte();
-    if b == 0xFF { // Ignore invalid bytes
+    if b == 0xFF {
+        // Ignore invalid bytes
         return;
     }
     let c = match b as char {

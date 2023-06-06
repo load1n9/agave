@@ -5,6 +5,7 @@ use alloc::string::ToString;
 use core::fmt;
 use core::sync::atomic::{AtomicBool, Ordering};
 use spin::Mutex;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
 
 pub static STDIN: Mutex<String> = Mutex::new(String::new());

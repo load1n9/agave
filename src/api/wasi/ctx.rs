@@ -4,7 +4,6 @@ pub type WasiCtx = u32;
 // use rand::RngCore;
 // use spin::Mutex;
 
-
 // #[derive(Clone)]
 // pub struct WasiCtx(Arc<WasiCtxInner>);
 

@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use bit_field::BitField;
 use lazy_static::lazy_static;
 use spin::Mutex;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
 #[derive(Debug, Clone, Copy)]
@@ -122,7 +123,14 @@ fn check_device(bus: u8, device: u8) {
 fn add_device(bus: u8, device: u8, function: u8) {
     let config = DeviceConfig::new(bus, device, function);
     PCI_DEVICES.lock().push(config);
-    log!("PCI {:04X}:{:02X}:{:02X} [{:04X}:{:04X}]\n", bus, device, function, config.vendor_id, config.device_id);
+    log!(
+        "PCI {:04X}:{:02X}:{:02X} [{:04X}:{:04X}]\n",
+        bus,
+        device,
+        function,
+        config.vendor_id,
+        config.device_id
+    );
 }
 
 fn get_vendor_id(bus: u8, device: u8, function: u8) -> u16 {
@@ -151,10 +159,11 @@ impl ConfigRegister {
         Self {
             data_port: Port::new(0xCFC),
             addr_port: Port::new(0xCF8),
-            addr: 0x8000_0000 | ((bus as u32) << 16)
-                              | ((device as u32) << 11)
-                              | ((function as u32) << 8)
-                              | ((offset as u32) & 0xFC),
+            addr: 0x8000_0000
+                | ((bus as u32) << 16)
+                | ((device as u32) << 11)
+                | ((function as u32) << 8)
+                | ((offset as u32) & 0xFC),
         }
     }
 
@@ -182,22 +191,27 @@ pub fn init() {
     for dev in devs.iter() {
         // NOTE: There's not yet an AHCI driver for SATA disks so we must
         // switch to IDE legacy mode for the ATA driver.
-        if dev.class == 0x01 && dev.subclass == 0x01 { // IDE Controller
+        if dev.class == 0x01 && dev.subclass == 0x01 {
+            // IDE Controller
             let mut register = ConfigRegister::new(dev.bus, dev.device, dev.function, 0x08);
             let mut data = register.read();
             let prog_offset = 8; // The programing interface start at bit 8
 
             // Switching primary channel to compatibility mode
-            if dev.prog.get_bit(0) { // PCI native mode
-                if dev.prog.get_bit(1) { // Modifiable
+            if dev.prog.get_bit(0) {
+                // PCI native mode
+                if dev.prog.get_bit(1) {
+                    // Modifiable
                     data.set_bit(prog_offset, false);
                     register.write(data);
                 }
             }
 
             // Switching secondary channel to compatibility mode
-            if dev.prog.get_bit(2) { // PCI native mode
-                if dev.prog.get_bit(3) { // Modifiable
+            if dev.prog.get_bit(2) {
+                // PCI native mode
+                if dev.prog.get_bit(3) {
+                    // Modifiable
                     data.set_bit(prog_offset + 2, false);
                     register.write(data);
                 }

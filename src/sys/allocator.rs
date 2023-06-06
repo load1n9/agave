@@ -8,8 +8,12 @@ use core::cmp;
 use core::ops::{Index, IndexMut};
 use linked_list_allocator::LockedHeap;
 use spin::Mutex;
+
+#[cfg(feature = "x86_64")]
 use x86_64::structures::paging::mapper::MapToError;
+#[cfg(feature = "x86_64")]
 use x86_64::structures::paging::{FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB};
+#[cfg(feature = "x86_64")]
 use x86_64::VirtAddr;
 
 pub const HEAP_START: u64 = 0x4444_4444_0000;
@@ -18,10 +22,17 @@ pub const HEAP_START: u64 = 0x4444_4444_0000;
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 fn max_memory() -> u64 {
-    option_env!("AGAVE_MEMORY").unwrap_or("32").parse::<u64>().unwrap() << 20 // MB
+    option_env!("AGAVE_MEMORY")
+        .unwrap_or("32")
+        .parse::<u64>()
+        .unwrap()
+        << 20 // MB
 }
 
-pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl FrameAllocator<Size4KiB>) -> Result<(), MapToError<Size4KiB>> {
+pub fn init_heap(
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+) -> Result<(), MapToError<Size4KiB>> {
     // Use half of the memory for the heap caped to 16MB by default because the
     // allocator is slow.
     let heap_size = cmp::min(sys::mem::memory_size(), max_memory()) / 2;
@@ -37,14 +48,18 @@ pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl 
 
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     for page in pages {
-        let frame = frame_allocator.allocate_frame().ok_or(MapToError::FrameAllocationFailed)?;
+        let frame = frame_allocator
+            .allocate_frame()
+            .ok_or(MapToError::FrameAllocationFailed)?;
         unsafe {
             mapper.map_to(page, frame, flags, frame_allocator)?.flush();
         }
     }
 
     unsafe {
-        ALLOCATOR.lock().init(heap_start.as_mut_ptr(), heap_size as usize);
+        ALLOCATOR
+            .lock()
+            .init(heap_start.as_mut_ptr(), heap_size as usize);
     }
 
     Ok(())
@@ -53,8 +68,10 @@ pub fn init_heap(mapper: &mut impl Mapper<Size4KiB>, frame_allocator: &mut impl 
 pub fn alloc_pages(addr: u64, size: usize) -> Result<(), ()> {
     //debug!("Alloc pages (addr={:#x}, size={})", addr, size);
     let mut mapper = unsafe { sys::mem::mapper(VirtAddr::new(sys::mem::PHYS_MEM_OFFSET)) };
-    let mut frame_allocator = unsafe { sys::mem::BootInfoFrameAllocator::init(sys::mem::MEMORY_MAP.unwrap()) };
-    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
+    let mut frame_allocator =
+        unsafe { sys::mem::BootInfoFrameAllocator::init(sys::mem::MEMORY_MAP.unwrap()) };
+    let flags =
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
     let pages = {
         let start_page = Page::containing_address(VirtAddr::new(addr));
         let end_page = Page::containing_address(VirtAddr::new(addr + (size as u64) - 1));
@@ -115,7 +132,9 @@ impl PhysBuf {
         let buffer_len = vec.len() - 1;
         let memory_len = phys_addr(&vec[buffer_len]) - phys_addr(&vec[0]);
         if buffer_len == memory_len as usize {
-            Self { buf: Arc::new(Mutex::new(vec)) }
+            Self {
+                buf: Arc::new(Mutex::new(vec)),
+            }
         } else {
             Self::from(vec.clone()) // Clone vec and try again
         }

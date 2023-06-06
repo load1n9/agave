@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::convert::TryInto;
 
 pub struct Palette {
-    pub colors: [(u8, u8, u8); 16]
+    pub colors: [(u8, u8, u8); 16],
 }
 
 impl Palette {
@@ -25,26 +25,34 @@ impl Palette {
                 (0xFF, 0x00, 0xFF), // Pink (Light Magenta)
                 (0xFF, 0xFF, 0x00), // Yellow (Light Yellow)
                 (0xFF, 0xFF, 0xFF), // White
-            ]
+            ],
         }
     }
 }
 
 pub fn from_csv(s: &str) -> Result<Palette, ()> {
-    let colors: Vec<_> = s.split('\n').filter_map(|line| {
-        let line = line.split('#').next().unwrap(); // Remove comments
-        let color: Vec<u8> = line.split(',').filter_map(|value| {
-            let radix = if value.contains("0x") { 16 } else { 10 };
-            let value = value.trim().trim_start_matches("0x");
-            u8::from_str_radix(value, radix).ok()
-        }).collect();
-        if color.len() == 3 { // RGB values
-            Some((color[0], color[1], color[2]))
-        } else {
-            None
-        }
-    }).collect();
-    if let Ok(colors) = colors.try_into() { // Array of 16 colors
+    let colors: Vec<_> = s
+        .split('\n')
+        .filter_map(|line| {
+            let line = line.split('#').next().unwrap(); // Remove comments
+            let color: Vec<u8> = line
+                .split(',')
+                .filter_map(|value| {
+                    let radix = if value.contains("0x") { 16 } else { 10 };
+                    let value = value.trim().trim_start_matches("0x");
+                    u8::from_str_radix(value, radix).ok()
+                })
+                .collect();
+            if color.len() == 3 {
+                // RGB values
+                Some((color[0], color[1], color[2]))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if let Ok(colors) = colors.try_into() {
+        // Array of 16 colors
         Ok(Palette { colors })
     } else {
         Err(())

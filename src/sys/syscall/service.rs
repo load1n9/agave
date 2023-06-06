@@ -1,7 +1,7 @@
-use crate::sys;
 use crate::api::process::ExitCode;
-use crate::sys::fs::FileInfo;
+use crate::sys;
 use crate::sys::fs::FileIO;
+use crate::sys::fs::FileInfo;
 use crate::sys::process::Process;
 
 use alloc::vec;
@@ -106,15 +106,14 @@ pub fn spawn(path: &str, args_ptr: usize, args_len: usize) -> ExitCode {
 
 pub fn stop(code: usize) -> usize {
     match code {
-        0xcafe => { // Reboot
+        0xcafe => {
+            // Reboot
             unsafe {
-                asm!(
-                    "xor rax, rax",
-                    "mov cr3, rax"
-                );
+                asm!("xor rax, rax", "mov cr3, rax");
             }
         }
-        0xdead => { // Halt
+        0xdead => {
+            // Halt
             sys::process::exit();
             sys::acpi::shutdown();
         }

@@ -1,8 +1,8 @@
-use crate::sys;
+use crate::api::console::Style;
 use crate::api::fs;
 use crate::api::process::ExitCode;
 use crate::api::regex::Regex;
-use crate::api::console::Style;
+use crate::sys;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -68,7 +68,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         return Err(ExitCode::UsageError);
     }
 
-    if name.is_some() { // TODO
+    if name.is_some() {
+        // TODO
         error!("`--name` is not implemented");
         return Err(ExitCode::Failure);
     }
@@ -148,7 +149,14 @@ fn print_matching_lines_in_file(path: &str, pattern: &str, state: &mut PrintingS
             }
             let width = matches[matches.len() - 1].0.to_string().len();
             for (i, line) in matches {
-                println!("{}{:>width$}:{} {}", line_color, i, reset, line, width = width);
+                println!(
+                    "{}{:>width$}:{} {}",
+                    line_color,
+                    i,
+                    reset,
+                    line,
+                    width = width
+                );
             }
         }
     }
@@ -158,9 +166,18 @@ fn usage() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} find {}<options> <path>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} find {}<options> <path>{1}",
+        csi_title, csi_reset, csi_option
+    );
     println!();
     println!("{}Options:{}", csi_title, csi_reset);
-    println!("  {0}-n{1},{0} --name \"<pattern>\"{1}    Find file name matching {0}<pattern>{1}", csi_option, csi_reset);
-    println!("  {0}-l{1},{0} --line \"<pattern>\"{1}    Find lines matching {0}<pattern>{1}", csi_option, csi_reset);
+    println!(
+        "  {0}-n{1},{0} --name \"<pattern>\"{1}    Find file name matching {0}<pattern>{1}",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-l{1},{0} --line \"<pattern>\"{1}    Find lines matching {0}<pattern>{1}",
+        csi_option, csi_reset
+    );
 }

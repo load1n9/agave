@@ -1,10 +1,10 @@
-use crate::{sys, usr, debug};
-use crate::api::console::Style;
 use crate::api::clock;
+use crate::api::console::Style;
 use crate::api::io;
 use crate::api::process::ExitCode;
 use crate::api::random;
 use crate::api::syscall;
+use crate::{debug, sys, usr};
 
 use alloc::format;
 use alloc::string::String;
@@ -23,8 +23,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let mut read_only = false;
     let mut interval = 0.0;
     let mut next_arg_is_interval = false;
-    let mut args: Vec<&str> = args.iter().filter_map(|arg| {
-        match *arg {
+    let mut args: Vec<&str> = args
+        .iter()
+        .filter_map(|arg| match *arg {
             "-l" | "--listen" => {
                 listen = true;
                 None
@@ -52,11 +53,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 }
                 None
             }
-            _ => {
-                Some(*arg)
-            }
-        }
-    }).collect();
+            _ => Some(*arg),
+        })
+        .collect();
     if prompt {
         println!("Agave Socket v0.1.0\n");
     }
@@ -64,7 +63,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let required_args_count = if listen { 2 } else { 3 };
 
     if args.len() == required_args_count - 1 {
-        if let Some(i) = args[1].find(':') { // Split <host> and <port>
+        if let Some(i) = args[1].find(':') {
             let (host, path) = args[1].split_at(i);
             args[1] = host;
             args.push(&path[1..]);
@@ -77,15 +76,15 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     }
 
     let host = if listen { "0.0.0.0" } else { args[1] };
-    let port: u16 = args[required_args_count - 1].parse().expect("Could not parse port");
+    let port: u16 = args[required_args_count - 1]
+        .parse()
+        .expect("Could not parse port");
 
     let address = if host.ends_with(char::is_numeric) {
         IpAddress::from_str(host).expect("invalid address format")
     } else {
         match usr::host::resolve(host) {
-            Ok(ip_addr) => {
-                ip_addr
-            }
+            Ok(ip_addr) => ip_addr,
             Err(e) => {
                 error!("Could not resolve host: {:?}", e);
                 return Err(ExitCode::Failure);
@@ -94,7 +93,11 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     };
 
     #[derive(Debug)]
-    enum State { Connecting, Sending, Receiving }
+    enum State {
+        Connecting,
+        Sending,
+        Receiving,
+    }
     let mut state = State::Connecting;
 
     if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
@@ -129,14 +132,14 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
             state = match state {
                 State::Connecting if !socket.is_active() => {
-                    if listen { // Listen to a local port
+                    if listen {
                         if !socket.is_open() {
                             if verbose {
                                 debug!("Listening to {}", port);
                             }
                             socket.listen(port).unwrap();
                         }
-                    } else { // Connect to a remote port
+                    } else {
                         let local_port = 49152 + random::get_u16() % 16384;
                         if verbose {
                             debug!("Connecting to {}:{}", address, port);
@@ -177,14 +180,18 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     if verbose {
                         debug!("Receiving ...");
                     }
-                    socket.recv(|data| {
-                        let contents = String::from_utf8_lossy(data);
-                        print!("{}", contents.replace("\r\n", "\n"));
-                        (data.len(), ())
-                    }).unwrap();
+                    socket
+                        .recv(|data| {
+                            let contents = String::from_utf8_lossy(data);
+                            print!("{}", contents.replace("\r\n", "\n"));
+                            (data.len(), ())
+                        })
+                        .unwrap();
                     State::Receiving
                 }
-                _ if socket.state() == tcp::State::SynSent || socket.state() == tcp::State::SynReceived => {
+                _ if socket.state() == tcp::State::SynSent
+                    || socket.state() == tcp::State::SynReceived =>
+                {
                     state
                 }
                 State::Receiving if !socket.may_recv() && !listen => {
@@ -205,7 +212,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     }
                     break;
                 }
-                _ => state
+                _ => state,
             };
 
             if interval > 0.0 {
@@ -225,12 +232,30 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} socket {}[<host>] <port>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} socket {}[<host>] <port>{1}",
+        csi_title, csi_reset, csi_option
+    );
     println!();
     println!("{}Options:{}", csi_title, csi_reset);
-    println!("  {0}-l{1}, {0}--listen{1}             Listen to a local port", csi_option, csi_reset);
-    println!("  {0}-v{1}, {0}--verbose{1}            Increase verbosity", csi_option, csi_reset);
-    println!("  {0}-p{1}, {0}--prompt{1}             Display prompt", csi_option, csi_reset);
-    println!("  {0}-r{1}, {0}--read-only{1}          Read only connexion", csi_option, csi_reset);
-    println!("  {0}-i{1}, {0}--interval <time>{1}    Wait <time> between packets", csi_option, csi_reset);
+    println!(
+        "  {0}-l{1}, {0}--listen{1}             Listen to a local port",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-v{1}, {0}--verbose{1}            Increase verbosity",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-p{1}, {0}--prompt{1}             Display prompt",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-r{1}, {0}--read-only{1}          Read only connexion",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {0}-i{1}, {0}--interval <time>{1}    Wait <time> between packets",
+        csi_option, csi_reset
+    );
 }

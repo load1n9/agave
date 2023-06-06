@@ -1,9 +1,9 @@
-use crate::{sys, usr, debug};
-use crate::api::console::Style;
 use crate::api::clock;
+use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::api::random;
 use crate::api::syscall;
+use crate::{debug, sys, usr};
 
 use alloc::string::String;
 use alloc::vec;
@@ -16,19 +16,17 @@ use smoltcp::wire::IpAddress;
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let mut verbose = false;
-    let mut args: Vec<&str> = args.iter().filter_map(|arg| {
-        match *arg {
+    let mut args: Vec<&str> = args
+        .iter()
+        .filter_map(|arg| match *arg {
             "-v" | "--verbose" => {
                 verbose = true;
                 None
             }
-            _ => {
-                Some(*arg)
-            }
-        }
-    }).collect();
+            _ => Some(*arg),
+        })
+        .collect();
 
-    // Split <host> and <port>
     if args.len() == 2 {
         if let Some(i) = args[1].find(':') {
             let (host, path) = args[1].split_at(i);
@@ -50,9 +48,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         IpAddress::from_str(host).expect("invalid address format")
     } else {
         match usr::host::resolve(host) {
-            Ok(ip_addr) => {
-                ip_addr
-            }
+            Ok(ip_addr) => ip_addr,
             Err(e) => {
                 error!("Could not resolve host: {:?}", e);
                 return Err(ExitCode::Failure);
@@ -60,7 +56,12 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
     };
 
-    enum State { Connect, Request, Response }
+    enum State {
+        Connect,
+        Request,
+        Response,
+    }
+    
     let mut state = State::Connect;
 
     if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
@@ -106,19 +107,21 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     State::Response
                 }
                 State::Response if socket.can_recv() => {
-                    socket.recv(|data| {
-                        let contents = String::from_utf8_lossy(data);
-                        for line in contents.lines() {
-                            println!("{}", line);
-                        }
-                        (data.len(), ())
-                    }).unwrap();
+                    socket
+                        .recv(|data| {
+                            let contents = String::from_utf8_lossy(data);
+                            for line in contents.lines() {
+                                println!("{}", line);
+                            }
+                            (data.len(), ())
+                        })
+                        .unwrap();
                     State::Response
                 }
                 State::Response if !socket.may_recv() => {
                     break;
                 }
-                _ => state
+                _ => state,
             };
 
             if let Some(wait_duration) = iface.poll_delay(timestamp, &sockets) {
@@ -135,5 +138,8 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} tcp {}<host> <port>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} tcp {}<host> <port>{1}",
+        csi_title, csi_reset, csi_option
+    );
 }

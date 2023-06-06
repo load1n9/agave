@@ -3,6 +3,7 @@ use crate::sys::fs::FileIO;
 
 use rand::{RngCore, SeedableRng};
 use rand_hc::Hc128Rng;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::random::RdRand;
 
 #[derive(Debug, Clone)]

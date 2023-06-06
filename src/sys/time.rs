@@ -1,15 +1,13 @@
 use crate::sys;
 use crate::sys::cmos::CMOS;
 use core::hint::spin_loop;
-use core::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
+use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
-// At boot the PIT starts with a frequency divider of 0 (equivalent to 65536)
-// which will result in about 54.926 ms between ticks.
-// During init we will change the divider to 1193 to have about 1.000 ms
-// between ticks to improve time measurements accuracy.
-pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0; // 1_193_181.666 Hz
+pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0;
 const PIT_DIVIDER: usize = 1193;
 const PIT_INTERVAL: f64 = (PIT_DIVIDER as f64) / PIT_FREQUENCY;
 

@@ -7,9 +7,8 @@ use core::fmt;
 use core::hint::spin_loop;
 use lazy_static::lazy_static;
 use spin::Mutex;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::{Port, PortReadOnly, PortWriteOnly};
-
-// See "Information Technology - AT Attachment with Packet Interface Extension (ATA/ATAPI-4)" (1998)
 
 pub const BLOCK_SIZE: usize = 512;
 
@@ -32,14 +31,14 @@ enum IdentifyResponse {
 #[repr(usize)]
 #[derive(Debug, Clone, Copy)]
 enum Status {
-    ERR  = 0, // Error
-    IDX  = 1, // (obsolete)
+    ERR = 0,  // Error
+    IDX = 1,  // (obsolete)
     CORR = 2, // (obsolete)
-    DRQ  = 3, // Data Request
-    DSC  = 4, // (command dependant)
-    DF   = 5, // (command dependant)
+    DRQ = 3,  // Data Request
+    DSC = 4,  // (command dependant)
+    DF = 5,   // (command dependant)
     DRDY = 6, // Device Ready
-    BSY  = 7, // Busy
+    BSY = 7,  // Busy
 }
 
 #[allow(dead_code)]
@@ -67,7 +66,8 @@ pub struct Bus {
 impl Bus {
     pub fn new(id: u8, io_base: u16, ctrl_base: u16, irq: u8) -> Self {
         Self {
-            id, irq,
+            id,
+            irq,
 
             data_register: Port::new(io_base + 0),
             error_register: PortReadOnly::new(io_base + 1),
@@ -175,7 +175,8 @@ impl Bus {
         self.wait(400); // Wait at least 400 ns
         self.status(); // Ignore results of first read
         self.clear_interrupt();
-        if self.status() == 0 { // Drive does not exist
+        if self.status() == 0 {
+            // Drive does not exist
             return Err(());
         }
         if self.is_error() {
@@ -242,7 +243,7 @@ impl Bus {
             }
         }
         match (self.lba1(), self.lba2()) {
-            (0x00, 0x00) => Ok(IdentifyResponse::Ata([(); 256].map(|_| { self.read_data() }))),
+            (0x00, 0x00) => Ok(IdentifyResponse::Ata([(); 256].map(|_| self.read_data()))),
             (0x14, 0xEB) => Ok(IdentifyResponse::Atapi),
             (0x3C, 0xC3) => Ok(IdentifyResponse::Sata),
             (_, _) => Err(()),
@@ -253,17 +254,23 @@ impl Bus {
     fn reset(&mut self) {
         unsafe {
             self.control_register.write(4); // Set SRST bit
-            self.wait(5);                   // Wait at least 5 ns
+            self.wait(5); // Wait at least 5 ns
             self.control_register.write(0); // Then clear it
-            self.wait(2000);                // Wait at least 2 ms
+            self.wait(2000); // Wait at least 2 ms
         }
     }
 
     #[allow(dead_code)]
     fn debug(&mut self) {
         unsafe {
-            debug!("ATA status register: 0b{:08b} <BSY|DRDY|#|#|DRQ|#|#|ERR>", self.alternate_status_register.read());
-            debug!("ATA error register:  0b{:08b} <#|#|#|#|#|ABRT|#|#>", self.error_register.read());
+            debug!(
+                "ATA status register: 0b{:08b} <BSY|DRDY|#|#|DRQ|#|#|ERR>",
+                self.alternate_status_register.read()
+            );
+            debug!(
+                "ATA error register:  0b{:08b} <#|#|#|#|#|ABRT|#|#>",
+                self.error_register.read()
+            );
         }
     }
 }
@@ -301,7 +308,13 @@ impl Drive {
             let serial = String::from_utf8_lossy(&buf[20..40]).trim().into();
             let model = String::from_utf8_lossy(&buf[54..94]).trim().into();
             let blocks = u32::from_be_bytes(buf[120..124].try_into().unwrap()).rotate_left(16);
-            Some(Self { bus, dsk, model, serial, blocks })
+            Some(Self {
+                bus,
+                dsk,
+                model,
+                serial,
+                blocks,
+            })
         } else {
             None
         }

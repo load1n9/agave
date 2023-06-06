@@ -14,9 +14,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     }
     let pathname = args[1];
 
-    // The command `write /usr/alice/` with a trailing slash will create
-    // a directory, while the same command without a trailing slash will
-    // create a file.
     let res = if pathname.ends_with('/') {
         let pathname = pathname.trim_end_matches('/');
         fs::create_dir(pathname)
@@ -37,7 +34,10 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} write {}<path>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} write {}<path>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
     println!();
     println!("{}Paths:{}", csi_title, csi_reset);
     println!("  {0}<dir>/{1}     Write directory", csi_option, csi_reset);

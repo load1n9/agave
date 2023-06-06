@@ -5,21 +5,13 @@ use alloc::string::String;
 
 #[derive(Debug, Clone)]
 pub struct MousePositionEvent {
-    /// the relative position in window
     pub coordinate: Coord,
-    /// the global position in window
     pub gcoordinate: Coord,
-    /// whether the mouse is scrolling up
     pub scrolling_up: bool,
-    /// whether the mouse is scrolling down
     pub scrolling_down: bool,
-    /// whether the left button holds
     pub left_button_hold: bool,
-    /// whether the right button holds
     pub right_button_hold: bool,
-    /// whether the fourth button holds
     pub fourth_button_hold: bool,
-    /// whether the fifth button holds
     pub fifth_button_hold: bool,
 }
 

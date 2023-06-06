@@ -1,9 +1,15 @@
 use crate::sys;
 use bootloader::bootinfo::{BootInfo, MemoryMap, MemoryRegionType};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
+#[cfg(feature = "x86_64")]
 use x86_64::registers::control::Cr3;
-use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, Translate};
+#[cfg(feature = "x86_64")]
+use x86_64::structures::paging::{
+    FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, Translate,
+};
+#[cfg(feature = "x86_64")]
 use x86_64::{PhysAddr, VirtAddr};
 
 pub static mut PHYS_MEM_OFFSET: u64 = 0;
@@ -19,7 +25,12 @@ pub fn init(boot_info: &'static BootInfo) {
             let start_addr = region.range.start_addr();
             let end_addr = region.range.end_addr();
             memory_size += end_addr - start_addr;
-            log!("MEM [{:#016X}-{:#016X}] {:?}\n", start_addr, end_addr - 1, region.region_type);
+            log!(
+                "MEM [{:#016X}-{:#016X}] {:?}\n",
+                start_addr,
+                end_addr - 1,
+                region.region_type
+            );
         }
         log!("MEM {} KB\n", memory_size >> 10);
         MEMORY_SIZE.store(memory_size, Ordering::Relaxed);
@@ -30,7 +41,8 @@ pub fn init(boot_info: &'static BootInfo) {
         let mut mapper = unsafe { mapper(VirtAddr::new(PHYS_MEM_OFFSET)) };
         let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
-        sys::allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+        sys::allocator::init_heap(&mut mapper, &mut frame_allocator)
+            .expect("heap initialization failed");
     });
 }
 
@@ -63,7 +75,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 }
 
 pub struct BootInfoFrameAllocator {
-    memory_map: &'static MemoryMap
+    memory_map: &'static MemoryMap,
 }
 
 impl BootInfoFrameAllocator {

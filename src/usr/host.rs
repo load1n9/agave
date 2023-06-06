@@ -1,9 +1,9 @@
-use crate::{sys, usr};
 use crate::api::clock;
 use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::api::random;
 use crate::api::syscall;
+use crate::{sys, usr};
 use alloc::vec;
 use alloc::vec::Vec;
 use bit_field::BitField;
@@ -150,7 +150,11 @@ pub fn resolve(name: &str) -> Result<IpAddress, ResponseCode> {
     let query = Message::query(qname, qtype, qclass);
 
     #[derive(Debug)]
-    enum State { Bind, Query, Response }
+    enum State {
+        Bind,
+        Query,
+        Response,
+    }
     let mut state = State::Bind;
 
     if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
@@ -187,7 +191,9 @@ pub fn resolve(name: &str) -> Result<IpAddress, ResponseCode> {
                     State::Query
                 }
                 State::Query if socket.can_send() => {
-                    socket.send_slice(&query.datagram, server).expect("cannot send");
+                    socket
+                        .send_slice(&query.datagram, server)
+                        .expect("cannot send");
                     State::Response
                 }
                 State::Response if socket.can_recv() => {
@@ -204,19 +210,16 @@ pub fn resolve(name: &str) -> Result<IpAddress, ResponseCode> {
 
                                 Ok(IpAddress::from(Ipv4Address::from_bytes(rdata)))
                             }
-                            rcode => {
-                                Err(rcode)
-                            }
-                        }
+                            rcode => Err(rcode),
+                        };
                     }
                     state
                 }
-                _ => state
+                _ => state,
             };
 
             if let Some(wait_duration) = iface.poll_delay(timestamp, &sockets) {
                 syscall::sleep((wait_duration.total_micros() as f64) / 1000000.0);
-
             }
         }
     } else {
@@ -247,5 +250,8 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} host {}<domain>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} host {}<domain>{1}",
+        csi_title, csi_reset, csi_option
+    );
 }

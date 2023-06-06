@@ -31,7 +31,10 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     let size = section.size();
                     let align = section.align();
                     println!();
-                    println!("{}{}{} (addr: {:#x}, size: {}, align: {})", color, name, reset, addr, size, align);
+                    println!(
+                        "{}{}{} (addr: {:#x}, size: {}, align: {})",
+                        color, name, reset, addr, size, align
+                    );
                     if let Ok(data) = section.data() {
                         usr::hex::print_hex(data);
                     }
@@ -52,5 +55,8 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} elf {}<binary>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} elf {}<binary>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
 }

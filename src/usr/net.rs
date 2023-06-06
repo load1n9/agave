@@ -1,22 +1,22 @@
-use crate::sys;
-use alloc::format;
 use crate::api::clock;
 use crate::api::console::Style;
 use crate::api::fs;
-use crate::api::syscall;
 use crate::api::process::ExitCode;
+use crate::api::syscall;
+use crate::sys;
 use crate::sys::net::EthernetDeviceIO;
+use alloc::format;
 
 use alloc::borrow::ToOwned;
-use alloc::string::ToString;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec;
 use core::str::FromStr;
-use smoltcp::wire::{EthernetFrame, PrettyPrinter, IpCidr, Ipv4Address};
+use smoltcp::iface::SocketSet;
+use smoltcp::phy::Device;
 use smoltcp::socket::tcp;
 use smoltcp::time::Instant;
-use smoltcp::phy::Device;
-use smoltcp::iface::SocketSet;
+use smoltcp::wire::{EthernetFrame, IpCidr, Ipv4Address, PrettyPrinter};
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     match *args.get(1).unwrap_or(&"") {
@@ -44,8 +44,20 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 let stats = device.stats();
                 let csi_color = Style::color("LightCyan");
                 let csi_reset = Style::reset();
-                println!("{}rx:{} {} packets ({} bytes)", csi_color, csi_reset, stats.rx_packets_count(), stats.rx_bytes_count());
-                println!("{}tx:{} {} packets ({} bytes)", csi_color, csi_reset, stats.tx_packets_count(), stats.tx_bytes_count());
+                println!(
+                    "{}rx:{} {} packets ({} bytes)",
+                    csi_color,
+                    csi_reset,
+                    stats.rx_packets_count(),
+                    stats.rx_bytes_count()
+                );
+                println!(
+                    "{}tx:{} {} packets ({} bytes)",
+                    csi_color,
+                    csi_reset,
+                    stats.tx_packets_count(),
+                    stats.tx_bytes_count()
+                );
             } else {
                 error!("Network error");
             }
@@ -72,12 +84,17 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     iface.poll(timestamp, device, &mut sockets);
                     let socket = sockets.get_mut::<tcp::Socket>(tcp_handle);
                     if socket.may_recv() {
-                        socket.recv(|buffer| {
-                            let recvd_len = buffer.len();
-                            let data = buffer.to_owned();
-                            debug!("{}", PrettyPrinter::<EthernetFrame<&[u8]>>::new("", &buffer));
-                            (recvd_len, data)
-                        }).unwrap();
+                        socket
+                            .recv(|buffer| {
+                                let recvd_len = buffer.len();
+                                let data = buffer.to_owned();
+                                debug!(
+                                    "{}",
+                                    PrettyPrinter::<EthernetFrame<&[u8]>>::new("", &buffer)
+                                );
+                                (recvd_len, data)
+                            })
+                            .unwrap();
                     }
                 }
             } else {
@@ -96,19 +113,28 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} net {}<command>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} net {}<command>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
     println!();
     println!("{}Commands:{}", csi_title, csi_reset);
     println!("  {}config{}   Configure network", csi_option, csi_reset);
     println!("  {}monitor{}  Monitor network", csi_option, csi_reset);
-    println!("  {}stat{}     Display network status", csi_option, csi_reset);
+    println!(
+        "  {}stat{}     Display network status",
+        csi_option, csi_reset
+    );
 }
 
 fn help_config() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} net config {}<attribute> <value>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} net config {}<attribute> <value>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
     println!();
     println!("{}Attributes:{}", csi_title, csi_reset);
     println!("  {}mac{}  MAC Address", csi_option, csi_reset);
@@ -122,7 +148,15 @@ fn print_config(attribute: &str) {
     let csi_reset = Style::reset();
     if let Some(value) = get_config(attribute) {
         let width = 4 - attribute.len();
-        println!("{}{}:{}{:width$}{}", csi_color, attribute, csi_reset, "", value, width = width);
+        println!(
+            "{}{}:{}{:width$}{}",
+            csi_color,
+            attribute,
+            csi_reset,
+            "",
+            value,
+            width = width
+        );
     }
 }
 

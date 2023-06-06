@@ -1,10 +1,10 @@
-use crate::{api, sys, usr};
 use crate::api::console::Style;
 use crate::api::fs;
 use crate::api::io;
-use crate::api::random;
 use crate::api::process::ExitCode;
+use crate::api::random;
 use crate::api::syscall;
+use crate::{api, sys, usr};
 use alloc::collections::btree_map::BTreeMap;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -18,8 +18,8 @@ const DISABLE_EMPTY_PASSWORD: bool = false;
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     match *args.get(1).unwrap_or(&"invalid") {
-        "create" => {},
-        "login" => {},
+        "create" => {}
+        "login" => {}
         "-h" | "--help" => {
             help();
             return Ok(());
@@ -60,21 +60,21 @@ pub fn login(username: &str) -> Result<(), ExitCode> {
     match hashed_password(username) {
         Some(hash) => {
             print!("Password: ");
-            print!("\x1b[12l"); // Disable echo
+            print!("\x1b[12l");
             let password = io::stdin().read_line().trim_end().to_string();
-            print!("\x1b[12h"); // Enable echo
+            print!("\x1b[12h");
             println!();
             if !check(&password, &hash) {
                 println!();
                 syscall::sleep(1.0);
                 return main(&["user", "login"]);
             }
-        },
+        }
         None => {
             println!();
             syscall::sleep(1.0);
             return main(&["user", "login"]);
-        },
+        }
     }
 
     let home = format!("/usr/{}", username);
@@ -93,14 +93,14 @@ pub fn create(username: &str) -> Result<(), ExitCode> {
     }
 
     if hashed_password(username).is_some() {
-        error!("Username exists");
+        error!("Username already exists");
         return Err(ExitCode::Failure);
     }
 
     print!("Password: ");
-    print!("\x1b[12l"); // Disable echo
+    print!("\x1b[12l");
     let password = io::stdin().read_line().trim_end().to_string();
-    print!("\x1b[12h"); // Enable echo
+    print!("\x1b[12h");
     println!();
 
     if password.is_empty() && DISABLE_EMPTY_PASSWORD {
@@ -108,9 +108,9 @@ pub fn create(username: &str) -> Result<(), ExitCode> {
     }
 
     print!("Confirm: ");
-    print!("\x1b[12l"); // Disable echo
+    print!("\x1b[12l");
     let confirm = io::stdin().read_line().trim_end().to_string();
-    print!("\x1b[12h"); // Enable echo
+    print!("\x1b[12h");
     println!();
 
     if password != confirm {
@@ -123,7 +123,6 @@ pub fn create(username: &str) -> Result<(), ExitCode> {
         return Err(ExitCode::Failure);
     }
 
-    // Create home dir
     if let Some(handle) = api::fs::create_dir(&format!("/usr/{}", username)) {
         api::syscall::close(handle);
     } else {
@@ -153,16 +152,12 @@ pub fn check(password: &str, hashed_password: &str) -> bool {
     encoded_hash == fields[3]
 }
 
-// Password hashing version 1 => PBKDF2-HMAC-SHA256 + BASE64
-// Fields: "<version>$<c>$<salt>$<hash>"
-// Example: "1$AAAQAA$PDkXP0I8O7SxNOxvUKmHHQ$BwIUWBxKs50BTpH6i4ImF3SZOxADv7dh4xtu3IKc3o8"
 pub fn hash(password: &str) -> String {
-    let v = "1"; // Password hashing version
-    let c = 4096u32; // Number of iterations
+    let v = "1";
+    let c = 4096u32;
     let mut salt = [0u8; 16];
     let mut hash = [0u8; 32];
 
-    // Generating salt
     for i in 0..2 {
         let num = random::get_u64();
         let buf = num.to_be_bytes();
@@ -172,10 +167,8 @@ pub fn hash(password: &str) -> String {
         }
     }
 
-    // Hashing password with PBKDF2-HMAC-SHA256
     pbkdf2::pbkdf2_hmac::<Sha256>(password.as_bytes(), &salt, c, &mut hash);
 
-    // Encoding in Base64 standard without padding
     let c = c.to_be_bytes();
     let mut res: String = String::from(v);
     res.push('$');
@@ -203,7 +196,9 @@ fn read_hashed_passwords() -> BTreeMap<String, String> {
 }
 
 fn hashed_password(username: &str) -> Option<String> {
-    read_hashed_passwords().get(username).map(|hash| hash.into())
+    read_hashed_passwords()
+        .get(username)
+        .map(|hash| hash.into())
 }
 
 fn save_hashed_password(username: &str, hash: &str) -> Result<usize, ()> {
@@ -223,9 +218,15 @@ fn help() {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} user {}<command>{}", csi_title, csi_reset, csi_option, csi_reset);
+    println!(
+        "{}Usage:{} user {}<command>{}",
+        csi_title, csi_reset, csi_option, csi_reset
+    );
     println!();
     println!("{}Commands:{}", csi_title, csi_reset);
-    println!("  {}create [<user>]{}    Create user", csi_option, csi_reset);
+    println!(
+        "  {}create [<user>]{}    Create user",
+        csi_option, csi_reset
+    );
     println!("  {}login [<user>]{}     Login user", csi_option, csi_reset);
 }

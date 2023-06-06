@@ -5,7 +5,9 @@ use alloc::string::String;
 use bit_field::BitField;
 use core::hint::spin_loop;
 use time::{Date, PrimitiveDateTime};
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
 const RTC_CENTURY: u16 = 2000; // NOTE: Change this at the end of 2099

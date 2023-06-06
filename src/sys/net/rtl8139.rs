@@ -1,5 +1,5 @@
 use crate::sys::allocator::PhysBuf;
-use crate::sys::net::{EthernetDeviceIO, Config, Stats};
+use crate::sys::net::{Config, EthernetDeviceIO, Stats};
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -7,6 +7,7 @@ use core::convert::TryInto;
 use core::hint::spin_loop;
 use core::sync::atomic::{fence, AtomicUsize, Ordering};
 use smoltcp::wire::EthernetAddress;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
 // 00 = 8K + 16 bytes
@@ -24,9 +25,9 @@ const TX_BUFFER_LEN: usize = 2048;
 const TX_BUFFERS_COUNT: usize = 4;
 const ROK: u16 = 0x01;
 
-const CR_RST:  u8 = 1 << 4; // Reset
-const CR_RE:   u8 = 1 << 3; // Receiver Enable
-const CR_TE:   u8 = 1 << 2; // Transmitter Enable
+const CR_RST: u8 = 1 << 4; // Reset
+const CR_RE: u8 = 1 << 3; // Receiver Enable
+const CR_TE: u8 = 1 << 2; // Transmitter Enable
 const CR_BUFE: u8 = 1 << 0; // Buffer Empty
 
 // Rx Buffer Length
@@ -38,10 +39,10 @@ const RCR_RBLEN: u32 = (RX_BUFFER_IDX << 11) as u32;
 // of the buffer. So the buffer must have an additionnal 1500 bytes.
 const RCR_WRAP: u32 = 1 << 7;
 
-const RCR_AB:   u32 = 1 << 3; // Accept Broadcast packets
-const RCR_AM:   u32 = 1 << 2; // Accept Multicast packets
-const RCR_APM:  u32 = 1 << 1; // Accept Physical Match packets
-const RCR_AAP:  u32 = 1 << 0; // Accept All Packets
+const RCR_AB: u32 = 1 << 3; // Accept Broadcast packets
+const RCR_AM: u32 = 1 << 2; // Accept Multicast packets
+const RCR_APM: u32 = 1 << 1; // Accept Physical Match packets
+const RCR_AAP: u32 = 1 << 0; // Accept All Packets
 
 // Interframe Gap Time
 const TCR_IFG: u32 = 3 << 24;
@@ -68,7 +69,7 @@ const TCR_MXDMA2: u32 = 1 << 10;
 //const OWC: u32 = 1 << 29; // Out of Window Collision
 //const CDH: u32 = 1 << 28; // CD Heart Beat
 const TOK: u32 = 1 << 15; // Transmit OK
-//const TUN: u32 = 1 << 14; // Transmit FIFO Underrun
+                          //const TUN: u32 = 1 << 14; // Transmit FIFO Underrun
 const OWN: u32 = 1 << 13; // DMA operation completed
 
 #[derive(Clone)]
@@ -189,7 +190,8 @@ impl Device {
         unsafe { self.ports.cmd.write(CR_RE | CR_TE) }
 
         // Read MAC addr
-        self.config.update_mac(EthernetAddress::from_bytes(&self.ports.mac()));
+        self.config
+            .update_mac(EthernetAddress::from_bytes(&self.ports.mac()));
 
         // Get physical address of rx_buffer
         let rx_addr = self.rx_buffer.addr();
@@ -206,10 +208,18 @@ impl Device {
         }
 
         // Configure receive buffer (RCR)
-        unsafe { self.ports.rx_config.write(RCR_RBLEN | RCR_WRAP | RCR_AB | RCR_AM | RCR_APM | RCR_AAP) }
+        unsafe {
+            self.ports
+                .rx_config
+                .write(RCR_RBLEN | RCR_WRAP | RCR_AB | RCR_AM | RCR_APM | RCR_AAP)
+        }
 
         // Configure transmit buffer (TCR)
-        unsafe { self.ports.tx_config.write(TCR_IFG | TCR_MXDMA1 | TCR_MXDMA2); }
+        unsafe {
+            self.ports
+                .tx_config
+                .write(TCR_IFG | TCR_MXDMA1 | TCR_MXDMA2);
+        }
     }
 }
 
@@ -238,19 +248,33 @@ impl EthernetDeviceIO for Device {
         // CAPR starts at 65520 and with the pad it overflows to 0
         let capr = unsafe { self.ports.capr.read() };
         let offset = ((capr as usize) + RX_BUFFER_PAD) % (1 << 16);
-        let header = u16::from_le_bytes(self.rx_buffer[(offset + 0)..(offset + 2)].try_into().unwrap());
+        let header = u16::from_le_bytes(
+            self.rx_buffer[(offset + 0)..(offset + 2)]
+                .try_into()
+                .unwrap(),
+        );
         if header & ROK != ROK {
-            unsafe { self.ports.capr.write((((cba as usize) % RX_BUFFER_LEN) - RX_BUFFER_PAD) as u16) };
+            unsafe {
+                self.ports
+                    .capr
+                    .write((((cba as usize) % RX_BUFFER_LEN) - RX_BUFFER_PAD) as u16)
+            };
             return None;
         }
 
-        let n = u16::from_le_bytes(self.rx_buffer[(offset + 2)..(offset + 4)].try_into().unwrap()) as usize;
+        let n = u16::from_le_bytes(
+            self.rx_buffer[(offset + 2)..(offset + 4)]
+                .try_into()
+                .unwrap(),
+        ) as usize;
         //let crc = u32::from_le_bytes(self.rx_buffer[(offset + n)..(offset + n + 4)].try_into().unwrap());
 
         // Update buffer read pointer
         self.rx_offset = (offset + n + 4 + 3) & !3;
         unsafe {
-            self.ports.capr.write(((self.rx_offset % RX_BUFFER_LEN) - RX_BUFFER_PAD) as u16);
+            self.ports
+                .capr
+                .write(((self.rx_offset % RX_BUFFER_LEN) - RX_BUFFER_PAD) as u16);
         }
 
         //unsafe { self.ports.isr.write(0x1); }

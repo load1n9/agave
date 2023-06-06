@@ -4,6 +4,7 @@ use crate::api::syscall;
 use core::sync::atomic::{AtomicBool, Ordering};
 use pc_keyboard::{layouts, DecodedKey, Error, HandleControl, KeyState, KeyCode, KeyEvent, Keyboard, ScancodeSet1};
 use spin::Mutex;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
 pub static KEYBOARD: Mutex<Option<KeyboardLayout>> = Mutex::new(None);

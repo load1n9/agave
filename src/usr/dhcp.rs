@@ -1,13 +1,13 @@
-use crate::{sys, usr, debug};
 use crate::api::clock;
 use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::api::syscall;
+use crate::{debug, sys, usr};
 
 use alloc::format;
 use alloc::string::ToString;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 use smoltcp::iface::SocketSet;
 use smoltcp::socket::dhcpv4;
 use smoltcp::time::Instant;
@@ -56,8 +56,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                     }
                     break;
                 }
-                Some(dhcpv4::Event::Deconfigured) => {
-                }
+                Some(dhcpv4::Event::Deconfigured) => {}
             }
 
             if let Some(wait_duration) = iface.poll_delay(timestamp, &sockets) {
@@ -96,9 +95,15 @@ fn help() -> Result<(), ExitCode> {
     let csi_option = Style::color("LightCyan");
     let csi_title = Style::color("Yellow");
     let csi_reset = Style::reset();
-    println!("{}Usage:{} dhcp {}<options>{1}", csi_title, csi_reset, csi_option);
+    println!(
+        "{}Usage:{} dhcp {}<options>{1}",
+        csi_title, csi_reset, csi_option
+    );
     println!();
     println!("{}Options:{}", csi_title, csi_reset);
-    println!("  {0}-v{1}, {0}--verbose{1}              Increase verbosity", csi_option, csi_reset);
+    println!(
+        "  {0}-v{1}, {0}--verbose{1}              Increase verbosity",
+        csi_option, csi_reset
+    );
     Ok(())
 }

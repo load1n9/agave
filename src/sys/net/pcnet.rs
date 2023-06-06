@@ -1,12 +1,13 @@
 use crate::sys;
 use crate::sys::allocator::PhysBuf;
-use crate::sys::net::{EthernetDeviceIO, Config, Stats};
+use crate::sys::net::{Config, EthernetDeviceIO, Stats};
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bit_field::BitField;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use smoltcp::wire::EthernetAddress;
+#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
 
 const CSR0_INIT: usize = 0;
@@ -26,14 +27,14 @@ const CSR0_IDON: usize = 8;
 //const CSR0_BABL: usize = 14;
 //const CSR0_ERR: usize = 0;
 
-const DE_ENP:  usize = 0;
-const DE_STP:  usize = 1;
+const DE_ENP: usize = 0;
+const DE_STP: usize = 1;
 //const DE_BUFF: usize = 2;
 //const DE_CRC:  usize = 3;
 //const DE_OFLO: usize = 4;
 //const DE_FRAM: usize = 5;
 //const DE_ERR:  usize = 6;
-const DE_OWN:  usize = 7;
+const DE_OWN: usize = 7;
 
 #[derive(Clone)]
 pub struct Ports {
@@ -237,7 +238,11 @@ impl Device {
     }
 
     fn init_descriptor_entry(&mut self, i: usize, is_rx: bool) {
-        let des = if is_rx { &mut self.rx_des } else { &mut self.tx_des };
+        let des = if is_rx {
+            &mut self.rx_des
+        } else {
+            &mut self.tx_des
+        };
 
         // Set buffer address
         let addr = if is_rx {
@@ -311,10 +316,14 @@ impl EthernetDeviceIO for Device {
             // Read packet size
             let packet_size = u16::from_le_bytes([
                 self.rx_des[rx_id * DE_LEN + 8],
-                self.rx_des[rx_id * DE_LEN + 9]
+                self.rx_des[rx_id * DE_LEN + 9],
             ]) as usize;
 
-            let n = if end_of_packet { packet_size } else { self.rx_buffers[rx_id].len() };
+            let n = if end_of_packet {
+                packet_size
+            } else {
+                self.rx_buffers[rx_id].len()
+            };
             packet.extend(&self.rx_buffers[rx_id][0..n]);
 
             self.rx_des[rx_id * DE_LEN + 7].set_bit(DE_OWN, true); // Give back ownership
@@ -338,13 +347,14 @@ impl EthernetDeviceIO for Device {
 
         self.tx_des[tx_id * DE_LEN + 7].set_bit(DE_STP, true); // Set start of packet
         self.tx_des[tx_id * DE_LEN + 7].set_bit(DE_ENP, true); // Set end of packet
-        // Set buffer byte count (0..12 BCNT + 12..16 ONES)
+                                                               // Set buffer byte count (0..12 BCNT + 12..16 ONES)
         let bcnt = (0xF000 | (0x0FFF & (1 + !(len as u16)))).to_le_bytes();
         self.tx_des[tx_id * DE_LEN + 4] = bcnt[0];
         self.tx_des[tx_id * DE_LEN + 5] = bcnt[1];
         // Give back ownership to the card
         self.tx_des[tx_id * DE_LEN + 7].set_bit(DE_OWN, true);
-        self.tx_id.store((tx_id + 1) % TX_BUFFERS_COUNT, Ordering::Relaxed);
+        self.tx_id
+            .store((tx_id + 1) % TX_BUFFERS_COUNT, Ordering::Relaxed);
 
         if !is_buffer_owner(&self.tx_des, tx_id) {
             self.ports.write_csr_32(0, 1 << CSR0_TDMD); // Send all buffers

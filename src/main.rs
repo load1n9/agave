@@ -3,9 +3,9 @@
 
 extern crate alloc;
 
+use agave_os::{debug, hlt_loop, print, println, sys, usr};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use agave_os::{sys, usr, print, println, debug, hlt_loop};
 
 entry_point!(main);
 
@@ -37,7 +37,7 @@ fn user_boot() {
         println!("Running in diskless mode type `install` to install to disk");
         sys::fs::mount_mem();
         sys::fs::format_mem();
-        usr::shell::main(&["shell", ]).ok();
+        usr::shell::main(&["shell"]).ok();
     }
 }
 

@@ -11,6 +11,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use lazy_static::lazy_static;
 use object::{Object, ObjectSegment};
 use spin::RwLock;
+#[cfg(feature = "x86_64")]
 use x86_64::structures::idt::InterruptStackFrameValue;
 
 const MAX_FILE_HANDLES: usize = 64;
@@ -193,7 +194,6 @@ pub fn exit() {
     MAX_PID.fetch_sub(1, Ordering::SeqCst);
     set_id(0); // FIXME: No process manager so we switch back to process 0
 }
-
 
 use crate::sys;
 use crate::sys::gdt::GDT;

@@ -66,14 +66,19 @@ macro_rules! error {
 }
 
 pub mod clock;
+pub mod color;
 pub mod console;
+pub mod data;
+pub mod events;
 pub mod font;
+pub mod framebuffer;
 pub mod fs;
 pub mod io;
 pub mod process;
 pub mod prompt;
 pub mod random;
 pub mod regex;
+pub mod shapes;
 pub mod syscall;
 pub mod time;
 pub mod unit;

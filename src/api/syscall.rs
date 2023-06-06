@@ -1,7 +1,7 @@
 use crate::api::process::ExitCode;
-use crate::syscall;
-use crate::sys::syscall::number::*;
 use crate::sys::fs::FileInfo;
+use crate::sys::syscall::number::*;
+use crate::syscall;
 
 /// exit the current process with the given exit code
 pub fn exit(code: ExitCode) {
@@ -109,7 +109,7 @@ pub fn halt() {
 
 #[test_case]
 fn test_file() {
-    use crate::sys::fs::{mount_mem, format_mem, dismount, OpenFlag};
+    use crate::sys::fs::{dismount, format_mem, mount_mem, OpenFlag};
     use alloc::vec;
     mount_mem();
     format_mem();

@@ -3,8 +3,6 @@ use alloc::vec::Vec;
 use core::convert::From;
 use core::ops::RangeBounds;
 
-// See "A Regular Expression Matcher" by Rob Pike and Brian Kernighan (2007)
-
 #[derive(Debug)]
 enum MetaChar {
     Any,
@@ -21,7 +19,7 @@ impl From<char> for MetaChar {
     fn from(c: char) -> Self {
         match c {
             '.' => MetaChar::Any,
-            _   => MetaChar::Literal(c),
+            _ => MetaChar::Literal(c),
         }
     }
 }
@@ -40,7 +38,7 @@ impl MetaCharExt for MetaChar {
             'D' => MetaChar::NonNumeric,
             'S' => MetaChar::NonWhitespace,
             'W' => MetaChar::NonAlphanumeric,
-            _   => MetaChar::Literal(c),
+            _ => MetaChar::Literal(c),
         }
     }
     fn contains(&self, c: char) -> bool {
@@ -70,8 +68,8 @@ impl Regex {
     }
 
     pub fn find(&self, text: &str) -> Option<(usize, usize)> {
-        let text: Vec<char> = text.chars().collect(); // UTF-32
-        let re: Vec<char> = self.0.chars().collect(); // UTF-32
+        let text: Vec<char> = text.chars().collect();
+        let re: Vec<char> = self.0.chars().collect();
         let mut start = 0;
         let mut end = 0;
         if is_match(&re[..], &text[..], &mut start, &mut end) {
@@ -148,7 +146,14 @@ fn is_match_ques(lazy: bool, mc: MetaChar, re: &[char], text: &[char], end: &mut
     is_match_char(lazy, mc, re, text, ..2, end)
 }
 
-fn is_match_char<T: RangeBounds<usize>>(lazy: bool, mc: MetaChar, re: &[char], text: &[char], range: T, end: &mut usize) -> bool {
+fn is_match_char<T: RangeBounds<usize>>(
+    lazy: bool,
+    mc: MetaChar,
+    re: &[char],
+    text: &[char],
+    range: T,
+    end: &mut usize,
+) -> bool {
     let mut i = 0;
     let n = text.len();
 
@@ -183,82 +188,81 @@ fn is_match_char<T: RangeBounds<usize>>(lazy: bool, mc: MetaChar, re: &[char], t
 #[test_case]
 fn test_regex() {
     let tests = [
-        ("",            "aaa",     true),
-        ("",            "",        true),
-        ("aaa",         "aaa",     true),
-        ("aaa",         "bbb",     false),
-        ("a.a",         "aaa",     true),
-        ("a.a",         "aba",     true),
-        ("a.a",         "abb",     false),
-
-        ("a*",          "aaa",     true),
-        ("a*b",         "aab",     true),
-        ("a*b*",        "aabb",    true),
-        ("a*b*",        "bb",      true),
-        ("a.*",         "abb",     true),
-        (".*",          "aaa",     true),
-        ("a.*",         "a",       true),
-
-        ("a.+",         "ab",      true),
-        ("a.+",         "abb",     true),
-        ("a.+",         "a",       false),
-        ("a.+b",        "ab",      false),
-        ("a.+b",        "abb",     true),
-        (".+",          "abb",     true),
-        (".+",          "b",       true),
-
-        ("a?b",         "abb",     true),
-        ("a?b",         "bb",      true),
-        ("a?b",         "aabb",    true),
-
-        ("^a.*a$",      "aaa",     true),
-        ("^#.*",        "#aaa",    true),
-        ("^#.*",        "a#aaa",   false),
-        (".*;$",        "aaa;",    true),
-        (".*;$",        "aaa;a",   false),
-        ("^.*$",        "aaa",     true),
-
-        ("a.b",         "abb",     true),
-        ("a.b",         "a.b",     true),
-        ("a\\.b",       "abb",     false),
-        ("a\\.b",       "a.b",     true),
-        ("a\\\\.b",     "abb",     false),
-        ("a\\\\.b",     "a.b",     false),
-        ("a\\\\.b",     "a\\bb",   true),
-        ("a\\\\.b",     "a\\.b",   true),
-        ("a\\\\\\.b",   "a\\bb",   false),
-        ("a\\\\\\.b",   "a\\.b",   true),
-        ("a\\\\\\.b",   "a\\\\bb", false),
-        ("a\\\\\\.b",   "a\\\\.b", false),
-        ("a\\\\\\\\.b", "a\\bb",   false),
-        ("a\\\\\\\\.b", "a\\.b",   false),
+        ("", "aaa", true),
+        ("", "", true),
+        ("aaa", "aaa", true),
+        ("aaa", "bbb", false),
+        ("a.a", "aaa", true),
+        ("a.a", "aba", true),
+        ("a.a", "abb", false),
+        ("a*", "aaa", true),
+        ("a*b", "aab", true),
+        ("a*b*", "aabb", true),
+        ("a*b*", "bb", true),
+        ("a.*", "abb", true),
+        (".*", "aaa", true),
+        ("a.*", "a", true),
+        ("a.+", "ab", true),
+        ("a.+", "abb", true),
+        ("a.+", "a", false),
+        ("a.+b", "ab", false),
+        ("a.+b", "abb", true),
+        (".+", "abb", true),
+        (".+", "b", true),
+        ("a?b", "abb", true),
+        ("a?b", "bb", true),
+        ("a?b", "aabb", true),
+        ("^a.*a$", "aaa", true),
+        ("^#.*", "#aaa", true),
+        ("^#.*", "a#aaa", false),
+        (".*;$", "aaa;", true),
+        (".*;$", "aaa;a", false),
+        ("^.*$", "aaa", true),
+        ("a.b", "abb", true),
+        ("a.b", "a.b", true),
+        ("a\\.b", "abb", false),
+        ("a\\.b", "a.b", true),
+        ("a\\\\.b", "abb", false),
+        ("a\\\\.b", "a.b", false),
+        ("a\\\\.b", "a\\bb", true),
+        ("a\\\\.b", "a\\.b", true),
+        ("a\\\\\\.b", "a\\bb", false),
+        ("a\\\\\\.b", "a\\.b", true),
+        ("a\\\\\\.b", "a\\\\bb", false),
+        ("a\\\\\\.b", "a\\\\.b", false),
+        ("a\\\\\\\\.b", "a\\bb", false),
+        ("a\\\\\\\\.b", "a\\.b", false),
         ("a\\\\\\\\.b", "a\\\\bb", true),
         ("a\\\\\\\\.b", "a\\\\.b", true),
-
-        ("a\\wb",       "aéb",     true),
-        ("a\\wb",       "awb",     true),
-        ("a\\wb",       "abb",     true),
-        ("a\\wb",       "a1b",     true),
-        ("a\\wb",       "a.b",     false),
-        ("a\\Wb",       "aWb",     false),
-        ("a\\Wb",       "abb",     false),
-        ("a\\Wb",       "a1b",     false),
-        ("a\\Wb",       "a.b",     true),
-        ("a\\db",       "abb",     false),
-        ("a\\db",       "a1b",     true),
-        ("a\\Db",       "abb",     true),
-        ("a\\Db",       "a1b",     false),
-        ("a\\sb",       "abb",     false),
-        ("a\\sb",       "a b",     true),
-        ("a\\Sb",       "abb",     true),
-        ("a\\Sb",       "a b",     false),
-
-        ("a\\.*d",      "a..d",    true),
-        ("a\\.*d",      "a.cd",    false),
-        ("a\\w*d",      "abcd",    true),
+        ("a\\wb", "aéb", true),
+        ("a\\wb", "awb", true),
+        ("a\\wb", "abb", true),
+        ("a\\wb", "a1b", true),
+        ("a\\wb", "a.b", false),
+        ("a\\Wb", "aWb", false),
+        ("a\\Wb", "abb", false),
+        ("a\\Wb", "a1b", false),
+        ("a\\Wb", "a.b", true),
+        ("a\\db", "abb", false),
+        ("a\\db", "a1b", true),
+        ("a\\Db", "abb", true),
+        ("a\\Db", "a1b", false),
+        ("a\\sb", "abb", false),
+        ("a\\sb", "a b", true),
+        ("a\\Sb", "abb", true),
+        ("a\\Sb", "a b", false),
+        ("a\\.*d", "a..d", true),
+        ("a\\.*d", "a.cd", false),
+        ("a\\w*d", "abcd", true),
     ];
     for (re, text, is_match) in tests {
-        assert!(Regex::new(re).is_match(text) == is_match, "Regex::new(\"{}\").is_match(\"{}\") == {}", re, text, is_match);
+        assert!(
+            Regex::new(re).is_match(text) == is_match,
+            "Regex::new(\"{}\").is_match(\"{}\") == {}",
+            re,
+            text,
+            is_match
+        );
     }
 
     assert_eq!(Regex::new(".*").find("abcd"), Some((0, 4)));

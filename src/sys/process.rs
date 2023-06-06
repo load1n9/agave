@@ -1,6 +1,6 @@
 use crate::api::process::ExitCode;
-use crate::sys::fs::{Resource, Device};
 use crate::sys::console::Console;
+use crate::sys::fs::{Device, Resource};
 
 use alloc::boxed::Box;
 use alloc::collections::btree_map::BTreeMap;
@@ -21,7 +21,8 @@ pub static PID: AtomicUsize = AtomicUsize::new(0);
 pub static MAX_PID: AtomicUsize = AtomicUsize::new(1);
 
 lazy_static! {
-    pub static ref PROCESS_TABLE: RwLock<[Box<Process>; MAX_PROCS]> = RwLock::new([(); MAX_PROCS].map(|_| Box::new(Process::new(0))));
+    pub static ref PROCESS_TABLE: RwLock<[Box<Process>; MAX_PROCS]> =
+        RwLock::new([(); MAX_PROCS].map(|_| Box::new(Process::new(0))));
 }
 
 #[derive(Clone, Debug)]
@@ -42,7 +43,12 @@ impl ProcessData {
         file_handles[1] = Some(Box::new(Resource::Device(Device::Console(Console::new())))); // stdout
         file_handles[2] = Some(Box::new(Resource::Device(Device::Console(Console::new())))); // stderr
         file_handles[3] = Some(Box::new(Resource::Device(Device::Null))); // stdnull
-        Self { env, dir, user, file_handles }
+        Self {
+            env,
+            dir,
+            user,
+            file_handles,
+        }
     }
 }
 
@@ -188,12 +194,6 @@ pub fn exit() {
     set_id(0); // FIXME: No process manager so we switch back to process 0
 }
 
-/************************
- * Userspace experiment *
- ************************/
-
-// See https://nfil.dev/kernel/rust/coding/rust-kernel-to-userspace-and-back/
-// And https://github.com/WartaPoirier-corp/ananos/blob/dev/docs/notes/context-switch.md
 
 use crate::sys;
 use crate::sys::gdt::GDT;
@@ -202,7 +202,6 @@ use x86_64::VirtAddr;
 
 static CODE_ADDR: AtomicU64 = AtomicU64::new(0);
 
-// Called during kernel heap initialization
 pub fn init_process_addr(addr: u64) {
     sys::process::CODE_ADDR.store(addr, Ordering::SeqCst);
 }
@@ -212,8 +211,8 @@ pub fn init_process_addr(addr: u64) {
 pub struct Registers {
     pub r11: usize,
     pub r10: usize,
-    pub r9:  usize,
-    pub r8:  usize,
+    pub r9: usize,
+    pub r8: usize,
     pub rdi: usize,
     pub rsi: usize,
     pub rdx: usize,
@@ -277,7 +276,8 @@ impl Process {
 
         let mut entry_point = 0;
         let code_ptr = code_addr as *mut u8;
-        if bin[0..4] == ELF_MAGIC { // ELF binary
+        if bin[0..4] == ELF_MAGIC {
+            // ELF binary
             if let Ok(obj) = object::File::parse(bin) {
                 //sys::allocator::alloc_pages(code_addr, proc_size as usize).expect("proc mem alloc");
                 entry_point = obj.entry();
@@ -291,8 +291,7 @@ impl Process {
                     }
                 }
             }
-        } else if bin[0..4] == BIN_MAGIC { // Flat binary
-            //sys::allocator::alloc_pages(code_addr, proc_size as usize).expect("proc mem alloc");
+        } else if bin[0..4] == BIN_MAGIC {
             for (i, b) in bin.iter().skip(4).enumerate() {
                 unsafe { core::ptr::write(code_ptr.add(i), *b) };
             }
@@ -310,7 +309,15 @@ impl Process {
         let stack_frame = parent.stack_frame;
 
         let id = MAX_PID.fetch_add(1, Ordering::SeqCst);
-        let proc = Process { id, code_addr, stack_addr, entry_point, data, stack_frame, registers };
+        let proc = Process {
+            id,
+            code_addr,
+            stack_addr,
+            entry_point,
+            data,
+            stack_frame,
+            registers,
+        };
 
         let mut table = PROCESS_TABLE.write();
         table[id] = Box::new(proc);
@@ -318,24 +325,27 @@ impl Process {
         Ok(id)
     }
 
-    // Switch to user mode and execute the program
     fn exec(&self, args_ptr: usize, args_len: usize) {
         let heap_addr = self.code_addr + (self.stack_addr - self.code_addr) / 2;
         //debug!("heap_addr:  {:#x}", heap_addr);
         sys::allocator::alloc_pages(heap_addr, 1).expect("proc heap alloc");
 
         let args_ptr = ptr_from_addr(args_ptr as u64) as usize;
-        let args: &[&str] = unsafe { core::slice::from_raw_parts(args_ptr as *const &str, args_len) };
+        let args: &[&str] =
+            unsafe { core::slice::from_raw_parts(args_ptr as *const &str, args_len) };
         let mut addr = heap_addr;
-        let vec: Vec<&str> = args.iter().map(|arg| {
-            let ptr = addr as *mut u8;
-            addr += arg.len() as u64;
-            unsafe {
-                let s = core::slice::from_raw_parts_mut(ptr, arg.len());
-                s.copy_from_slice(arg.as_bytes());
-                core::str::from_utf8_unchecked(s)
-            }
-        }).collect();
+        let vec: Vec<&str> = args
+            .iter()
+            .map(|arg| {
+                let ptr = addr as *mut u8;
+                addr += arg.len() as u64;
+                unsafe {
+                    let s = core::slice::from_raw_parts_mut(ptr, arg.len());
+                    s.copy_from_slice(arg.as_bytes());
+                    core::str::from_utf8_unchecked(s)
+                }
+            })
+            .collect();
         let align = core::mem::align_of::<&str>() as u64;
         addr += align - (addr % align);
         let args = vec.as_slice();
@@ -347,7 +357,7 @@ impl Process {
         };
         let args_ptr = args.as_ptr() as u64;
 
-        set_id(self.id); // Change PID
+        set_id(self.id);
         unsafe {
             asm!(
                 "cli",        // Disable interrupts

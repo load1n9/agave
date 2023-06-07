@@ -46,7 +46,6 @@ pub mod mem;
 pub mod net;
 pub mod pci;
 pub mod pic;
-pub mod port_io;
 pub mod process;
 pub mod random;
 pub mod serial;

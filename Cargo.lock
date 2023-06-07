@@ -1083,6 +1083,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasmtime"
+version = "0.1.0"
+
+[[package]]
 name = "wyz"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

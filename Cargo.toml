@@ -4,6 +4,9 @@ version = "0.0.5"
 edition = "2021"
 default-run = "agave_os"
 
+[workspace]
+members = ["ports/*"]
+
 [features]
 default = ["video", "x86_64"]
 x86_64 = ["dep:x86_64"]

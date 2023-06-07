@@ -1,8 +1,8 @@
 #![no_std]
 #![no_main]
 
-use agave_os::entry_point;
-use agave_os::api::syscall;
+use agave_kernel::api::syscall;
+use agave_kernel::entry_point;
 
 entry_point!(main);
 

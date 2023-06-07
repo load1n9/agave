@@ -1,0 +1,90 @@
+[package]
+name = "agave-kernel"
+version = "0.1.0"
+edition = "2021"
+
+
+[features]
+default = ["video", "x86_64"]
+x86_64 = ["dep:x86_64"]
+video = []
+serial = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
+acpi = "4.1.0"
+aml = "0.16.3"
+base64 = { version = "0.13.1", default-features = false }
+bit_field = "0.10.2"
+bootloader = { version = "0.9.23", features = ["map_physical_memory"] }
+volatile = "=0.2.6"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+libm = "0.2.6"
+linked_list_allocator = "0.10.5"
+littlewing = { version = "0.7.0", default-features = false }
+nom = { version = "7.1.3", default-features = false, features = ["alloc"] }
+num-bigint = { version = "0.4.3", default-features = false }
+num-traits = { version = "0.2.15", default-features = false }
+pbkdf2 = { version = "0.12.1", default-features = false, features = ["hmac"] }
+uart_16550 = "0.2.18"
+zerocopy = "0.5.0"
+mpmc = "0.1.6"
+modular-bitfield = "0.11.2"
+bitflags = "1.1.0"
+spin = "0.9.8"
+pic8259 = "0.10.1"
+anyhow = { version = "1.0", default-features = false }
+pc-keyboard = "0.6.1"
+rand = { version = "0.8.5", default-features = false }
+rand_hc = "0.3.1"
+vte = "0.11.0"
+x86_64 = { version = "0.14.10", optional = true }
+
+object = { version = "0.30.3", default-features = false, features = ["read"] }
+wasmi = { version = "0.30.0", default-features = false }
+core2 = { version = "0.4.0", default-features = false, features = [
+    "alloc",
+    "nightly",
+] }
+hashbrown = { version = "0.13.2", features = ["nightly"] }
+wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
+raw-cpuid = "11.0.1"
+sha2 = { version = "0.10.6", default-features = false, features = [
+    "force-soft",
+] }
+time = { version = "0.2.27", default-features = false }
+smoltcp = { version = "0.9.1", default-features = false, features = [
+    "alloc",
+    "medium-ethernet",
+    "socket-tcp",
+    "socket-udp",
+    "socket-dhcpv4",
+    "proto-ipv4",
+    "proto-dhcpv4",
+] }
+
+[dependencies.num_enum]
+version = "0.5.7"
+default-features = false
+
+[dependencies.crossbeam-queue]
+version = "0.2.1"
+default-features = false
+features = ["alloc"]
+
+[dependencies.conquer-once]
+version = "0.2.0"
+default-features = false
+
+[dependencies.futures-util]
+version = "0.3.4"
+default-features = false
+features = ["alloc"]
+
+[package.metadata.bootimage]
+test-success-exit-code = 33 # (0x10 << 1) | 1

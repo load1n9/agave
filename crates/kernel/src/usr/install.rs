@@ -20,34 +20,54 @@ pub fn copy_files(verbose: bool) {
     create_dir("/usr", verbose); // User directories
     create_dir("/var", verbose); // Variables
 
-    copy_file("/bin/clear", include_bytes!("../../dsk/bin/clear"), verbose);
-    copy_file("/bin/halt", include_bytes!("../../dsk/bin/halt"), verbose);
-    copy_file("/bin/hello", include_bytes!("../../dsk/bin/hello"), verbose);
-    copy_file("/bin/print", include_bytes!("../../dsk/bin/print"), verbose);
     copy_file(
-        "/bin/reboot",
-        include_bytes!("../../dsk/bin/reboot"),
+        "/bin/clear",
+        include_bytes!("../../../../dsk/bin/clear"),
         verbose,
     );
-    copy_file("/bin/sleep", include_bytes!("../../dsk/bin/sleep"), verbose);
+    copy_file(
+        "/bin/halt",
+        include_bytes!("../../../../dsk/bin/halt"),
+        verbose,
+    );
+    copy_file(
+        "/bin/hello",
+        include_bytes!("../../../../dsk/bin/hello"),
+        verbose,
+    );
+    copy_file(
+        "/bin/print",
+        include_bytes!("../../../../dsk/bin/print"),
+        verbose,
+    );
+    copy_file(
+        "/bin/reboot",
+        include_bytes!("../../../../dsk/bin/reboot"),
+        verbose,
+    );
+    copy_file(
+        "/bin/sleep",
+        include_bytes!("../../../../dsk/bin/sleep"),
+        verbose,
+    );
     copy_file(
         "/bin/test.wasm",
-        include_bytes!("../../dsk/bin/test.wasm"),
+        include_bytes!("../../../../dsk/bin/test.wasm"),
         verbose,
     );
     copy_file(
         "/bin/wasi_test.wasm",
-        include_bytes!("../../dsk/bin/wasi_test.wasm"),
+        include_bytes!("../../../../dsk/bin/wasi_test.wasm"),
         verbose,
     );
     copy_file(
         "/bin/wasi_test.wat",
-        include_bytes!("../../dsk/bin/wasi_test.wat"),
+        include_bytes!("../../../../dsk/bin/wasi_test.wat"),
         verbose,
     );
     copy_file(
         "/bin/test.wat",
-        include_bytes!("../../dsk/bin/test.wat"),
+        include_bytes!("../../../../dsk/bin/test.wat"),
         verbose,
     );
 
@@ -61,39 +81,39 @@ pub fn copy_files(verbose: bool) {
 
     copy_file(
         "/ini/banner.txt",
-        include_bytes!("../../dsk/ini/banner.txt"),
+        include_bytes!("../../../../dsk/ini/banner.txt"),
         verbose,
     );
     copy_file(
         "/ini/boot.sh",
-        include_bytes!("../../dsk/ini/boot.sh"),
+        include_bytes!("../../../../dsk/ini/boot.sh"),
         verbose,
     );
     copy_file(
         "/ini/setup.sh",
-        include_bytes!("../../dsk/ini/setup.sh"),
+        include_bytes!("../../../../dsk/ini/setup.sh"),
         verbose,
     );
     copy_file(
         "/ini/shell.sh",
-        include_bytes!("../../dsk/ini/shell.sh"),
+        include_bytes!("../../../../dsk/ini/shell.sh"),
         verbose,
     );
     copy_file(
         "/ini/version.txt",
-        include_bytes!("../../dsk/ini/version.txt"),
+        include_bytes!("../../../../dsk/ini/version.txt"),
         verbose,
     );
 
     create_dir("/ini/palettes", verbose);
     copy_file(
         "/ini/palettes/agave-dark.csv",
-        include_bytes!("../../dsk/ini/palettes/agave-dark.csv"),
+        include_bytes!("../../../../dsk/ini/palettes/agave-dark.csv"),
         verbose,
     );
     copy_file(
         "/ini/palettes/gruvbox-light.csv",
-        include_bytes!("../../dsk/ini/palettes/gruvbox-light.csv"),
+        include_bytes!("../../../../dsk/ini/palettes/gruvbox-light.csv"),
         verbose,
     );
 
@@ -101,12 +121,12 @@ pub fn copy_files(verbose: bool) {
     //copy_file("/ini/fonts/lat15-terminus-8x16.psf", include_bytes!("../../dsk/ini/fonts/lat15-terminus-8x16.psf"), verbose);
     copy_file(
         "/ini/fonts/zap-light-8x16.psf",
-        include_bytes!("../../dsk/ini/fonts/zap-light-8x16.psf"),
+        include_bytes!("../../../../dsk/ini/fonts/zap-light-8x16.psf"),
         verbose,
     );
     copy_file(
         "/ini/fonts/zap-vga-8x16.psf",
-        include_bytes!("../../dsk/ini/fonts/zap-vga-8x16.psf"),
+        include_bytes!("../../../../dsk/ini/fonts/zap-vga-8x16.psf"),
         verbose,
     );
 
@@ -114,12 +134,12 @@ pub fn copy_files(verbose: bool) {
 
     copy_file(
         "/tmp/alice.txt",
-        include_bytes!("../../dsk/tmp/alice.txt"),
+        include_bytes!("../../../../dsk/tmp/alice.txt"),
         verbose,
     );
     copy_file(
         "/tmp/machines.txt",
-        include_bytes!("../../dsk/tmp/machines.txt"),
+        include_bytes!("../../../../dsk/tmp/machines.txt"),
         verbose,
     );
 
@@ -128,71 +148,71 @@ pub fn copy_files(verbose: bool) {
     create_dir("/tmp/life", verbose);
     copy_file(
         "/tmp/life/centinal.cells",
-        include_bytes!("../../dsk/tmp/life/centinal.cells"),
+        include_bytes!("../../../../dsk/tmp/life/centinal.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/flower-of-eden.cells",
-        include_bytes!("../../dsk/tmp/life/flower-of-eden.cells"),
+        include_bytes!("../../../../dsk/tmp/life/flower-of-eden.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/garden-of-eden.cells",
-        include_bytes!("../../dsk/tmp/life/garden-of-eden.cells"),
+        include_bytes!("../../../../dsk/tmp/life/garden-of-eden.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/glider-gun.cells",
-        include_bytes!("../../dsk/tmp/life/glider-gun.cells"),
+        include_bytes!("../../../../dsk/tmp/life/glider-gun.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/pentadecathlon.cells",
-        include_bytes!("../../dsk/tmp/life/pentadecathlon.cells"),
+        include_bytes!("../../../../dsk/tmp/life/pentadecathlon.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/queen-bee-shuttle.cells",
-        include_bytes!("../../dsk/tmp/life/queen-bee-shuttle.cells"),
+        include_bytes!("../../../../dsk/tmp/life/queen-bee-shuttle.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/ship-in-a-bottle.cells",
-        include_bytes!("../../dsk/tmp/life/ship-in-a-bottle.cells"),
+        include_bytes!("../../../../dsk/tmp/life/ship-in-a-bottle.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/thunderbird.cells",
-        include_bytes!("../../dsk/tmp/life/thunderbird.cells"),
+        include_bytes!("../../../../dsk/tmp/life/thunderbird.cells"),
         verbose,
     );
     copy_file(
         "/tmp/life/wing.cells",
-        include_bytes!("../../dsk/tmp/life/wing.cells"),
+        include_bytes!("../../../../dsk/tmp/life/wing.cells"),
         verbose,
     );
 
     create_dir("/tmp/beep", verbose);
     copy_file(
         "/tmp/beep/tetris.sh",
-        include_bytes!("../../dsk/tmp/beep/tetris.sh"),
+        include_bytes!("../../../../dsk/tmp/beep/tetris.sh"),
         verbose,
     );
     copy_file(
         "/tmp/beep/starwars.sh",
-        include_bytes!("../../dsk/tmp/beep/starwars.sh"),
+        include_bytes!("../../../../dsk/tmp/beep/starwars.sh"),
         verbose,
     );
     copy_file(
         "/tmp/beep/mario.sh",
-        include_bytes!("../../dsk/tmp/beep/mario.sh"),
+        include_bytes!("../../../../dsk/tmp/beep/mario.sh"),
         verbose,
     );
 
     create_dir("/var/www", verbose);
     copy_file(
         "/var/www/index.html",
-        include_bytes!("../../dsk/var/www/index.html"),
+        include_bytes!("../../../../dsk/var/www/index.html"),
         verbose,
     );
 }

@@ -14,15 +14,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "agave-sys"
+name = "agave-kernel"
 version = "0.1.0"
-dependencies = [
- "core2",
-]
-
-[[package]]
-name = "agave_os"
-version = "0.0.5"
 dependencies = [
  "acpi",
  "aml",
@@ -64,6 +57,14 @@ dependencies = [
  "wasmi",
  "x86_64",
  "zerocopy",
+]
+
+[[package]]
+name = "agave_os"
+version = "0.1.0"
+dependencies = [
+ "agave-kernel",
+ "bootloader",
 ]
 
 [[package]]

@@ -1,16 +1,17 @@
 #![no_std]
 #![no_main]
 
+extern crate agave_kernel;
 extern crate alloc;
 
-use agave_os::{debug, hlt_loop, print, println, sys, usr};
+use agave_kernel::{debug, hlt_loop, print, println, sys, usr};
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 
 entry_point!(main);
 
 fn main(boot_info: &'static BootInfo) -> ! {
-    agave_os::init(boot_info);
+    agave_kernel::init(boot_info);
     print!("\x1b[?25h"); // Enable cursor
     loop {
         if let Some(cmd) = option_env!("agave_os_CMD") {

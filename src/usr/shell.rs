@@ -498,6 +498,7 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "disk" => usr::disk::main(&args),
         "elf" => usr::elf::main(&args),
         "env" => usr::env::main(&args),
+        "edit" => usr::editor::main(&args),
         "find" => usr::find::main(&args),
         "goto" => cmd_change_dir(&args, config), // TODO: Remove this
         "help" => usr::help::main(&args),

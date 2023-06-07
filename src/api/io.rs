@@ -2,6 +2,7 @@ use crate::api::syscall;
 
 use alloc::string::{String, ToString};
 use alloc::vec;
+use core2::io::ErrorKind;
 
 pub struct Stdin;
 pub struct Stdout;
@@ -12,10 +13,10 @@ impl Stdin {
         Self {}
     }
 
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize, ()> {
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize, ErrorKind> {
         match syscall::read(0, buf) {
             Some(res) => Ok(res),
-            None => Err(()),
+            None => Err(ErrorKind::Interrupted),
         }
     }
 
@@ -47,6 +48,25 @@ impl Stdin {
             String::from_utf8_lossy(&buf).to_string()
         } else {
             String::new()
+        }
+    }
+
+    pub fn read_exact(&self, mut buf: &mut [u8]) -> Result<(), ErrorKind> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let tmp = buf;
+                    buf = &mut tmp[n..];
+                }
+                Err(ref e) if e == &ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !buf.is_empty() {
+            Err(ErrorKind::UnexpectedEof)
+        } else {
+            Ok(())
         }
     }
 }

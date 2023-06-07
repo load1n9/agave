@@ -1,0 +1,12 @@
+[package]
+name = "leb128"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 WITH LLVM-exception"
+
+
+[dependencies]
+core2 = { version = "0.4.0", default-features = false, features = [
+    "alloc",
+    "nightly",
+] }

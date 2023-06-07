@@ -3,6 +3,88 @@ name = "wasmtime"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "nightlydoc"]
 
 [dependencies]
+wasmtime-runtime = { path = "../runtime", version = "0.1.0", default-features = false }
+wasmtime-environ = { path = "../environ", version = "0.1.0", default-features = false }
+wasmtime-jit = { path = "../jit", version = "0.1.0", default-features = false }
+wasmtime-cache = { path = "../cache", version = "0.1.0", optional = true }
+wasmtime-fiber = { path = "../fiber", version = "0.1.0", optional = true }
+wasmtime-cranelift = { path = "../cranelift", version = "0.1.0", optional = true }
+target-lexicon = { version = "0.12.0", default-features = false }
+wasmparser = { version = "0.81", default-features = false }
+anyhow = { version = "1.0.19", default-features = false }
+region = "3.0.0"
+libc = { version = "0.2", default-features = false }
+cfg-if = "1.0"
+backtrace = { version = "0.3.61", default-features = false }
+rustc-demangle = "0.1.16"
+cpp_demangle = { version = "0.3.2", default-features = false, features = ["alloc"] }
+log = "0.4.8"
+wat = { version = "1.0.36", optional = true }
+serde = { version = "1.0.94", default-features = false, features = ["derive", "alloc"] }
+### Use the newest version of `bincode` from GitHub because it supports no_std
+bincode = { version = "2.0.0-rc.1", default-features = false, features = ["alloc", "serde_alloc", "derive"] }
+indexmap = "1.6"
+paste = "1.0.3"
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
+rayon = { version = "1.0", optional = true }
+object = { version = "0.27.1", default-features = false, features = ['read_core', 'elf'] }
+hashbrown = { version = "0.11.2", features = ["ahash"], default-features = false }
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = [
+    'std',
+    'async',
+    'cache',
+    'wat',
+    'jitdump',
+    'parallel-compilation',
+    'cranelift',
+]
+std = [
+    "anyhow/std",
+    "backtrace/std",
+    "wasmtime-runtime/std",
+    "wasmtime-environ/std",
+    "wasmparser/std",
+    "cpp_demangle/std",
+    "bincode/std",
+    "serde/std",
+]
+
+cranelift = ["wasmtime-cranelift"]
+
+# Enables support for the `perf` jitdump profiler
+jitdump = ["wasmtime-jit/jitdump"]
+
+# Enables support for the `VTune` profiler
+vtune = ["wasmtime-jit/vtune"]
+
+# Enables parallel compilation of WebAssembly code.
+parallel-compilation = ["rayon"]
+
+# Enables support for automatic cache configuration to be enabled in `Config`.
+cache = ["wasmtime-cache"]
+
+# Enables support for "async stores" as well as defining host functions as
+# `async fn` and calling functions asynchronously.
+async = ["wasmtime-fiber", "wasmtime-runtime/async"]
+
+# Enables userfaultfd support in the runtime's pooling allocator when building on Linux
+uffd = ["wasmtime-runtime/uffd"]
+
+# Enables support for all architectures in Cranelift, allowing
+# cross-compilation using the `wasmtime` crate's API, notably the
+# `Engine::precompile_module` function.
+all-arch = ["wasmtime-cranelift/all-arch"]
+
+# Enables trap handling using POSIX signals instead of Mach exceptions on MacOS.
+# It is useful for applications that do not bind their own exception ports and
+# need portable signal handling.
+posix-signals-on-macos = ["wasmtime-runtime/posix-signals-on-macos"]

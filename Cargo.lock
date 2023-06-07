@@ -15,7 +15,7 @@ dependencies = [
 
 [[package]]
 name = "agave_os"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "acpi",
  "aml",

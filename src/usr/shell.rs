@@ -110,7 +110,7 @@ pub fn prompt_string(success: bool) -> String {
     }
     let line1 = format!("{}{}{}", csi_line1, current_dir, csi_reset);
     let line2 = format!(
-        "{} >{} ",
+        "{}>{} ",
         if success { csi_line2 } else { csi_error },
         csi_reset
     );

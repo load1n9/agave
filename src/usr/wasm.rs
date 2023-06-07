@@ -32,7 +32,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let pathname = format!("{}{}", &sys::process::dir(), filename);
 
     if let Ok(buf) = fs::read_to_bytes(&pathname) {
-        let mut instance = WasmInstance::new(buf);
+        let mut instance = WasmInstance::new(buf, 42);
         instance.start();
         Ok(())
     } else {

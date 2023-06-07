@@ -1,15 +1,18 @@
-use alloc::vec::Vec;
-use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
+use alloc::{string::String, vec::Vec};
+use wasmi::{core::Trap, Caller, Engine, Extern, Func, Instance, Linker, Module, Store};
 
-use crate::api::wasi::ctx::WasiCtx;
+// use crate::api::wasi::ctx::WasiCtx;
 
-pub struct WasmInstance {
-    store: Store<u32>,
+pub struct WasmInstance<T> {
+    store: Store<T>,
     instance: Instance,
 }
 
-impl WasmInstance {
-    pub fn new(wasm: Vec<u8>) -> Self {
+impl<T> WasmInstance<T>
+where
+    T: core::fmt::Display + core::fmt::Debug,
+{
+    pub fn new(wasm: Vec<u8>, val: T) -> Self {
         let engine = Engine::default();
         let module = Module::new(&engine, &wasm[..]).unwrap();
         // let wasi = WasiCtxBuilder::new()
@@ -18,24 +21,52 @@ impl WasmInstance {
         //     .unwrap()
         //     .build();
         // let mut store = Store::new(&engine, wasi);
-        type HostState = u32;
 
-        let mut store = Store::new(&engine, 42);
+        let mut store = Store::new(&engine, val);
 
-        let mut linker = <Linker<WasiCtx>>::new(&engine);
+        let mut linker = <Linker<T>>::new(&engine);
 
-        let host_hello = Func::wrap(&mut store, |caller: Caller<'_, HostState>, param: i32| {
+        let host_hello = Func::wrap(&mut store, |mut caller: Caller<'_, T>, param: i32| {
             println!("Received {} from WebAssembly", param);
+            let _result = async {
+                let memory = match caller.get_export("memory") {
+                    Some(Extern::Memory(m)) => m,
+                    _ => {
+                        return Err(Trap::new(String::from(
+                            "missing required WASI memory export",
+                        )))
+                    }
+                };
+
+                let (memory, ctx) = memory.data_and_store_mut(&mut caller);
+                // let memory = Memory::new(ctx, memory);
+                // let memory = memory.unwrap();
+                println!("{:?}", ctx);
+                Ok(memory)
+            };
             println!("host state: {}", caller.data());
         });
 
-        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, HostState>, param: i32| {
+        let proc_exit = Func::wrap(&mut store, |mut caller: Caller<'_, T>, param: i32| {
+            let _result = async {
+                let memory = match caller.get_export("memory") {
+                    Some(Extern::Memory(m)) => m,
+                    _ => {
+                        return Err(Trap::new(String::from(
+                            "missing required WASI memory export",
+                        )))
+                    }
+                };
+
+                let (memory, ctx) = memory.data_and_store_mut(&mut caller);
+                // let memory = Memory::new(ctx, memory);
+                // let memory = memory.unwrap();
+                println!("{:?}", ctx);
+                Ok(memory)
+            };
+
             crate::api::wasi::syscalls::proc_exit((param as usize).into());
         });
-
-        // linker
-        //     .define("wasi_unstable", "args_get", args_get)
-        //     .unwrap();
 
         linker.define("host", "hello", host_hello).unwrap();
         linker

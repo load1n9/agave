@@ -112,8 +112,8 @@ pub fn copy_files(verbose: bool) {
         verbose,
     );
     copy_file(
-        "/ini/palettes/gruvbox-light.csv",
-        include_bytes!("../../../../dsk/ini/palettes/gruvbox-light.csv"),
+        "/ini/palettes/agave-light.csv",
+        include_bytes!("../../../../dsk/ini/palettes/agave-light.csv"),
         verbose,
     );
 
@@ -130,8 +130,6 @@ pub fn copy_files(verbose: bool) {
         verbose,
     );
 
-    create_dir("/lib/lisp", verbose);
-
     copy_file(
         "/tmp/alice.txt",
         include_bytes!("../../../../dsk/tmp/alice.txt"),
@@ -144,53 +142,6 @@ pub fn copy_files(verbose: bool) {
     );
 
     create_dir("/tmp/lisp", verbose);
-
-    create_dir("/tmp/life", verbose);
-    copy_file(
-        "/tmp/life/centinal.cells",
-        include_bytes!("../../../../dsk/tmp/life/centinal.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/flower-of-eden.cells",
-        include_bytes!("../../../../dsk/tmp/life/flower-of-eden.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/garden-of-eden.cells",
-        include_bytes!("../../../../dsk/tmp/life/garden-of-eden.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/glider-gun.cells",
-        include_bytes!("../../../../dsk/tmp/life/glider-gun.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/pentadecathlon.cells",
-        include_bytes!("../../../../dsk/tmp/life/pentadecathlon.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/queen-bee-shuttle.cells",
-        include_bytes!("../../../../dsk/tmp/life/queen-bee-shuttle.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/ship-in-a-bottle.cells",
-        include_bytes!("../../../../dsk/tmp/life/ship-in-a-bottle.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/thunderbird.cells",
-        include_bytes!("../../../../dsk/tmp/life/thunderbird.cells"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/life/wing.cells",
-        include_bytes!("../../../../dsk/tmp/life/wing.cells"),
-        verbose,
-    );
 
     create_dir("/tmp/beep", verbose);
     copy_file(

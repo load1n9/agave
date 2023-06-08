@@ -3,7 +3,6 @@ name = "agave-kernel"
 version = "0.1.0"
 edition = "2021"
 
-
 [features]
 default = ["video", "x86_64"]
 x86_64 = ["dep:x86_64"]
@@ -32,7 +31,7 @@ num-bigint = { version = "0.4.3", default-features = false }
 num-traits = { version = "0.2.15", default-features = false }
 pbkdf2 = { version = "0.12.1", default-features = false, features = ["hmac"] }
 uart_16550 = "0.2.18"
-zerocopy = "0.5.0"
+zerocopy = "0.6.1"
 mpmc = "0.1.6"
 modular-bitfield = "0.11.2"
 bitflags = "1.1.0"
@@ -44,8 +43,7 @@ rand = { version = "0.8.5", default-features = false }
 rand_hc = "0.3.1"
 vte = "0.11.0"
 x86_64 = { version = "0.14.10", optional = true }
-
-object = { version = "0.30.3", default-features = false, features = ["read"] }
+object = { version = "0.31.1", default-features = false, features = ["read"] }
 wasmi = { version = "0.30.0", default-features = false }
 core2 = { version = "0.4.0", default-features = false, features = [
     "alloc",
@@ -69,16 +67,16 @@ smoltcp = { version = "0.9.1", default-features = false, features = [
 ] }
 
 [dependencies.num_enum]
-version = "0.5.7"
+version = "0.6.1"
 default-features = false
 
 [dependencies.crossbeam-queue]
-version = "0.2.1"
+version = "0.3.8"
 default-features = false
 features = ["alloc"]
 
 [dependencies.conquer-once]
-version = "0.2.0"
+version = "0.4.0"
 default-features = false
 
 [dependencies.futures-util]

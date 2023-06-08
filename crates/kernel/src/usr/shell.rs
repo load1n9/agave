@@ -13,7 +13,6 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::sync::atomic::{fence, Ordering};
 
-// TODO: Scan /bin
 const AUTOCOMPLETE_COMMANDS: [&str; 35] = [
     "2048", "base64", "calc", "copy", "date", "delete", "dhcp", "disk", "edit", "elf", "env",
     "goto", "help", "hex", "host", "http", "httpd", "install", "keyboard", "life", "lisp", "list",
@@ -31,7 +30,7 @@ impl Config {
         let aliases = BTreeMap::new();
         let mut env = BTreeMap::new();
         for (key, val) in sys::process::envs() {
-            env.insert(key, val); // Copy the process environment to the shell environment
+            env.insert(key, val);
         }
         env.insert("DIR".to_string(), sys::process::dir());
         env.insert("status".to_string(), "0".to_string());
@@ -98,7 +97,7 @@ fn shell_completer(line: &str) -> Vec<String> {
 
 pub fn prompt_string(success: bool) -> String {
     let csi_line1 = Style::color("Blue");
-    let csi_line2 = Style::color("Magenta");
+    let csi_line2 = Style::color("LightGreen");
     let csi_error = Style::color("Red");
     let csi_reset = Style::reset();
     let mut current_dir = sys::process::dir();
@@ -385,7 +384,6 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         return Ok(());
     }
 
-    // Replace command alias
     if let Some(alias) = config.aliases.get(&args[0]) {
         args.remove(0);
         for arg in alias.split(' ').rev() {
@@ -409,26 +407,12 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         let mut head_count = 0;
         let mut left_handle;
         if Regex::new("^[?\\d*]?-+>$").is_match(args[i]) {
-            // Pipes
-            // read foo.txt --> write bar.txt
-            // read foo.txt -> write bar.txt
-            // read foo.txt [2]-> write /dev/null
             is_thin_arrow = true;
             left_handle = 1;
         } else if Regex::new("^[?\\d*]?=*>+[?\\d*]?$").is_match(args[i]) {
-            // Redirections to
-            // read foo.txt ==> bar.txt
-            // read foo.txt => bar.txt
-            // read foo.txt > bar.txt
-            // read foo.txt [1]=> /dev/null
-            // read foo.txt [1]=>[3]
             is_fat_arrow = true;
             left_handle = 1;
         } else if Regex::new("^+<=*$").is_match(args[i]) {
-            // Redirections from
-            // write bar.txt <== foo.txt
-            // write bar.txt <= foo.txt
-            // write bar.txt < foo.txt
             is_fat_arrow = true;
             left_handle = 0;
         } else {
@@ -436,7 +420,6 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
             continue;
         }
 
-        // Parse file handles
         let mut num = String::new();
         for c in args[i].chars() {
             match c {
@@ -457,10 +440,8 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         }
 
         if is_fat_arrow {
-            // Redirections
             restore_file_handles = true;
             if !num.is_empty() {
-                // if let Ok(right_handle) = num.parse() {}
                 println!("Redirecting to a file handle has not been implemented yet");
                 return Err(ExitCode::Failure);
             } else {
@@ -525,6 +506,7 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "version" => cmd_version(&args),
         "user" => usr::user::main(&args),
         "vga" => usr::vga::main(&args),
+        "palette" => usr::palette::main(&args),
         "write" => usr::write::main(&args),
         "panic" => panic!("{}", args[1..].join(" ")),
         "hedgehog" => usr::hedgehog::main(&args),
@@ -600,7 +582,7 @@ fn repl(config: &mut Config) -> Result<(), ExitCode> {
         sys::console::drain();
         println!();
     }
-    print!("\x1b[2J\x1b[1;1H"); // Clear screen and move cursor to top
+    print!("\x1b[2J\x1b[1;1H");
     Ok(())
 }
 
@@ -628,7 +610,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
         config.env.insert(0.to_string(), args[1].to_string());
 
-        // Add script arguments to the environment as `$1`, `$2`, `$3`, ...
         for (i, arg) in args[2..].iter().enumerate() {
             config.env.insert((i + 1).to_string(), arg.to_string());
         }
@@ -667,21 +648,18 @@ fn test_shell() {
     sys::fs::format_mem();
     usr::install::copy_files(false);
 
-    // Redirect standard output
     exec("print test1 => /tmp/test1").ok();
     assert_eq!(
         api::fs::read_to_string("/tmp/test1"),
         Ok("test1\n".to_string())
     );
 
-    // Redirect standard output explicitely
     exec("print test2 1=> /tmp/test2").ok();
     assert_eq!(
         api::fs::read_to_string("/tmp/test2"),
         Ok("test2\n".to_string())
     );
 
-    // Redirect standard error explicitely
     exec("hex /nope 2=> /tmp/test3").ok();
     assert!(api::fs::read_to_string("/tmp/test3")
         .unwrap()

@@ -19,6 +19,7 @@ pub mod list;
 pub mod memory;
 pub mod r#move;
 pub mod net;
+pub mod palette;
 pub mod pci;
 pub mod pow;
 pub mod read;

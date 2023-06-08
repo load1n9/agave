@@ -43,6 +43,7 @@ pub mod idt;
 pub mod interrupts;
 pub mod keyboard;
 pub mod mem;
+pub mod mouse;
 pub mod net;
 pub mod pci;
 pub mod pic;

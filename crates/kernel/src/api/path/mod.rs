@@ -1,88 +1,16 @@
 // ported from https://gitlab.com/SnejUgal/unix_path/-/blob/master/src/lib.rs
-//! Unix path manipulation.
-//!
-//! This crate provides two types, [`PathBuf`] and [`Path`] (akin to `String`
-//! and `str`), for working with paths abstractly. These types are thin wrappers
-//! around `UnixString` and `UnixStr` respectively, meaning that they work
-//! directly on strings independently from the local platform's path syntax.
-//!
-//! Paths can be parsed into [`Component`]s by iterating over the structure
-//! returned by the [`components`] method on [`Path`]. [`Component`]s roughly
-//! correspond to the substrings between path separators (`/`). You can
-//! reconstruct an equivalent path from components with the [`push`] method on
-//! [`PathBuf`]; note that the paths may differ syntactically by the
-//! normalization described in the documentation for the [`components`] method.
-//!
-//! ## Simple usage
-//!
-//! Path manipulation includes both parsing components from slices and building
-//! new owned paths.
-//!
-//! To parse a path, you can create a [`Path`] slice from a `str`
-//! slice and start asking questions:
-//!
-//! ```
-//! use unix_path::Path;
-//! use unix_str::UnixStr;
-//!
-//! let path = Path::new("/tmp/foo/bar.txt");
-//!
-//! let parent = path.parent();
-//! assert_eq!(parent, Some(Path::new("/tmp/foo")));
-//!
-//! let file_stem = path.file_stem();
-//! assert_eq!(file_stem, Some(UnixStr::new("bar")));
-//!
-//! let extension = path.extension();
-//! assert_eq!(extension, Some(UnixStr::new("txt")));
-//! ```
-//!
-//! To build or modify paths, use [`PathBuf`]:
-//!
-//! ```
-//! use unix_path::PathBuf;
-//!
-//! // This way works...
-//! let mut path = PathBuf::from("/");
-//!
-//! path.push("feel");
-//! path.push("the");
-//!
-//! path.set_extension("force");
-//!
-//! // ... but push is best used if you don't know everything up
-//! // front. If you do, this way is better:
-//! let path: PathBuf = ["/", "feel", "the.force"].iter().collect();
-//! ```
-//!
-//! [`Component`]: enum.Component.html
-//! [`components`]:struct.Path.html#method.components
-//! [`PathBuf`]: struct.PathBuf.html
-//! [`Path`]: struct.Path.html
-//! [`push`]: struct.PathBuf.html#method.push
-
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "shrink_to", feature(shrink_to))]
-
-#[cfg(feature = "alloc")]
-extern crate alloc;
 
 use unix_str::UnixStr;
-#[cfg(feature = "alloc")]
 use unix_str::UnixString;
 
-#[cfg(feature = "alloc")]
 use core::borrow::Borrow;
 use core::cmp;
 use core::fmt;
 use core::hash::{Hash, Hasher};
-#[cfg(feature = "alloc")]
 use core::iter;
 use core::iter::FusedIterator;
-#[cfg(feature = "alloc")]
 use core::ops::{self, Deref};
 
-#[cfg(feature = "alloc")]
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
@@ -95,19 +23,6 @@ use alloc::{
 
 mod lossy;
 
-////////////////////////////////////////////////////////////////////////////////
-// Exposed parsing helpers
-////////////////////////////////////////////////////////////////////////////////
-
-/// Determines whether the character is the permitted path separator for Unix,
-/// `/`.
-///
-/// # Examples
-///
-/// ```
-/// assert!(unix_path::is_separator('/'));
-/// assert!(!unix_path::is_separator('❤'));
-/// ```
 pub fn is_separator(c: char) -> bool {
     c == '/'
 }
@@ -736,12 +651,10 @@ impl FusedIterator for Ancestors<'_> {}
 ///
 /// Which method works best depends on what kind of situation you're in.
 #[derive(Clone)]
-#[cfg(feature = "alloc")]
 pub struct PathBuf {
     inner: UnixString,
 }
 
-#[cfg(feature = "alloc")]
 impl PathBuf {
     fn as_mut_vec(&mut self) -> &mut Vec<u8> {
         unsafe { &mut *(self as *mut PathBuf as *mut Vec<u8>) }
@@ -876,31 +789,6 @@ impl PathBuf {
         }
     }
 
-    /// Updates [`self.file_name`] to `file_name`.
-    ///
-    /// If [`self.file_name`] was `None`, this is equivalent to pushing
-    /// `file_name`.
-    ///
-    /// Otherwise it is equivalent to calling [`pop`] and then pushing
-    /// `file_name`. The new path will be a sibling of the original path.
-    /// (That is, it will have the same parent.)
-    ///
-    /// [`self.file_name`]: struct.PathBuf.html#method.file_name
-    /// [`pop`]: struct.PathBuf.html#method.pop
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use unix_path::PathBuf;
-    ///
-    /// let mut buf = PathBuf::from("/");
-    /// assert!(buf.file_name() == None);
-    /// buf.set_file_name("bar");
-    /// assert!(buf == PathBuf::from("/bar"));
-    /// assert!(buf.file_name().is_some());
-    /// buf.set_file_name("baz.txt");
-    /// assert!(buf == PathBuf::from("/baz.txt"));
-    /// ```
     pub fn set_file_name<S: AsRef<UnixStr>>(&mut self, file_name: S) {
         self._set_file_name(file_name.as_ref())
     }
@@ -912,31 +800,6 @@ impl PathBuf {
         }
         self.push(file_name);
     }
-
-    /// Updates [`self.extension`] to `extension`.
-    ///
-    /// Returns `false` and does nothing if [`self.file_name`] is `None`,
-    /// returns `true` and updates the extension otherwise.
-    ///
-    /// If [`self.extension`] is `None`, the extension is added; otherwise
-    /// it is replaced.
-    ///
-    /// [`self.file_name`]: struct.PathBuf.html#method.file_name
-    /// [`self.extension`]: struct.PathBuf.html#method.extension
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use unix_path::{Path, PathBuf};
-    ///
-    /// let mut p = PathBuf::from("/feel/the");
-    ///
-    /// p.set_extension("force");
-    /// assert_eq!(Path::new("/feel/the.force"), p.as_path());
-    ///
-    /// p.set_extension("dark_side");
-    /// assert_eq!(Path::new("/feel/the.dark_side"), p.as_path());
-    /// ```
 
     pub fn set_extension<S: AsRef<UnixStr>>(&mut self, extension: S) -> bool {
         self._set_extension(extension.as_ref())
@@ -965,16 +828,6 @@ impl PathBuf {
         true
     }
 
-    /// Consumes the `PathBuf`, yielding its internal `UnixString` storage.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use unix_path::PathBuf;
-    ///
-    /// let p = PathBuf::from("/the/head");
-    /// let bytes = p.into_unix_string();
-    /// ```
     pub fn into_unix_string(self) -> UnixString {
         self.inner
     }
@@ -1013,13 +866,11 @@ impl PathBuf {
     }
 
     /// Invokes `shrink_to` on the underlying instance of `UnixString`.
-    #[cfg(feature = "shrink_to")]
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.inner.shrink_to(min_capacity)
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<&Path> for Box<Path> {
     fn from(path: &Path) -> Box<Path> {
         let boxed: Box<UnixStr> = path.inner.into();
@@ -1028,7 +879,6 @@ impl From<&Path> for Box<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<Cow<'_, Path>> for Box<Path> {
     #[inline]
     fn from(cow: Cow<'_, Path>) -> Box<Path> {
@@ -1039,7 +889,6 @@ impl From<Cow<'_, Path>> for Box<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<Box<Path>> for PathBuf {
     /// Converts a `Box<Path>` into a `PathBuf`
     ///
@@ -1049,7 +898,6 @@ impl From<Box<Path>> for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<PathBuf> for Box<Path> {
     /// Converts a `PathBuf` into a `Box<Path>`
     ///
@@ -1060,7 +908,6 @@ impl From<PathBuf> for Box<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Clone for Box<Path> {
     #[inline]
     fn clone(&self) -> Self {
@@ -1068,45 +915,31 @@ impl Clone for Box<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<T: ?Sized + AsRef<UnixStr>> From<&T> for PathBuf {
     fn from(s: &T) -> Self {
         PathBuf::from(s.as_ref().to_unix_string())
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<UnixString> for PathBuf {
-    /// Converts a `UnixString` into a `PathBuf`
-    ///
-    /// This conversion does not allocate or copy memory.
     #[inline]
     fn from(s: UnixString) -> Self {
         PathBuf { inner: s }
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<PathBuf> for UnixString {
-    /// Converts a `PathBuf` into a `UnixString`
-    ///
-    /// This conversion does not allocate or copy memory.
     fn from(path_buf: PathBuf) -> Self {
         path_buf.inner
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<String> for PathBuf {
-    /// Converts a `String` into a `PathBuf`
-    ///
-    /// This conversion does not allocate or copy memory.
     fn from(s: String) -> PathBuf {
         PathBuf::from(UnixString::from(s))
     }
 }
 
-#[cfg(feature = "alloc")]
 impl FromStr for PathBuf {
     type Err = core::convert::Infallible;
 
@@ -1115,7 +948,6 @@ impl FromStr for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<P: AsRef<Path>> iter::FromIterator<P> for PathBuf {
     fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> PathBuf {
         let mut buf = PathBuf::new();
@@ -1124,21 +956,18 @@ impl<P: AsRef<Path>> iter::FromIterator<P> for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<P: AsRef<Path>> iter::Extend<P> for PathBuf {
     fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
         iter.into_iter().for_each(move |p| self.push(p.as_ref()));
     }
 }
 
-#[cfg(feature = "alloc")]
 impl fmt::Debug for PathBuf {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(&**self, formatter)
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ops::Deref for PathBuf {
     type Target = Path;
     #[inline]
@@ -1147,21 +976,18 @@ impl ops::Deref for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Borrow<Path> for PathBuf {
     fn borrow(&self) -> &Path {
         self.deref()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Default for PathBuf {
     fn default() -> Self {
         PathBuf::new()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'a> From<&'a Path> for Cow<'a, Path> {
     #[inline]
     fn from(s: &'a Path) -> Cow<'a, Path> {
@@ -1169,7 +995,6 @@ impl<'a> From<&'a Path> for Cow<'a, Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'a> From<PathBuf> for Cow<'a, Path> {
     #[inline]
     fn from(s: PathBuf) -> Cow<'a, Path> {
@@ -1177,7 +1002,6 @@ impl<'a> From<PathBuf> for Cow<'a, Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'a> From<&'a PathBuf> for Cow<'a, Path> {
     #[inline]
     fn from(p: &'a PathBuf) -> Cow<'a, Path> {
@@ -1185,7 +1009,6 @@ impl<'a> From<&'a PathBuf> for Cow<'a, Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'a> From<Cow<'a, Path>> for PathBuf {
     #[inline]
     fn from(p: Cow<'a, Path>) -> Self {
@@ -1193,9 +1016,7 @@ impl<'a> From<Cow<'a, Path>> for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<PathBuf> for Arc<Path> {
-    /// Converts a `PathBuf` into an `Arc` by moving the `PathBuf` data into a new `Arc` buffer.
     #[inline]
     fn from(s: PathBuf) -> Arc<Path> {
         let arc: Arc<UnixStr> = Arc::from(s.into_unix_string());
@@ -1203,9 +1024,7 @@ impl From<PathBuf> for Arc<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<&Path> for Arc<Path> {
-    /// Converts a `Path` into an `Arc` by copying the `Path` data into a new `Arc` buffer.
     #[inline]
     fn from(s: &Path) -> Arc<Path> {
         let arc: Arc<UnixStr> = Arc::from(s.as_unix_str());
@@ -1213,9 +1032,7 @@ impl From<&Path> for Arc<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<PathBuf> for Rc<Path> {
-    /// Converts a `PathBuf` into an `Rc` by moving the `PathBuf` data into a new `Rc` buffer.
     #[inline]
     fn from(s: PathBuf) -> Rc<Path> {
         let rc: Rc<UnixStr> = Rc::from(s.into_unix_string());
@@ -1223,9 +1040,7 @@ impl From<PathBuf> for Rc<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl From<&Path> for Rc<Path> {
-    /// Converts a `Path` into an `Rc` by copying the `Path` data into a new `Rc` buffer.
     #[inline]
     fn from(s: &Path) -> Rc<Path> {
         let rc: Rc<UnixStr> = Rc::from(s.as_unix_str());
@@ -1233,7 +1048,6 @@ impl From<&Path> for Rc<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl ToOwned for Path {
     type Owned = PathBuf;
     fn to_owned(&self) -> PathBuf {
@@ -1241,88 +1055,42 @@ impl ToOwned for Path {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl cmp::PartialEq for PathBuf {
     fn eq(&self, other: &PathBuf) -> bool {
         self.components() == other.components()
     }
 }
 
-#[cfg(feature = "alloc")]
 impl Hash for PathBuf {
     fn hash<H: Hasher>(&self, h: &mut H) {
         self.as_path().hash(h)
     }
 }
 
-#[cfg(feature = "alloc")]
 impl cmp::Eq for PathBuf {}
 
-#[cfg(feature = "alloc")]
 impl cmp::PartialOrd for PathBuf {
     fn partial_cmp(&self, other: &PathBuf) -> Option<cmp::Ordering> {
         self.components().partial_cmp(other.components())
     }
 }
 
-#[cfg(feature = "alloc")]
 impl cmp::Ord for PathBuf {
     fn cmp(&self, other: &PathBuf) -> cmp::Ordering {
         self.components().cmp(other.components())
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AsRef<UnixStr> for PathBuf {
     fn as_ref(&self) -> &UnixStr {
         &self.inner[..]
     }
 }
 
-/// A slice of a path (akin to `str`).
-///
-/// This type supports a number of operations for inspecting a path, including
-/// breaking the path into its components (separated by `/` ), extracting the
-/// file name, determining whether the path is absolute, and so on.
-///
-/// This is an *unsized* type, meaning that it must always be used behind a
-/// pointer like `&` or `Box`. For an owned version of this type,
-/// see [`PathBuf`].
-///
-/// [`PathBuf`]: struct.PathBuf.html
-///
-/// More details about the overall approach can be found in
-/// the [crate documentation](index.html).
-///
-/// # Examples
-///
-/// ```
-/// use unix_path::Path;
-/// use unix_str::UnixStr;
-///
-/// let path = Path::new("./foo/bar.txt");
-///
-/// let parent = path.parent();
-/// assert_eq!(parent, Some(Path::new("./foo")));
-///
-/// let file_stem = path.file_stem();
-/// assert_eq!(file_stem, Some(UnixStr::new("bar")));
-///
-/// let extension = path.extension();
-/// assert_eq!(extension, Some(UnixStr::new("txt")));
-/// ```
 pub struct Path {
     inner: UnixStr,
 }
 
-/// An error returned from [`Path::strip_prefix`][`strip_prefix`] if the prefix
-/// was not found.
-///
-/// This `struct` is created by the [`strip_prefix`] method on [`Path`].
-/// See its documentation for more.
-///
-/// [`strip_prefix`]: struct.Path.html#method.strip_prefix
-/// [`Path`]: struct.Path.html
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StripPrefixError(());
 
@@ -1396,26 +1164,6 @@ impl Path {
         self.inner.to_str()
     }
 
-    /// Converts a `Path` to a `Cow<str>`.
-    ///
-    /// Any non-Unicode sequences are replaced with
-    /// `U+FFFD REPLACEMENT CHARACTER`.
-    ///
-    ///
-    /// # Examples
-    ///
-    /// Calling `to_string_lossy` on a `Path` with valid unicode:
-    ///
-    /// ```
-    /// use unix_path::Path;
-    ///
-    /// let path = Path::new("foo.txt");
-    /// assert_eq!(path.to_string_lossy(), "foo.txt");
-    /// ```
-    ///
-    /// Had `path` contained invalid unicode, the `to_string_lossy` call might
-    /// have returned `"fo�.txt"`.
-    #[cfg(feature = "alloc")]
     pub fn to_string_lossy(&self) -> Cow<'_, str> {
         self.inner.to_string_lossy()
     }
@@ -1432,7 +1180,6 @@ impl Path {
     /// let path_buf = Path::new("foo.txt").to_path_buf();
     /// assert_eq!(path_buf, unix_path::PathBuf::from("foo.txt"));
     /// ```
-    #[cfg(feature = "alloc")]
     pub fn to_path_buf(&self) -> PathBuf {
         PathBuf::from(&self.inner)
     }
@@ -1723,12 +1470,10 @@ impl Path {
     /// assert_eq!(Path::new("/etc").join("passwd"), PathBuf::from("/etc/passwd"));
     /// ```
     #[must_use]
-    #[cfg(feature = "alloc")]
     pub fn join<P: AsRef<Path>>(&self, path: P) -> PathBuf {
         self._join(path.as_ref())
     }
 
-    #[cfg(feature = "alloc")]
     fn _join(&self, path: &Path) -> PathBuf {
         let mut buf = self.to_path_buf();
         buf.push(path);
@@ -1753,12 +1498,10 @@ impl Path {
     /// let path = Path::new("/tmp");
     /// assert_eq!(path.with_file_name("var"), PathBuf::from("/var"));
     /// ```
-    #[cfg(feature = "alloc")]
     pub fn with_file_name<S: AsRef<UnixStr>>(&self, file_name: S) -> PathBuf {
         self._with_file_name(file_name.as_ref())
     }
 
-    #[cfg(feature = "alloc")]
     fn _with_file_name(&self, file_name: &UnixStr) -> PathBuf {
         let mut buf = self.to_path_buf();
         buf.set_file_name(file_name);
@@ -1780,12 +1523,10 @@ impl Path {
     /// let path = Path::new("foo.rs");
     /// assert_eq!(path.with_extension("txt"), PathBuf::from("foo.txt"));
     /// ```
-    #[cfg(feature = "alloc")]
     pub fn with_extension<S: AsRef<UnixStr>>(&self, extension: S) -> PathBuf {
         self._with_extension(extension.as_ref())
     }
 
-    #[cfg(feature = "alloc")]
     fn _with_extension(&self, extension: &UnixStr) -> PathBuf {
         let mut buf = self.to_path_buf();
         buf.set_extension(extension);
@@ -1865,7 +1606,6 @@ impl Path {
     /// allocating.
     ///
     /// [`PathBuf`]: struct.PathBuf.html
-    #[cfg(feature = "alloc")]
     pub fn into_path_buf(self: Box<Path>) -> PathBuf {
         let rw = Box::into_raw(self) as *mut UnixStr;
         let inner = unsafe { Box::from_raw(rw) };
@@ -1933,14 +1673,12 @@ impl AsRef<Path> for UnixStr {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AsRef<Path> for Cow<'_, UnixStr> {
     fn as_ref(&self) -> &Path {
         Path::new(self)
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AsRef<Path> for UnixString {
     fn as_ref(&self) -> &Path {
         Path::new(self)
@@ -1954,14 +1692,12 @@ impl AsRef<Path> for str {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AsRef<Path> for String {
     fn as_ref(&self) -> &Path {
         Path::new(self)
     }
 }
 
-#[cfg(feature = "alloc")]
 impl AsRef<Path> for PathBuf {
     #[inline]
     fn as_ref(&self) -> &Path {
@@ -1969,7 +1705,6 @@ impl AsRef<Path> for PathBuf {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'a> IntoIterator for &'a PathBuf {
     type Item = &'a UnixStr;
     type IntoIter = Iter<'a>;
@@ -1986,13 +1721,11 @@ impl<'a> IntoIterator for &'a Path {
     }
 }
 
-#[cfg(feature = "serde")]
 use serde::{
     de::{self, Deserialize, Deserializer, Unexpected, Visitor},
     ser::{self, Serialize, Serializer},
 };
 
-#[cfg(feature = "serde")]
 impl Serialize for Path {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2005,7 +1738,6 @@ impl Serialize for Path {
     }
 }
 
-#[cfg(feature = "serde")]
 impl Serialize for PathBuf {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -2015,10 +1747,8 @@ impl Serialize for PathBuf {
     }
 }
 
-#[cfg(feature = "serde")]
 struct PathVisitor;
 
-#[cfg(feature = "serde")]
 impl<'a> Visitor<'a> for PathVisitor {
     type Value = &'a Path;
 
@@ -2043,7 +1773,6 @@ impl<'a> Visitor<'a> for PathVisitor {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de: 'a, 'a> Deserialize<'de> for &'a Path {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -2053,10 +1782,8 @@ impl<'de: 'a, 'a> Deserialize<'de> for &'a Path {
     }
 }
 
-#[cfg(feature = "serde")]
 struct PathBufVisitor;
 
-#[cfg(feature = "serde")]
 impl<'de> Visitor<'de> for PathBufVisitor {
     type Value = PathBuf;
 
@@ -2097,7 +1824,6 @@ impl<'de> Visitor<'de> for PathBufVisitor {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for PathBuf {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -2107,7 +1833,6 @@ impl<'de> Deserialize<'de> for PathBuf {
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Box<Path> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -2117,7 +1842,6 @@ impl<'de> Deserialize<'de> for Box<Path> {
     }
 }
 
-#[cfg(feature = "alloc")]
 macro_rules! impl_cmp {
     ($lhs:ty, $rhs: ty) => {
         impl<'a, 'b> PartialEq<$rhs> for $lhs {
@@ -2150,29 +1874,16 @@ macro_rules! impl_cmp {
     };
 }
 
-#[cfg(feature = "alloc")]
 impl_cmp!(PathBuf, Path);
-#[cfg(feature = "alloc")]
 impl_cmp!(PathBuf, &'a Path);
-#[cfg(feature = "alloc")]
 impl_cmp!(Cow<'a, Path>, Path);
-#[cfg(feature = "alloc")]
 impl_cmp!(Cow<'a, Path>, &'b Path);
-#[cfg(feature = "alloc")]
 impl_cmp!(Cow<'a, Path>, PathBuf);
 
 impl fmt::Display for StripPrefixError {
     #[allow(deprecated, deprecated_in_future)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         "prefix not found".fmt(f)
-    }
-}
-
-#[cfg(feature = "std")]
-impl Error for StripPrefixError {
-    #[allow(deprecated)]
-    fn description(&self) -> &str {
-        "prefix not found"
     }
 }
 

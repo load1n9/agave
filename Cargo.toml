@@ -1,8 +1,8 @@
 [package]
-name = "agave_os"
+name = "agave-os"
 version = "0.1.0"
 edition = "2021"
-default-run = "agave_os"
+default-run = "agave-os"
 
 [workspace]
 members = ["crates/*", "libs/*"]
@@ -21,6 +21,7 @@ panic = "abort"
 
 [dependencies]
 bootloader = { version = "0.9.23", features = ["map_physical_memory"] }
+bootloader_api = { version = "0.11.3" }
 agave-kernel = { path = "crates/kernel", features = ["x86_64", "video"] }
 
 [package.metadata.bootimage]

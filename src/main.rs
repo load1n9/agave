@@ -12,7 +12,7 @@ entry_point!(main);
 
 fn main(boot_info: &'static BootInfo) -> ! {
     agave_kernel::init(boot_info);
-    print!("\x1b[?25h"); // Enable cursor
+    print!("\x1b[?25h");
     loop {
         if let Some(cmd) = option_env!("agave_os_CMD") {
             let prompt = usr::shell::prompt_string(true);

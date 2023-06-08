@@ -116,6 +116,11 @@ pub fn copy_files(verbose: bool) {
         include_bytes!("../../../../dsk/ini/palettes/agave-light.csv"),
         verbose,
     );
+    copy_file(
+        "/ini/palettes/synthwave.csv",
+        include_bytes!("../../../../dsk/ini/palettes/synthwave.csv"),
+        verbose,
+    );
 
     create_dir("/ini/fonts", verbose);
     //copy_file("/ini/fonts/lat15-terminus-8x16.psf", include_bytes!("../../dsk/ini/fonts/lat15-terminus-8x16.psf"), verbose);

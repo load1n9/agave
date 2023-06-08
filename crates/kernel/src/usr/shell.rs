@@ -5,6 +5,7 @@ use crate::api::prompt::Prompt;
 use crate::api::regex::Regex;
 use crate::api::syscall;
 use crate::sys::fs::FileType;
+use crate::sys::process::current_parent_dir;
 use crate::{api, sys, usr};
 
 use alloc::collections::btree_map::BTreeMap;
@@ -278,7 +279,9 @@ fn cmd_change_dir(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
         }
         2 => {
             if args[1] == ".." {
-                println!("Not allowed to go up a directory that way until we have a proper filesystem");
+                // println!("Not allowed to go up a directory that way until we have a proper filesystem");
+                sys::process::set_dir(&current_parent_dir());
+                return Ok(());
             }
             let mut pathname = fs::realpath(args[1]);
             if pathname.len() > 1 {

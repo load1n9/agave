@@ -79,6 +79,25 @@ pub fn dir() -> String {
     proc.data.dir.clone()
 }
 
+pub fn current_parent_dir() -> String {
+    let table = PROCESS_TABLE.read();
+    let proc = &table[id()];
+    let binding = proc.data.dir.clone();
+    let parent = crate::api::path::Path::new(&binding).parent();
+    match parent {
+        Some(parent) => parent.to_str().unwrap().to_string(),
+        None => "/".to_string(),
+    }
+}
+
+pub fn parent_dir(path: String) -> String {
+    let parent = crate::api::path::Path::new(&path).parent();
+    match parent {
+        Some(parent) => parent.to_str().unwrap().to_string(),
+        None => "/".to_string(),
+    }
+}
+
 pub fn user() -> Option<String> {
     let table = PROCESS_TABLE.read();
     let proc = &table[id()];

@@ -277,6 +277,9 @@ fn cmd_change_dir(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
             Ok(())
         }
         2 => {
+            if args[1] == ".." {
+                println!("Not allowed to go up a directory that way until we have a proper filesystem");
+            }
             let mut pathname = fs::realpath(args[1]);
             if pathname.len() > 1 {
                 pathname = pathname.trim_end_matches('/').into();
@@ -472,29 +475,29 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "2048" => usr::pow::main(&args),
         "alias" => cmd_alias(&args, config),
         "base64" => usr::base64::main(&args),
-        "copy" => usr::copy::main(&args),
+        "cp" => usr::copy::main(&args),
         "date" => usr::date::main(&args),
-        "delete" => usr::delete::main(&args),
+        "rm" => usr::rm::main(&args),
         "dhcp" => usr::dhcp::main(&args),
         "disk" => usr::disk::main(&args),
         "elf" => usr::elf::main(&args),
         "env" => usr::env::main(&args),
         "edit" => usr::editor::main(&args),
         "find" => usr::find::main(&args),
-        "goto" => cmd_change_dir(&args, config), // TODO: Remove this
+        "cd" => cmd_change_dir(&args, config),
         "help" => usr::help::main(&args),
         "hex" => usr::hex::main(&args),
         "host" => usr::host::main(&args),
         "http" => usr::http::main(&args),
         "install" => usr::install::main(&args),
         "keyboard" => usr::keyboard::main(&args),
-        "list" => usr::list::main(&args),
+        "ls" => usr::ls::main(&args),
         "memory" => usr::memory::main(&args),
-        "move" => usr::r#move::main(&args),
+        "move" => usr::r#mv::main(&args),
         "net" => usr::net::main(&args),
         "pci" => usr::pci::main(&args),
         "proc" => cmd_proc(&args),
-        "quit" => Err(ExitCode::ShellExit),
+        "exit" => Err(ExitCode::ShellExit),
         "read" => usr::read::main(&args),
         "set" => cmd_set(&args, config),
         "shell" => usr::shell::main(&args),

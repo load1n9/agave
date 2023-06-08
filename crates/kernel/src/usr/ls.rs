@@ -31,8 +31,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
     }
 
-    // The commands `list /usr/alice/` and `list /usr/alice` are equivalent,
-    // but `list /` should not be modified.
     if path.len() > 1 {
         path = path.trim_end_matches('/');
     }

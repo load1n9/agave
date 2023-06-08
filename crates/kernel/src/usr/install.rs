@@ -36,8 +36,8 @@ pub fn copy_files(verbose: bool) {
         verbose,
     );
     copy_file(
-        "/bin/print",
-        include_bytes!("../../../../dsk/bin/print"),
+        "/bin/echo",
+        include_bytes!("../../../../dsk/bin/echo"),
         verbose,
     );
     copy_file(

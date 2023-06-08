@@ -20,7 +20,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
     // TODO: Avoid doing copy+delete
     match usr::copy::main(args) {
-        Ok(()) => usr::delete::main(&args[0..2]),
+        Ok(()) => usr::rm::main(&args[0..2]),
         _ => Err(ExitCode::Failure),
     }
 }

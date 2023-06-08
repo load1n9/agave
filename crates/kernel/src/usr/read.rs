@@ -61,7 +61,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 Err(ExitCode::Failure)
             }
         } else if info.is_dir() {
-            usr::list::main(args)
+            usr::ls::main(args)
         } else if info.is_device() {
             let is_char_device = info.size() == 4;
             let is_float_device = info.size() == 8;

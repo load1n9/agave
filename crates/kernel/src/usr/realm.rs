@@ -78,8 +78,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             println!(
                 "{}\nExited {}`{}`{} {}realm{}",
                 Style::color("LightGreen"),
-                Style::reset(),
                 Style::color("Green"),
+                realm,
                 Style::reset(),
                 Style::color("LightGreen"),
                 Style::reset(),
@@ -114,7 +114,13 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 );
                 Ok(())
             } else {
-                println!("\nActive realm: {}", realm);
+                println!(
+                    "\n{}Active realm: {}{}{}",
+                    Style::color("LightGreen"),
+                    Style::color("Green"),
+                    realm,
+                    Style::reset()
+                );
                 Ok(())
             }
         }

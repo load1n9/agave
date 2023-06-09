@@ -16,69 +16,113 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
         "create" => {
             if args.len() < 3 {
-                error!("Invalid command");
+                error!("\nInvalid command");
                 return Err(ExitCode::Failure);
             }
             let realm = args[2];
             if realm == "bin" {
-                error!("Invalid realm name");
+                error!("\nInvalid realm name");
                 return Err(ExitCode::Failure);
             }
             if crate::sys::realm::realm_exists(realm) {
-                error!("Realm already exists");
+                error!("\nRealm already exists");
                 return Err(ExitCode::Failure);
             }
             crate::sys::realm::create_realm(realm);
-            println!("Realm {} created successfully", realm);
+            println!(
+                "\n {}created realm {}{}{} {}successfully{}",
+                Style::color("LightGreen"),
+                Style::color("Green"),
+                realm,
+                Style::reset(),
+                Style::color("LightGreen"),
+                Style::reset()
+            );
             Ok(())
         }
         "enter" => {
             if args.len() < 3 {
-                error!("Invalid command");
+                error!("\nInvalid command");
                 return Err(ExitCode::Failure);
             }
             let realm = args[2];
             if realm == "bin" {
-                error!("Invalid realm name");
+                error!("\nInvalid realm name `{}`", realm);
                 return Err(ExitCode::Failure);
             }
             if !crate::sys::realm::realm_exists(realm) {
-                error!("Realm does not exist");
+                error!("\nRealm `{}` does not exist", realm);
                 return Err(ExitCode::Failure);
             }
             crate::sys::realm::enter_realm(realm);
-            println!("Realm {} entered", realm);
+            println!(
+                "\n{}entered {}`{}`{} {}realm {}",
+                Style::color("LightGreen"),
+                Style::color("Green"),
+                realm,
+                Style::reset(),
+                Style::color("LightGreen"),
+                Style::reset()
+            );
 
             Ok(())
         }
         "exit" => {
+            let realm = crate::sys::realm::get_current_realm().clone();
+            if realm == "bin" {
+                error!("\nNo active realm");
+                return Err(ExitCode::Failure);
+            }
             crate::sys::realm::exit_realm();
-            println!("Exited realm");
+
+            println!(
+                "{}\nExited {}`{}`{} {}realm{}",
+                Style::color("LightGreen"),
+                Style::reset(),
+                Style::color("Green"),
+                Style::reset(),
+                Style::color("LightGreen"),
+                Style::reset(),
+            );
             Ok(())
         }
         "delete" => {
             if args.len() < 3 {
-                error!("Invalid command");
+                error!("\nInvalid command");
                 return Err(ExitCode::Failure);
             }
             let realm = args[2];
             if realm == "bin" {
-                error!("Invalid realm name");
+                error!("\nInvalid realm name");
                 return Err(ExitCode::Failure);
             }
             if !crate::sys::realm::realm_exists(realm) {
-                error!("Realm does not exist");
+                error!("\nRealm does not exist");
                 return Err(ExitCode::Failure);
             }
             crate::sys::realm::delete_realm(realm);
             println!("Realm {} deleted", realm);
             Ok(())
         }
+        "active" => {
+            let realm = crate::sys::realm::get_current_realm();
+            if realm == "bin" {
+                println!(
+                    "\n{}No active realm{}",
+                    Style::color("LightGray"),
+                    Style::reset()
+                );
+                Ok(())
+            } else {
+                println!("\nActive realm: {}", realm);
+                Ok(())
+            }
+        }
         "list" => {
             let realms = crate::sys::realm::get_realms();
-            println!("Realms:");
+            println!("\nRealms:");
             for realm in realms {
-                println!("  {}", realm);
+                println!("-  {}", realm);
             }
             Ok(())
         }

@@ -45,6 +45,7 @@ pub mod keyboard;
 pub mod mem;
 pub mod mouse;
 pub mod net;
+pub mod net_manager;
 pub mod pci;
 pub mod pic;
 pub mod process;

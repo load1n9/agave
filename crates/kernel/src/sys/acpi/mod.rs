@@ -1,5 +1,4 @@
 use crate::sys;
-
 use acpi::{AcpiHandler, AcpiTables, PhysicalMapping};
 use alloc::boxed::Box;
 use aml::value::AmlValue;
@@ -10,6 +9,8 @@ use core::ptr::NonNull;
 use x86_64::instructions::port::Port;
 #[cfg(feature = "x86_64")]
 use x86_64::PhysAddr;
+
+pub mod sdt;
 
 #[allow(dead_code)]
 #[repr(u64)]

@@ -63,7 +63,11 @@ smoltcp = { version = "0.9.1", default-features = false, features = [
     "socket-udp",
     "socket-dhcpv4",
     "proto-ipv4",
+    "proto-igmp",
+    "proto-ipv6",
     "proto-dhcpv4",
+    "socket-raw",
+    "socket-icmp"
 ] }
 unix_str = { version = "1.0.0", default-features = false, features = [
     "alloc",

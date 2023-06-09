@@ -1,3 +1,5 @@
+// ported from https://gitlab.com/SnejUgal/unix_path/-/blob/master/src/lossy.rs
+
 use core::char;
 use core::fmt::{self, Write};
 use core::mem;

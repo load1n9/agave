@@ -1,0 +1,8 @@
+[package]
+name = "bootloader-boot-config"
+version = "0.1.0"
+edition = "2021"
+description = "The runtime configurations that are saved in a JSON file for the bootloader crate"
+
+[dependencies]
+serde = { version = "1.0.152", default-features = false, features = ["derive"] }

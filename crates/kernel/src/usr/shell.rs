@@ -7,6 +7,7 @@ use crate::api::regex::Regex;
 use crate::api::syscall;
 use crate::sys::fs::FileType;
 use crate::sys::process::{current_parent_dir, dir};
+use crate::sys::realm;
 use crate::{api, sys, usr};
 
 use alloc::collections::btree_map::BTreeMap;
@@ -44,6 +45,14 @@ fn autocomplete_commands() -> Vec<String> {
     let mut res = Vec::new();
     for cmd in AUTOCOMPLETE_COMMANDS {
         res.push(cmd.to_string());
+    }
+    let current = realm::get_current_realm();
+    if realm::realm_exists(&current.as_str()) {
+        if let Ok(files) = fs::read_dir(realm::get_realm_path(&current.as_str()).as_str()) {
+            for file in files {
+                res.push(file.name());
+            }
+        }
     }
     if let Ok(files) = fs::read_dir("/bin") {
         for file in files {
@@ -542,6 +551,13 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
                 }
                 Some(FileType::File) => spawn(&path, &args),
                 _ => {
+                    let current = realm::get_current_realm();
+                    if realm::realm_exists(&current.as_str()) {
+                        let path = format!("{}/{}", realm::get_realm_path(&current.as_str()).as_str(), args[0]);
+                        if fs::exists(path.as_str()) {
+                            return spawn(&path, &args);
+                        }
+                    }
                     let path = format!("/bin/{}", args[0]);
                     spawn(&path, &args)
                 }

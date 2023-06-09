@@ -1,7 +1,6 @@
 pub mod base64;
 pub mod copy;
 pub mod date;
-pub mod rm;
 pub mod dhcp;
 pub mod disk;
 pub mod editor;
@@ -23,6 +22,8 @@ pub mod palette;
 pub mod pci;
 pub mod pow;
 pub mod read;
+pub mod realm;
+pub mod rm;
 pub mod shell;
 pub mod socket;
 pub mod tcp;

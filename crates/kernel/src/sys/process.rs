@@ -67,6 +67,12 @@ pub fn env(key: &str) -> Option<String> {
     proc.data.env.get(key).cloned()
 }
 
+pub fn delete_env(key: &str) {
+    let mut table = PROCESS_TABLE.write();
+    let proc = &mut table[id()];
+    proc.data.env.remove(key);
+}
+
 pub fn envs() -> BTreeMap<String, String> {
     let table = PROCESS_TABLE.read();
     let proc = &table[id()];

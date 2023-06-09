@@ -49,6 +49,7 @@ pub mod pci;
 pub mod pic;
 pub mod process;
 pub mod random;
+pub mod realm;
 pub mod serial;
 pub mod syscall;
 pub mod time;

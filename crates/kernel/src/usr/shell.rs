@@ -15,11 +15,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::sync::atomic::{fence, Ordering};
 
-const AUTOCOMPLETE_COMMANDS: [&str; 36] = [
+const AUTOCOMPLETE_COMMANDS: [&str; 38] = [
     "2048", "alias", "base64", "cp", "date", "rm", "dhcp", "disk", "edit", "env", "cd", "help",
     "hex", "host", "http", "find", "install", "keyboard", "ls", "memory", "mv", "net", "pci",
     "proc", "exit", "read", "shell", "socket", "tcp", "time", "version", "user", "vga", "palette",
-    "theme", "write",
+    "theme", "write", "run", "realm",
 ];
 
 struct Config {
@@ -528,6 +528,7 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "panic" => panic!("{}", args[1..].join(" ")),
         "hedgehog" => usr::hedgehog::main(&args),
         "run" => usr::wasm::main(&args),
+        "realm" => usr::realm::main(&args),
         _ => {
             let mut path = fs::realpath(args[0]);
             if path.len() > 1 {

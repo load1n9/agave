@@ -10,13 +10,6 @@ default-run = "agave-os"
 members = [
     "crates/kernel",
     "libs/*",
-    "crates/bootloader-api",
-    "crates/bootloader-common",
-    "crates/bootloader-common/config",
-    "crates/bootloader-uefi",
-    "crates/bootloader-bios/boot_sector",
-    "crates/bootloader-bios/stage-*",
-    "crates/bootloader-bios/common",
 ]
 
 [features]
@@ -38,47 +31,3 @@ agave-kernel = { path = "crates/kernel", features = ["x86_64", "video"] }
 
 [package.metadata.bootimage]
 test-success-exit-code = 33 # (0x10 << 1) | 1
-
-
-# duplicated from `bios/boot_sector/Cargo.toml`
-[profile.stage-1]
-inherits = "release"
-opt-level = "s"
-lto = true
-codegen-units = 1
-debug = false
-overflow-checks = false
-
-# duplicated from `bios/stage-2/Cargo.toml`
-[profile.stage-2]
-inherits = "release"
-opt-level = "s"
-codegen-units = 1
-debug = false
-overflow-checks = true
-
-# duplicated from `bios/stage-3/Cargo.toml`
-[profile.stage-3]
-inherits = "release"
-debug = true
-overflow-checks = true
-
-# duplicated from `bios/stage-4/Cargo.toml`
-[profile.stage-4]
-inherits = "release"
-debug = true
-overflow-checks = true
-
-[profile.lto]
-inherits = "release"
-lto = true
-
-
-[build-dependencies]
-llvm-tools = "0.1.1"
-async-process = "1.6.0"
-futures = "0.3.25"
-futures-concurrency = "7.0.0"
-
-[package.metadata.docs.rs]
-rustc-args = ["--cfg", "docsrs_dummy_build"]

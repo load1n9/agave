@@ -19,6 +19,8 @@ pub fn copy_files(verbose: bool) {
     create_dir("/tmp", verbose); // Temporaries
     create_dir("/usr", verbose); // User directories
     create_dir("/var", verbose); // Variables
+    create_dir("/realms", verbose); // variables
+
 
     copy_file(
         "/bin/clear",
@@ -145,8 +147,6 @@ pub fn copy_files(verbose: bool) {
         include_bytes!("../../../../dsk/tmp/machines.txt"),
         verbose,
     );
-
-    create_dir("/tmp/lisp", verbose);
 
     create_dir("/tmp/beep", verbose);
     copy_file(

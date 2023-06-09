@@ -1,11 +1,12 @@
 use crate::api::console::Style;
 use crate::api::fs;
+use crate::api::path::PathBuf;
 use crate::api::process::ExitCode;
 use crate::api::prompt::Prompt;
 use crate::api::regex::Regex;
 use crate::api::syscall;
 use crate::sys::fs::FileType;
-use crate::sys::process::current_parent_dir;
+use crate::sys::process::{current_parent_dir, dir};
 use crate::{api, sys, usr};
 
 use alloc::collections::btree_map::BTreeMap;
@@ -14,11 +15,11 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::sync::atomic::{fence, Ordering};
 
-const AUTOCOMPLETE_COMMANDS: [&str; 35] = [
-    "2048", "base64", "calc", "copy", "date", "delete", "dhcp", "disk", "edit", "elf", "env",
-    "goto", "help", "hex", "host", "http", "httpd", "install", "keyboard", "life", "lisp", "list",
-    "memory", "move", "net", "pci", "quit", "read", "shell", "socket", "tcp", "time", "user",
-    "vga", "write",
+const AUTOCOMPLETE_COMMANDS: [&str; 36] = [
+    "2048", "alias", "base64", "cp", "date", "rm", "dhcp", "disk", "edit", "env", "cd", "help",
+    "hex", "host", "http", "find", "install", "keyboard", "ls", "memory", "mv", "net", "pci",
+    "proc", "exit", "read", "shell", "socket", "tcp", "time", "version", "user", "vga", "palette",
+    "theme", "write",
 ];
 
 struct Config {
@@ -275,28 +276,38 @@ fn cmd_change_dir(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
     match args.len() {
         1 => {
             println!("{}", sys::process::dir());
-            Ok(())
+            return Ok(());
         }
         2 => {
-            if args[1] == ".." {
-                // println!("Not allowed to go up a directory that way until we have a proper filesystem");
-                sys::process::set_dir(&current_parent_dir());
-                return Ok(());
-            }
-            let mut pathname = fs::realpath(args[1]);
-            if pathname.len() > 1 {
-                pathname = pathname.trim_end_matches('/').into();
-            }
-            if api::fs::is_dir(&pathname) {
-                sys::process::set_dir(&pathname);
+            let mut pathname = PathBuf::from(args[1]);
+            if pathname.starts_with("..") {
+                while pathname.starts_with("..") {
+                    sys::process::set_dir(&current_parent_dir());
+                    pathname = pathname.strip_prefix("..").unwrap().to_path_buf();
+                }
+                if !pathname.as_unix_str().is_empty() {
+                    sys::process::set_dir(
+                        format!("{}{}", dir(), &pathname.to_path_buf().to_string_lossy()).as_str(),
+                    );
+                }
                 config.env.insert("DIR".to_string(), sys::process::dir());
-                Ok(())
+                return Ok(());
             } else {
-                error!("File not found '{}'", pathname);
-                Err(ExitCode::Failure)
+                let mut pathname = fs::realpath(args[1]);
+                if pathname.len() > 1 {
+                    pathname = pathname.trim_end_matches('/').into();
+                }
+                if api::fs::is_dir(&pathname) {
+                    sys::process::set_dir(&pathname);
+                    config.env.insert("DIR".to_string(), sys::process::dir());
+                    return Ok(());
+                } else {
+                    error!("File not found '{}'", pathname);
+                    return Err(ExitCode::Failure);
+                }
             }
         }
-        _ => Err(ExitCode::Failure),
+        _ => return Err(ExitCode::Failure),
     }
 }
 
@@ -483,20 +494,20 @@ fn exec_with_config(cmd: &str, config: &mut Config) -> Result<(), ExitCode> {
         "rm" => usr::rm::main(&args),
         "dhcp" => usr::dhcp::main(&args),
         "disk" => usr::disk::main(&args),
+        "edit" => usr::editor::main(&args),
         "elf" => usr::elf::main(&args),
         "env" => usr::env::main(&args),
-        "edit" => usr::editor::main(&args),
-        "find" => usr::find::main(&args),
         "cd" => cmd_change_dir(&args, config),
-        "help" => usr::help::main(&args),
         "hex" => usr::hex::main(&args),
         "host" => usr::host::main(&args),
+        "help" => usr::help::main(&args),
         "http" => usr::http::main(&args),
+        "find" => usr::find::main(&args),
         "install" => usr::install::main(&args),
         "keyboard" => usr::keyboard::main(&args),
         "ls" => usr::ls::main(&args),
         "memory" => usr::memory::main(&args),
-        "move" => usr::r#mv::main(&args),
+        "mv" => usr::r#mv::main(&args),
         "net" => usr::net::main(&args),
         "pci" => usr::pci::main(&args),
         "proc" => cmd_proc(&args),

@@ -21,7 +21,6 @@ pub fn copy_files(verbose: bool) {
     create_dir("/var", verbose); // Variables
     create_dir("/realms", verbose); // variables
 
-
     copy_file(
         "/bin/clear",
         include_bytes!("../../../../dsk/bin/clear"),
@@ -30,11 +29,6 @@ pub fn copy_files(verbose: bool) {
     copy_file(
         "/bin/halt",
         include_bytes!("../../../../dsk/bin/halt"),
-        verbose,
-    );
-    copy_file(
-        "/bin/hello",
-        include_bytes!("../../../../dsk/bin/hello"),
         verbose,
     );
     copy_file(
@@ -125,7 +119,11 @@ pub fn copy_files(verbose: bool) {
     );
 
     create_dir("/ini/fonts", verbose);
-    //copy_file("/ini/fonts/lat15-terminus-8x16.psf", include_bytes!("../../dsk/ini/fonts/lat15-terminus-8x16.psf"), verbose);
+    copy_file(
+        "/ini/fonts/lat15-terminus-8x16.psf",
+        include_bytes!("../../../../dsk/ini/fonts/lat15-terminus-8x16.psf"),
+        verbose,
+    );
     copy_file(
         "/ini/fonts/zap-light-8x16.psf",
         include_bytes!("../../../../dsk/ini/fonts/zap-light-8x16.psf"),
@@ -134,41 +132,6 @@ pub fn copy_files(verbose: bool) {
     copy_file(
         "/ini/fonts/zap-vga-8x16.psf",
         include_bytes!("../../../../dsk/ini/fonts/zap-vga-8x16.psf"),
-        verbose,
-    );
-
-    copy_file(
-        "/tmp/alice.txt",
-        include_bytes!("../../../../dsk/tmp/alice.txt"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/machines.txt",
-        include_bytes!("../../../../dsk/tmp/machines.txt"),
-        verbose,
-    );
-
-    create_dir("/tmp/beep", verbose);
-    copy_file(
-        "/tmp/beep/tetris.sh",
-        include_bytes!("../../../../dsk/tmp/beep/tetris.sh"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/beep/starwars.sh",
-        include_bytes!("../../../../dsk/tmp/beep/starwars.sh"),
-        verbose,
-    );
-    copy_file(
-        "/tmp/beep/mario.sh",
-        include_bytes!("../../../../dsk/tmp/beep/mario.sh"),
-        verbose,
-    );
-
-    create_dir("/var/www", verbose);
-    copy_file(
-        "/var/www/index.html",
-        include_bytes!("../../../../dsk/var/www/index.html"),
         verbose,
     );
 }

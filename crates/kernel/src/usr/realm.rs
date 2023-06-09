@@ -30,7 +30,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             }
             crate::sys::realm::create_realm(realm);
             println!(
-                "\n {}created realm {}{}{} {}successfully{}",
+                "\n {}created realm {}`{}`{} {}successfully{}",
                 Style::color("LightGreen"),
                 Style::color("Green"),
                 realm,
@@ -68,6 +68,10 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             Ok(())
         }
         "exit" => {
+            if args.len() > 2 {
+                error!("\nToo many arguments");
+                return Err(ExitCode::Failure);
+            }
             let realm = crate::sys::realm::get_current_realm().clone();
             if realm == "bin" {
                 error!("\nNo active realm");
@@ -104,7 +108,11 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             println!("Realm {} deleted", realm);
             Ok(())
         }
-        "active" => {
+        "current" => {
+            if args.len() > 2 {
+                error!("\nToo many arguments");
+                return Err(ExitCode::Failure);
+            }
             let realm = crate::sys::realm::get_current_realm();
             if realm == "bin" {
                 println!(
@@ -125,6 +133,10 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             }
         }
         "list" => {
+            if args.len() > 2 {
+                error!("\nToo many arguments");
+                return Err(ExitCode::Failure);
+            }
             let realms = crate::sys::realm::get_realms();
             println!("\nRealms:");
             for realm in realms {
@@ -165,5 +177,6 @@ fn help() {
         "{}delete <realm>{}    Deletes the given realm",
         csi_option, csi_reset
     );
-    println!("{}list{}    Lists all the realms", csi_option, csi_reset);
+    println!("{}current{}    Current active realm", csi_option, csi_reset);
+    println!("{}list{}    List of all realms", csi_option, csi_reset);
 }

@@ -78,6 +78,7 @@ pub mod path;
 pub mod process;
 pub mod prompt;
 pub mod random;
+pub mod realm;
 pub mod regex;
 pub mod shapes;
 pub mod syscall;

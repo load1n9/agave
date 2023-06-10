@@ -22,6 +22,16 @@ pub fn copy_files(verbose: bool) {
     create_dir("/realms", verbose); // variables
 
     copy_file(
+        "/bin/hello",
+        include_bytes!("../../../../dsk/bin/hello"),
+        verbose,
+    );
+    copy_file(
+        "/bin/hmm",
+        include_bytes!("../../../../dsk/bin/hmm"),
+        verbose,
+    );
+    copy_file(
         "/bin/clear",
         include_bytes!("../../../../dsk/bin/clear"),
         verbose,

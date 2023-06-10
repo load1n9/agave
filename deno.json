@@ -1,11 +1,11 @@
 {
     "tasks": {
-        "build": "cargo bootimage",
         "qemu-img": "qemu-img create agave.img 32M",
         "env-thing": "touch src/lib.rs && env | grep AGAVE",
         "bootimage": "cargo bootimage --no-default-features --features video --bin agave-os --release",
         "dd": "dd conv=notrunc if=target/x86_64-agave_os/release/bootimage-agave-os.bin of=agave.img",
         "image": "deno task qemu-img && deno task env-thing && deno task bootimage && deno task dd",
-        "dev": "qemu-system-x86_64 -drive format=raw,file=target/x86_64-agave_os/debug/bootimage-agave_os.bin"
+        "dev": "qemu-system-x86_64 -drive format=raw,file=target/x86_64-agave_os/release/bootimage-agave-os.bin",
+        "compile": "cargo rustc --release --bin"
     }
 }

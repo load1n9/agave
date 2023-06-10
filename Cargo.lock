@@ -68,6 +68,7 @@ dependencies = [
  "agave-kernel",
  "bootloader",
  "bootloader_api",
+ "vte",
 ]
 
 [[package]]

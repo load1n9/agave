@@ -48,8 +48,8 @@ pub fn shutdown() {
     let slp_len = 1 << 13;
 
     log!("ACPI Shutdown\n");
-    let mut aml = AmlContext::new(Box::new(MorosAmlHandler), DebugVerbosity::None);
-    let res = unsafe { AcpiTables::search_for_rsdp_bios(MorosAcpiHandler) };
+    let mut aml = AmlContext::new(Box::new(AgaveAmlHandler), DebugVerbosity::None);
+    let res = unsafe { AcpiTables::search_for_rsdp_bios(AgaveAcpiHandler) };
     match res {
         Ok(acpi) => {
             //debug!("ACPI Found RDSP in BIOS");
@@ -57,14 +57,14 @@ pub fn shutdown() {
                 if sign.as_str() == "FACP" {
                     //debug!("ACPI Found FACP at {:#x}", sdt.physical_address);
 
-                    /*
                     // Enable ACPI
                     let smi_cmd_port = read_fadt::<u16>(sdt.physical_address, FADT::SmiCmdPort);
                     let acpi_enable = read_fadt::<u8>(sdt.physical_address, FADT::AcpiEnable);
                     let mut port: Port<u8> = Port::new(smi_cmd_port);
-                    unsafe { port.write(acpi_enable); }
+                    unsafe {
+                        port.write(acpi_enable);
+                    }
                     sys::time::sleep(3.0);
-                    */
 
                     pm1a_control_block =
                         read_fadt::<u32>(sdt.physical_address, FADT::Pm1aControlBlock);
@@ -111,9 +111,9 @@ pub fn shutdown() {
 }
 
 #[derive(Clone)]
-pub struct MorosAcpiHandler;
+pub struct AgaveAcpiHandler;
 
-impl AcpiHandler for MorosAcpiHandler {
+impl AcpiHandler for AgaveAcpiHandler {
     unsafe fn map_physical_region<T>(
         &self,
         physical_address: usize,
@@ -133,9 +133,9 @@ impl AcpiHandler for MorosAcpiHandler {
     fn unmap_physical_region<T>(_region: &PhysicalMapping<Self, T>) {}
 }
 
-struct MorosAmlHandler;
+struct AgaveAmlHandler;
 
-impl Handler for MorosAmlHandler {
+impl Handler for AgaveAmlHandler {
     fn read_u8(&self, address: usize) -> u8 {
         read_addr::<u8>(address)
     }

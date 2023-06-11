@@ -49,6 +49,7 @@ pub mod net_manager;
 pub mod pci;
 pub mod pic;
 pub mod process;
+pub mod ps2;
 pub mod random;
 pub mod realm;
 pub mod serial;

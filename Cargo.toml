@@ -27,7 +27,7 @@ panic = "abort"
 [dependencies]
 bootloader = { version = "0.9.23", features = ["map_physical_memory"] }
 bootloader_api = { version = "0.11.3" }
-agave-kernel = { path = "crates/kernel", features = ["x86_64", "video"] }
+agave-kernel = { path = "crates/kernel", features = ["x86_64", "video"], version = "0.1.0"}
 vte = "0.11.0"
 
 

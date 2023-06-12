@@ -75,6 +75,7 @@ pub mod font;
 pub mod framebuffer;
 pub mod fs;
 pub mod io;
+pub mod json;
 pub mod memory;
 pub mod path;
 pub mod process;

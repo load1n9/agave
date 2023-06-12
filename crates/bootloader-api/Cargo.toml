@@ -9,11 +9,5 @@ x86_64 = []
 video = []
 serial = []
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
 [dependencies]
 acpi = "4.1.0"

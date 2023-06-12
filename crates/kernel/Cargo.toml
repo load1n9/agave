@@ -74,11 +74,13 @@ smoltcp = { version = "0.9.1", default-features = false, features = [
     "socket-raw",
     "socket-icmp"
 ] }
+intrusive-collections = "0.9.0"
 unix_str = { version = "1.0.0", default-features = false, features = [
     "alloc",
     "shrink_to"
 ] }
 serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
+atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 
 [dependencies.num_enum]
 version = "0.6.1"

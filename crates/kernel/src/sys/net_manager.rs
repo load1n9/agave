@@ -28,6 +28,6 @@ pub trait NetworkInterface {
 
 pub type NetworkInterfaceRef = Arc<Mutex<dyn NetworkInterface + Send>>;
 
-// pub fn add_to_network_interfaces<T: NetworkInterface + 'static + Send>(iface: T) {
-//     NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
-// }
+pub fn add_to_network_interfaces<T: NetworkInterface + 'static + Send>(iface: T) {
+    NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
+}

@@ -10,6 +10,9 @@ use derive_more::*;
 use paste::paste;
 use zerocopy::FromBytes;
 
+#[cfg(feature = "x86_64")]
+use x86_64::{PhysAddr, VirtAddr};
+
 macro_rules! implement_address {
     ($TypeName:ident, $desc:literal, $prefix:literal, $is_canonical:ident, $canonicalize:ident, $chunk:ident) => {
         paste! {
@@ -174,6 +177,16 @@ implement_address!(
     page
 );
 
+impl Into<VirtAddr> for VirtualAddress {
+    #[inline]
+    fn into(self) -> VirtAddr {
+        VirtAddr::new(self.0 as u64)
+    }
+}
+
+
+
+
 implement_address!(
     PhysicalAddress,
     "physical",
@@ -182,6 +195,13 @@ implement_address!(
     canonicalize_physical_address,
     frame
 );
+
+impl Into<PhysAddr> for PhysicalAddress {
+    #[inline]
+    fn into(self) -> PhysAddr {
+        PhysAddr::new(self.0 as u64)
+    }
+}
 
 macro_rules! implement_page_frame {
     ($TypeName:ident, $desc:literal, $prefix:literal, $address:ident) => {

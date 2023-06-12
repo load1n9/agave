@@ -6,11 +6,11 @@ use x86_64::instructions::interrupts;
 #[cfg(feature = "x86_64")]
 use x86_64::registers::control::Cr3;
 #[cfg(feature = "x86_64")]
-pub use x86_64::structures::paging::{
+use x86_64::structures::paging::{
     FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB, Translate,
 };
 #[cfg(feature = "x86_64")]
-pub use x86_64::{PhysAddr, VirtAddr};
+use x86_64::{PhysAddr, VirtAddr};
 
 pub static mut PHYS_MEM_OFFSET: u64 = 0;
 pub static mut MEMORY_MAP: Option<&MemoryMap> = None;

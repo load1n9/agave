@@ -19,6 +19,7 @@ use crate::{
     arch::jump_to_kernel,
     memory::{Frame, VirtualAddress},
 };
+use agave_uefi_bootloader_api::{BootInformation, FrameBuffer, FrameBufferInfo, PixelFormat};
 use core::{fmt::Write, ptr::NonNull};
 use log::{error, info};
 use uefi::{
@@ -30,7 +31,6 @@ use uefi::{
     },
     Handle, Status,
 };
-use agave_uefi_bootloader_api::{BootInformation, FrameBuffer, FrameBufferInfo, PixelFormat};
 
 pub(crate) use context::{BootContext, RuntimeContext};
 

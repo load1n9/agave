@@ -1,6 +1,7 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(abi_x86_interrupt)]
+#![feature(doc_cfg)]
 #![feature(error_in_core)]
 #![feature(step_trait)]
 #![feature(alloc_error_handler)]

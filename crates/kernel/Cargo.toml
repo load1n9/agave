@@ -81,7 +81,12 @@ unix_str = { version = "1.0.0", default-features = false, features = [
     "shrink_to"
 ] }
 serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 atomic_linked_list = { path = "../../libs/atomic_linked_list" }
+agave-uefi-bootloader-api = { path = "../uefi-bootloader-api", features = [
+    "x86_64",
+    "video"
+], version = "0.1.0" }
 
 [dependencies.num_enum]
 version = "0.6.1"

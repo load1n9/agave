@@ -33,6 +33,7 @@ macro_rules! log {
 pub mod acpi;
 pub mod allocator;
 pub mod ata;
+pub mod boot_info;
 pub mod clock;
 pub mod cmos;
 pub mod console;
@@ -49,6 +50,7 @@ pub mod net;
 pub mod net_manager;
 pub mod no_drop;
 pub mod page_alloc;
+pub mod page_table_entry;
 pub mod pci;
 pub mod pic;
 pub mod process;

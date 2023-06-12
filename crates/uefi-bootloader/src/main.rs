@@ -30,7 +30,7 @@ use uefi::{
     },
     Handle, Status,
 };
-use uefi_bootloader_api::{BootInformation, FrameBuffer, FrameBufferInfo, PixelFormat};
+use agave_uefi_bootloader_api::{BootInformation, FrameBuffer, FrameBufferInfo, PixelFormat};
 
 pub(crate) use context::{BootContext, RuntimeContext};
 

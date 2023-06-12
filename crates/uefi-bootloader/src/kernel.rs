@@ -13,7 +13,7 @@ use uefi::{
     table::boot::MemoryType,
     CStr16,
 };
-use uefi_bootloader_api::ElfSection;
+use agave_uefi_bootloader_api::ElfSection;
 
 const KERNEL_NAME: &CStr16 = cstr16!("kernel.elf");
 

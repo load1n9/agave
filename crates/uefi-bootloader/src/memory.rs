@@ -15,7 +15,7 @@ use uefi::table::{
     boot::{AllocateType, MemoryDescriptor, MemoryMapIter, MemoryType},
     Boot, SystemTable,
 };
-use uefi_bootloader_api::{MemoryRegion, MemoryRegionKind};
+use agave_uefi_bootloader_api::{MemoryRegion, MemoryRegionKind};
 use zerocopy::FromBytes;
 
 pub(crate) use imp::{set_up_arch_specific_mappings, Mapper, PageAllocator, PteFlags};

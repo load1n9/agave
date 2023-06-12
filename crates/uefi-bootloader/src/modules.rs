@@ -5,7 +5,7 @@ use uefi::{
     proto::media::file::{File, FileAttribute, FileMode},
     table::boot::MemoryType,
 };
-use uefi_bootloader_api::Module;
+use agave_uefi_bootloader_api::Module;
 
 const MODULES_MEMORY: MemoryType = MemoryType::custom(0x8000_0000);
 

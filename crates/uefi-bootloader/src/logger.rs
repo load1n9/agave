@@ -7,7 +7,7 @@ use noto_sans_mono_bitmap::{
     get_raster, get_raster_width, FontWeight, RasterHeight, RasterizedChar,
 };
 use spin::{Mutex, Once};
-use uefi_bootloader_api::{FrameBufferInfo, PixelFormat};
+use agave_uefi_bootloader_api::{FrameBufferInfo, PixelFormat};
 
 /// The global logger instance used for the `log` crate.
 pub(crate) static LOGGER: Once<LockedLogger> = Once::new();

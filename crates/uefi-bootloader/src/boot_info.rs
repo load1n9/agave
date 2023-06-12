@@ -4,7 +4,7 @@ use crate::{
     memory::{FrameAllocator, Page, PageRange, PteFlags},
 };
 use core::{alloc::Layout, mem::MaybeUninit, slice};
-use uefi_bootloader_api::{BootInformation, ElfSection, FrameBuffer, MemoryRegion, Module};
+use agave_uefi_bootloader_api::{BootInformation, ElfSection, FrameBuffer, MemoryRegion, Module};
 
 impl RuntimeContext {
     pub(crate) fn create_boot_info(

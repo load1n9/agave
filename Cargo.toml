@@ -7,7 +7,7 @@ edition = "2021"
 default-run = "agave-os"
 
 [workspace]
-members = ["crates/kernel", "libs/*"]
+members = ["crates/*", "libs/*"]
 
 [features]
 default = ["video", "x86_64"]

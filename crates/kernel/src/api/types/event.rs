@@ -1,6 +1,7 @@
-use super::data::keycodes::KeyEvent;
-use super::data::mouse::MouseEvent;
-use super::shapes::{Coord, Rect};
+// ported from https://github.com/theseus-os/Theseus/blob/theseus_main/kernel/event_types/src/lib.rs
+use crate::api::data::keycodes::KeyEvent;
+use crate::api::data::mouse::MouseEvent;
+use crate::api::shapes::{Coord, Rect};
 use alloc::string::String;
 
 #[derive(Debug, Clone)]

@@ -9,6 +9,7 @@
 #![feature(never_type)]
 #![feature(exact_size_is_empty)]
 #![feature(custom_test_frameworks)]
+#![feature(ptr_internals)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 

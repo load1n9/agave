@@ -34,6 +34,7 @@ dependencies = [
  "futures-util",
  "hashbrown",
  "intrusive-collections",
+ "irq_safety",
  "lazy_static",
  "libm",
  "linked_list_allocator",
@@ -46,6 +47,7 @@ dependencies = [
  "num-traits",
  "num_enum",
  "object",
+ "owned_borrowed_trait",
  "paste",
  "pbkdf2",
  "pc-keyboard",
@@ -464,7 +466,7 @@ dependencies = [
  "hash32",
  "rustc_version",
  "spin 0.9.8",
- "stable_deref_trait",
+ "stable_deref_trait 1.2.0",
 ]
 
 [[package]]
@@ -496,6 +498,16 @@ name = "intx"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6f38a50a899dc47a6d0ed5508e7f601a2e34c3a85303514b5d137f3c10a0c75"
+
+[[package]]
+name = "irq_safety"
+version = "0.1.1"
+source = "git+https://github.com/theseus-os/irq_safety#39ef02580d199b32ac6336fc35ae73682b95bf89"
+dependencies = [
+ "owning_ref",
+ "spin 0.9.8",
+ "stable_deref_trait 1.1.1",
+]
 
 [[package]]
 name = "lazy_static"
@@ -720,6 +732,19 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+
+[[package]]
+name = "owned_borrowed_trait"
+version = "0.1.0"
+
+[[package]]
+name = "owning_ref"
+version = "0.4.1"
+source = "git+https://github.com/theseus-os/owning-ref-rs.git#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
+dependencies = [
+ "spin 0.9.8",
+ "stable_deref_trait 1.1.1",
+]
 
 [[package]]
 name = "paste"
@@ -1033,6 +1058,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b9eb1a2f4c41445a3a0ff9abc5221c5fcd28e1f13cd7c0397706f9ac938ddb0"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "stable_deref_trait"
+version = "1.1.1"
+source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
+dependencies = [
+ "spin 0.9.8",
 ]
 
 [[package]]

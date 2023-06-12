@@ -83,6 +83,8 @@ unix_str = { version = "1.0.0", default-features = false, features = [
 serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 atomic_linked_list = { path = "../../libs/atomic_linked_list" }
+owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 agave-uefi-bootloader-api = { path = "../uefi-bootloader-api", features = [
     "x86_64",
     "video"

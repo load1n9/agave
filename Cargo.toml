@@ -28,7 +28,7 @@ agave-kernel = { path = "crates/kernel", features = [
     "x86_64",
     "video"
 ], version = "0.1.0" }
-agave-bootloader-api = { path = "crates/bootloader-api", features = [
+agave-uefi-bootloader-api = { path = "crates/uefi-bootloader-api", features = [
     "x86_64",
     "video"
 ], version = "0.1.0" }

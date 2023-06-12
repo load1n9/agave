@@ -14,13 +14,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "agave-bootloader-api"
-version = "0.1.0"
-dependencies = [
- "acpi",
-]
-
-[[package]]
 name = "agave-kernel"
 version = "0.1.0"
 dependencies = [
@@ -75,11 +68,18 @@ dependencies = [
 name = "agave-os"
 version = "0.1.0"
 dependencies = [
- "agave-bootloader-api",
  "agave-kernel",
+ "agave-uefi-bootloader-api",
  "bootloader",
  "bootloader_api",
  "vte",
+]
+
+[[package]]
+name = "agave-uefi-bootloader-api"
+version = "0.1.0"
+dependencies = [
+ "acpi",
 ]
 
 [[package]]

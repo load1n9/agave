@@ -65,7 +65,7 @@ where
                 Ok(memory)
             };
 
-            crate::api::wasi::syscalls::proc_exit((param as usize).into());
+            crate::api::wasi::syscalls::proc_exit(param as u32);
         });
 
         linker.define("host", "hello", host_hello).unwrap();

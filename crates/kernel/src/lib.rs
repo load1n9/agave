@@ -2,6 +2,7 @@
 #![cfg_attr(test, no_main)]
 #![feature(abi_x86_interrupt)]
 #![feature(error_in_core)]
+#![feature(step_trait)]
 #![feature(alloc_error_handler)]
 #![feature(naked_functions)]
 #![feature(never_type)]

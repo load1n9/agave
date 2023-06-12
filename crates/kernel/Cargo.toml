@@ -39,6 +39,8 @@ spin = "0.9.8"
 pic8259 = "0.10.1"
 anyhow = { version = "1.0", default-features = false }
 pc-keyboard = "0.7.0"
+derive_more = "0.99.0"
+paste = "1.0.5"
 rand = { version = "0.8.5", default-features = false }
 rand_hc = "0.3.1"
 vte = "0.11.0"

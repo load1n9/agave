@@ -1,0 +1,39 @@
+[package]
+name = "agave-bootloader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1.0"
+derive_more = "0.99"
+log = "0.4"
+paste = "1.0"
+plain = "0.2"
+spin = "0.9"
+uefi = { git = "https://github.com/rust-osdev/uefi-rs", default-features = false }
+agave-bootloader-api = { path = "../bootloader-api" }
+zerocopy = "0.6"
+
+[dependencies.goblin]
+version = "0.7.1"
+default-features = false
+features = ["elf64"]
+
+[dependencies.noto-sans-mono-bitmap]
+version = "0.2"
+default-features = false
+features = [
+    "regular",
+    "size_16",
+    "unicode-basic-latin",
+    "unicode-specials",
+]
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+bit_field = "0.10"
+cortex-a = "8.1"
+tock-registers = "0.8"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+bit_field = "0.10"
+x86_64 = "0.14"

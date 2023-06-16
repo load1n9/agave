@@ -16,9 +16,9 @@
 extern crate alloc;
 extern crate lazy_static;
 
-use conquer_once::spin::OnceCell;
-use bootloader_x86_64_common::logger::LockedLogger;
 use bootloader_api::info::FrameBufferInfo;
+use bootloader_x86_64_common::logger::LockedLogger;
+use conquer_once::spin::OnceCell;
 
 pub static LOGGER: OnceCell<LockedLogger> = OnceCell::uninit();
 
@@ -26,7 +26,7 @@ pub fn init_logger(buffer: &'static mut [u8], info: FrameBufferInfo) {
     let logger = LOGGER.get_or_init(move || LockedLogger::new(buffer, info, true, false));
     log::set_logger(logger).expect("Logger already set");
     log::set_max_level(log::LevelFilter::Trace);
-    log::trace!(
+    log::info!(
         "AGAVE v{}\n",
         option_env!("AGAVE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
     );
@@ -44,7 +44,13 @@ use bootloader_api::BootInfo;
 const KERNEL_SIZE: usize = 2 << 20; // 2 MB
 
 pub fn init(boot_info: &'static mut BootInfo) {
-    sys::vga::init();
+    // sys::vga::init();
+    let frame_buffer_optional = &mut boot_info.framebuffer;
+    let frame_buffer_option = frame_buffer_optional.as_mut();
+    let frame_buffer_struct = frame_buffer_option.unwrap();
+    let frame_buffer_info = frame_buffer_struct.info().clone();
+    let raw_frame_buffer = frame_buffer_struct.buffer_mut();
+    init_logger(raw_frame_buffer, frame_buffer_info);
     sys::gdt::init();
     sys::idt::init();
     sys::pic::init(); // Enable interrupts
@@ -56,7 +62,7 @@ pub fn init(boot_info: &'static mut BootInfo) {
         "AGAVE v{}\n",
         option_env!("AGAVE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
     );
-    sys::mem::init(boot_info);
+    // sys::mem::init(boot_info);
     sys::cpu::init();
     sys::pci::init(); // Require MEM
     sys::net::init(); // Require PCI

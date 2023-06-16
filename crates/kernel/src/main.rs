@@ -5,7 +5,7 @@ extern crate alloc;
 
 use agave_kernel::{debug, hlt_loop, print, println, sys, usr, init_logger};
 use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo, borrow::Borrow};
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -16,32 +16,19 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
 entry_point!(main, config = &BOOTLOADER_CONFIG);
 
 fn main(boot_info: &'static mut BootInfo) -> ! {
-    // agave_kernel::init(boot_info);
-    // print!("\x1b[?25h");
-    // loop {
-    //     if let Some(cmd) = option_env!("agave_os_CMD") {
-    //         let prompt = usr::shell::prompt_string(true);
-    //         println!("{}{}", prompt, cmd);
-    //         usr::shell::exec(cmd).ok();
-    //         sys::acpi::shutdown();
-    //     } else {
-    //         user_boot();
-    //     }
-    // }
-    if let Some(framebuffer) = boot_info.framebuffer.as_mut() {
-        let mut value = 0x90;
-        for byte in framebuffer.buffer_mut() {
-            *byte = value;
-            value = value.wrapping_add(1);
+    agave_kernel::init(boot_info);
+    print!("\x1b[?25h");
+    loop {
+        if let Some(cmd) = option_env!("agave_os_CMD") {
+            let prompt = usr::shell::prompt_string(true);
+            println!("{}{}", prompt, cmd);
+            usr::shell::exec(cmd).ok();
+            sys::acpi::shutdown();
+        } else {
+            user_boot();
         }
     }
-    let frame_buffer_optional = &mut boot_info.framebuffer;
-    let frame_buffer_option = frame_buffer_optional.as_mut();
-    let frame_buffer_struct = frame_buffer_option.unwrap();
-    let frame_buffer_info = frame_buffer_struct.info().clone();
-    let raw_frame_buffer = frame_buffer_struct.buffer_mut();
-    init_logger(raw_frame_buffer, frame_buffer_info);
-    loop {}
+    // loop {}
 }
 
 fn user_boot() {

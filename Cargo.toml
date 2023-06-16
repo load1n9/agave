@@ -1,0 +1,15 @@
+[package]
+name = "agave-os"
+version = "0.1.0"
+edition = "2021"
+default-run = "agave-os"
+
+[workspace]
+members = ["crates/*", "libs/*"]
+
+[dependencies]
+ovmf-prebuilt = "0.1.0-alpha"
+
+[build-dependencies]
+agave-kernel = { path = "crates/kernel", artifact = "bin", target = "x86_64-unknown-none" }
+bootloader = "0.11.3"

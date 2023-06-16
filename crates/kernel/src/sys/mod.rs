@@ -38,6 +38,7 @@ pub mod cmos;
 pub mod console;
 pub mod cpu;
 pub mod frame_alloc;
+pub mod framebuffer;
 pub mod fs;
 pub mod gdt;
 pub mod idt;

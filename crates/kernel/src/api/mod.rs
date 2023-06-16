@@ -71,7 +71,6 @@ pub mod config;
 pub mod console;
 pub mod data;
 pub mod font;
-pub mod framebuffer;
 pub mod fs;
 pub mod io;
 pub mod memory;

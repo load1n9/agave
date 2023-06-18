@@ -3,9 +3,9 @@
 extern crate agave_kernel;
 extern crate alloc;
 
-use agave_kernel::{debug, hlt_loop, print, println, sys, usr, init_logger};
+use agave_kernel::{debug, hlt_loop, print, println, sys, usr};
 use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
-use core::{panic::PanicInfo, borrow::Borrow};
+use core::panic::PanicInfo;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();

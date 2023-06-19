@@ -140,7 +140,6 @@ pub fn hlt_loop() -> ! {
 #[cfg(test)]
 use bootloader_api::entry_point;
 
-use core::borrow::Borrow;
 #[cfg(test)]
 use core::panic::PanicInfo;
 

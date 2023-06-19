@@ -1,8 +1,5 @@
 use crate::sys;
-use bootloader_api::{
-    info::{MemoryRegionKind, MemoryRegions},
-    BootInfo,
-};
+use bootloader_api::info::{MemoryRegionKind, MemoryRegions, Optional};
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 #[cfg(feature = "x86_64")]
 use x86_64::instructions::interrupts;
@@ -21,10 +18,10 @@ pub static MEMORY_SIZE: AtomicU64 = AtomicU64::new(0);
 
 static ALLOCATED_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
-pub fn init(boot_info: &'static BootInfo) {
+pub fn init(memory_regions: &'static MemoryRegions, physical_memory_offset: &Optional<u64>) {
     interrupts::without_interrupts(|| {
         let mut memory_size = 0;
-        for region in boot_info.memory_regions.iter() {
+        for region in memory_regions.iter() {
             let start_addr = region.start;
             let end_addr = region.end;
             memory_size += end_addr - start_addr;
@@ -38,12 +35,11 @@ pub fn init(boot_info: &'static BootInfo) {
         log!("MEM {} KB\n", memory_size >> 10);
         MEMORY_SIZE.store(memory_size, Ordering::Relaxed);
 
-        unsafe { PHYS_MEM_OFFSET = boot_info.physical_memory_offset.into_option().unwrap() };
-        unsafe { MEMORY_MAP.replace(&boot_info.memory_regions) };
+        unsafe { PHYS_MEM_OFFSET = physical_memory_offset.into_option().unwrap() };
+        unsafe { MEMORY_MAP.replace(&memory_regions) };
 
         let mut mapper = unsafe { mapper(VirtAddr::new(PHYS_MEM_OFFSET)) };
-        let mut frame_allocator =
-            unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
+        let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&memory_regions) };
 
         sys::allocator::init_heap(&mut mapper, &mut frame_allocator)
             .expect("heap initialization failed");

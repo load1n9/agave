@@ -45,6 +45,9 @@ const KERNEL_SIZE: usize = 2 << 20; // 2 MB
 
 pub fn init(boot_info: &'static mut BootInfo) {
     // sys::vga::init();
+    let _memory_regions = &boot_info.memory_regions;
+    let _physical_memory_offset = &boot_info.physical_memory_offset;
+    // sys::mem::init(_memory_regions, _physical_memory_offset);
     let frame_buffer_optional = &mut boot_info.framebuffer;
     let frame_buffer_option = frame_buffer_optional.as_mut();
     let frame_buffer_struct = frame_buffer_option.unwrap();
@@ -62,7 +65,6 @@ pub fn init(boot_info: &'static mut BootInfo) {
         "AGAVE v{}\n",
         option_env!("AGAVE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
     );
-    // sys::mem::init(boot_info);
     sys::cpu::init();
     sys::pci::init(); // Require MEM
     sys::net::init(); // Require PCI
@@ -138,6 +140,7 @@ pub fn hlt_loop() -> ! {
 #[cfg(test)]
 use bootloader_api::entry_point;
 
+use core::borrow::Borrow;
 #[cfg(test)]
 use core::panic::PanicInfo;
 

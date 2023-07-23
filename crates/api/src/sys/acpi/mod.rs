@@ -5,9 +5,7 @@ use aml::value::AmlValue;
 use aml::{AmlContext, AmlName, DebugVerbosity, Handler};
 use core::ptr::NonNull;
 
-#[cfg(feature = "x86_64")]
 use x86_64::instructions::port::Port;
-#[cfg(feature = "x86_64")]
 use x86_64::PhysAddr;
 
 pub mod sdt;

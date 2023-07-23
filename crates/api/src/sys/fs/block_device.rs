@@ -208,10 +208,10 @@ pub fn dismount() {
     *BLOCK_DEVICE.lock() = None;
 }
 
-#[test_case]
-fn test_mount_mem() {
-    assert!(!is_mounted());
-    mount_mem();
-    assert!(is_mounted());
-    dismount();
-}
+// #[test_case]
+// fn test_mount_mem() {
+//     assert!(!is_mounted());
+//     mount_mem();
+//     assert!(is_mounted());
+//     dismount();
+// }

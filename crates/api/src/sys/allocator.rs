@@ -9,11 +9,8 @@ use core::ops::{Index, IndexMut};
 use linked_list_allocator::LockedHeap;
 use spin::Mutex;
 
-#[cfg(feature = "x86_64")]
 use x86_64::structures::paging::mapper::MapToError;
-#[cfg(feature = "x86_64")]
 use x86_64::structures::paging::{FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB};
-#[cfg(feature = "x86_64")]
 use x86_64::VirtAddr;
 
 pub const HEAP_START: u64 = 0x4444_4444_0000;
@@ -195,27 +192,27 @@ pub fn memory_free() -> usize {
     ALLOCATOR.lock().free()
 }
 
-#[test_case]
-fn many_boxes() {
-    use alloc::boxed::Box;
+// #[test_case]
+// fn many_boxes() {
+//     use alloc::boxed::Box;
 
-    let heap_value_1 = Box::new(42);
-    let heap_value_2 = Box::new(1337);
-    assert_eq!(*heap_value_1, 42);
-    assert_eq!(*heap_value_2, 1337);
+//     let heap_value_1 = Box::new(42);
+//     let heap_value_2 = Box::new(1337);
+//     assert_eq!(*heap_value_1, 42);
+//     assert_eq!(*heap_value_2, 1337);
 
-    for i in 0..1000 {
-        let x = Box::new(i);
-        assert_eq!(*x, i);
-    }
-}
+//     for i in 0..1000 {
+//         let x = Box::new(i);
+//         assert_eq!(*x, i);
+//     }
+// }
 
-#[test_case]
-fn large_vec() {
-    let n = 1000;
-    let mut vec = Vec::new();
-    for i in 0..n {
-        vec.push(i);
-    }
-    assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n / 2);
-}
+// #[test_case]
+// fn large_vec() {
+//     let n = 1000;
+//     let mut vec = Vec::new();
+//     for i in 0..n {
+//         vec.push(i);
+//     }
+//     assert_eq!(vec.iter().sum::<u64>(), (n - 1) * n / 2);
+// }

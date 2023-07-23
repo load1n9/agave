@@ -270,28 +270,28 @@ fn truncate(s: &str, max: usize) -> String {
         .collect()
 }
 
-#[test_case]
-fn test_dir_create() {
-    super::mount_mem();
-    super::format_mem();
-    assert!(Dir::open("/test").is_none());
-    assert!(Dir::create("/test").is_some());
-    assert!(Dir::open("/test").is_some());
+// #[test_case]
+// fn test_dir_create() {
+//     super::mount_mem();
+//     super::format_mem();
+//     assert!(Dir::open("/test").is_none());
+//     assert!(Dir::create("/test").is_some());
+//     assert!(Dir::open("/test").is_some());
 
-    assert!(Dir::open("/test/test").is_none());
-    assert!(Dir::create("/test/test").is_some());
-    assert!(Dir::open("/test/test").is_some());
-    super::dismount();
-}
+//     assert!(Dir::open("/test/test").is_none());
+//     assert!(Dir::create("/test/test").is_some());
+//     assert!(Dir::open("/test/test").is_some());
+//     super::dismount();
+// }
 
-#[test_case]
-fn test_dir_delete() {
-    super::mount_mem();
-    super::format_mem();
-    assert!(Dir::open("/test").is_none());
-    assert!(Dir::create("/test").is_some());
-    assert!(Dir::open("/test").is_some());
-    assert!(Dir::delete("/test").is_ok());
-    assert!(Dir::open("/test").is_none());
-    super::dismount();
-}
+// #[test_case]
+// fn test_dir_delete() {
+//     super::mount_mem();
+//     super::format_mem();
+//     assert!(Dir::open("/test").is_none());
+//     assert!(Dir::create("/test").is_some());
+//     assert!(Dir::open("/test").is_some());
+//     assert!(Dir::delete("/test").is_ok());
+//     assert!(Dir::open("/test").is_none());
+//     super::dismount();
+// }

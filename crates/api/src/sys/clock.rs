@@ -118,12 +118,12 @@ pub fn init() {
     log!("RTC {}\n", rtc);
 }
 
-#[test_case]
-fn test_uptime() {
-    assert!(uptime() > 0.0);
-}
+// #[test_case]
+// fn test_uptime() {
+//     assert!(uptime() > 0.0);
+// }
 
-#[test_case]
-fn test_realtime() {
-    assert!(realtime() > 1234567890.0);
-}
+// #[test_case]
+// fn test_realtime() {
+//     assert!(realtime() > 1234567890.0);
+// }

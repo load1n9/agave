@@ -93,6 +93,63 @@ dependencies = [
 ]
 
 [[package]]
+name = "agave-usr"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "aml",
+ "anyhow",
+ "base64",
+ "bit_field",
+ "bitflags 1.3.2",
+ "bootloader-x86_64-common",
+ "bootloader_api",
+ "cfg-if",
+ "conquer-once 0.4.0",
+ "core2",
+ "crossbeam-queue",
+ "derive_more",
+ "futures-util",
+ "hashbrown",
+ "intrusive-collections",
+ "irq_safety",
+ "lazy_static",
+ "libm",
+ "linked_list_allocator",
+ "lite-json",
+ "littlewing",
+ "log",
+ "modular-bitfield",
+ "mpmc",
+ "nom",
+ "num-bigint",
+ "num-traits",
+ "num_enum",
+ "object",
+ "paste",
+ "pbkdf2",
+ "pc-keyboard",
+ "pic8259",
+ "rand 0.8.5",
+ "rand_hc 0.3.2",
+ "raw-cpuid 11.0.1",
+ "serde",
+ "sha2",
+ "smoltcp",
+ "spin 0.9.8",
+ "time",
+ "uart_16550",
+ "unix_str",
+ "volatile 0.2.6",
+ "vte",
+ "wasi 0.10.0+wasi-snapshot-preview1",
+ "wasmi",
+ "x86_64",
+ "xmas-elf 0.6.2",
+ "zerocopy",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

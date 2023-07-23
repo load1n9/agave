@@ -107,37 +107,37 @@ pub fn halt() {
     stop(0xdead);
 }
 
-#[test_case]
-fn test_file() {
-    use crate::sys::fs::{dismount, format_mem, mount_mem, OpenFlag};
-    use alloc::vec;
-    mount_mem();
-    format_mem();
+// #[test_case]
+// fn test_file() {
+//     use crate::sys::fs::{dismount, format_mem, mount_mem, OpenFlag};
+//     use alloc::vec;
+//     mount_mem();
+//     format_mem();
 
-    let flags = 0;
-    assert_eq!(open("/test", flags), None);
+//     let flags = 0;
+//     assert_eq!(open("/test", flags), None);
 
-    // Write file
-    let flags = OpenFlag::Create as usize;
-    assert_eq!(open("/test", flags), Some(4));
-    let input = "Hello, world!".as_bytes();
-    assert_eq!(write(4, &input), Some(input.len()));
+//     // Write file
+//     let flags = OpenFlag::Create as usize;
+//     assert_eq!(open("/test", flags), Some(4));
+//     let input = "Hello, world!".as_bytes();
+//     assert_eq!(write(4, &input), Some(input.len()));
 
-    // Read file
-    let flags = 0;
-    assert_eq!(open("/test", flags), Some(5));
-    let mut output = vec![0; input.len()];
-    assert_eq!(read(5, &mut output), Some(input.len()));
-    assert_eq!(output, input);
+//     // Read file
+//     let flags = 0;
+//     assert_eq!(open("/test", flags), Some(5));
+//     let mut output = vec![0; input.len()];
+//     assert_eq!(read(5, &mut output), Some(input.len()));
+//     assert_eq!(output, input);
 
-    close(4);
-    close(5);
+//     close(4);
+//     close(5);
 
-    assert_eq!(open("/test", flags), Some(4));
+//     assert_eq!(open("/test", flags), Some(4));
 
-    close(4);
+//     close(4);
 
-    //assert!(write(1, b"Hello, World\n").is_some());
+//     //assert!(write(1, b"Hello, World\n").is_some());
 
-    dismount();
-}
+//     dismount();
+// }

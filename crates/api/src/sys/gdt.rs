@@ -1,13 +1,8 @@
 use lazy_static::lazy_static;
-#[cfg(feature = "x86_64")]
 use x86_64::instructions::segmentation::{Segment, CS, DS};
-#[cfg(feature = "x86_64")]
 use x86_64::instructions::tables::load_tss;
-#[cfg(feature = "x86_64")]
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector};
-#[cfg(feature = "x86_64")]
 use x86_64::structures::tss::TaskStateSegment;
-#[cfg(feature = "x86_64")]
 use x86_64::VirtAddr;
 
 const STACK_SIZE: usize = 1024 * 8;

@@ -1,5 +1,5 @@
 [package]
-name = "agave-api"
+name = "agave-usr"
 version = "0.1.0"
 edition = "2021"
 
@@ -37,8 +37,7 @@ paste = "1.0.5"
 rand = { version = "0.8.5", default-features = false }
 rand_hc = "0.3.1"
 vte = "0.11.0"
-#TODO: change this once we have a proper way to make this crossplatform
-x86_64 = { version = "0.14.10" }
+x86_64 = { version = "0.14.10", optional = true }
 object = { version = "0.31.1", default-features = false, features = ["read"] }
 wasmi = { version = "0.30.0", default-features = false }
 cfg-if = "1.0.0"
@@ -79,13 +78,10 @@ xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.gi
 # atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 # owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+
 bootloader-x86_64-common = "0.11.4"
 conquer-once = { version = "0.4.0", default-features = false }
 log = { version = "0.4.17", default-features = false }
 num_enum = { version = "0.6.1", default-features = false }
-crossbeam-queue = { version = "0.3.8", default-features = false, features = [
-    "alloc"
-] }
-futures-util = { version = "0.3.4", default-features = false, features = [
-    "alloc"
-] }
+crossbeam-queue = {version = "0.3.8", default-features = false, features = ["alloc"]}
+futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }

@@ -5,7 +5,7 @@ edition = "2021"
 default-run = "agave-os"
 
 [workspace]
-members = ["crates/*", "libs/*"]
+members = ["crates/*"]
 
 [dependencies]
 ovmf-prebuilt = "0.1.0-alpha"

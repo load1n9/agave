@@ -16,78 +16,9 @@ serial = []
 
 [dependencies]
 bootloader_api = "0.11.2"
-acpi = "4.1.0"
-aml = "0.16.3"
-base64 = { version = "0.13.1", default-features = false }
-bit_field = "0.10.2"
-volatile = "=0.2.6"
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-libm = "0.2.6"
-linked_list_allocator = "0.10.5"
-littlewing = { version = "0.7.0", default-features = false }
-nom = { version = "7.1.3", default-features = false, features = ["alloc"] }
-num-bigint = { version = "0.4.3", default-features = false }
-num-traits = { version = "0.2.15", default-features = false }
-pbkdf2 = { version = "0.12.1", default-features = false, features = ["hmac"] }
-uart_16550 = "0.2.18"
-zerocopy = "0.6.1"
-mpmc = "0.1.6"
-modular-bitfield = "0.11.2"
-bitflags = "1.3.2"
-spin = "0.9.8"
-pic8259 = "0.10.1"
-anyhow = { version = "1.0", default-features = false }
-pc-keyboard = "0.7.0"
-derive_more = "0.99.0"
-paste = "1.0.5"
-rand = { version = "0.8.5", default-features = false }
-rand_hc = "0.3.1"
-vte = "0.11.0"
 x86_64 = { version = "0.14.10", optional = true }
-object = { version = "0.31.1", default-features = false, features = ["read"] }
-wasmi = { version = "0.30.0", default-features = false }
-cfg-if = "1.0.0"
-core2 = { version = "0.4.0", default-features = false, features = [
-    "alloc",
-    "nightly",
-] }
-lite-json = { version = "0.2.0", default-features = false, defaults = [
-    "no_std"
-] }
-hashbrown = { version = "0.13.2", features = ["nightly"] }
-wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
-raw-cpuid = "11.0.1"
-sha2 = { version = "0.10.6", default-features = false, features = [
-    "force-soft",
-] }
-time = { version = "0.2.27", default-features = false }
-smoltcp = { version = "0.9.1", default-features = false, features = [
-    "alloc",
-    "medium-ethernet",
-    "socket-tcp",
-    "socket-udp",
-    "socket-dhcpv4",
-    "proto-ipv4",
-    "proto-igmp",
-    "proto-ipv6",
-    "proto-dhcpv4",
-    "socket-raw",
-    "socket-icmp"
-] }
-intrusive-collections = "0.9.0"
-unix_str = { version = "1.0.0", default-features = false, features = [
-    "alloc",
-    "shrink_to"
-] }
-serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
-xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
-atomic_linked_list = { path = "../../libs/atomic_linked_list" }
-owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-
 bootloader-x86_64-common = "0.11.3"
 conquer-once = { version = "0.4.0", default-features = false }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = { version = "0.4.17", default-features = false }
-num_enum = { version = "0.6.1", default-features = false }
-crossbeam-queue = {version = "0.3.8", default-features = false, features = ["alloc"]}
-futures-util = { version = "0.3.4", default-features = false, features = ["alloc"] }
+agave-api = { path = "../api" }

@@ -248,14 +248,14 @@ impl FileIO for File {
 //     super::dismount();
 // }
 
-// #[test_case]
-// fn test_file_delete() {
-//     super::mount_mem();
-//     super::format_mem();
-//     assert!(File::open("/test").is_none());
-//     assert!(File::create("/test").is_some());
-//     assert!(File::open("/test").is_some());
-//     assert!(File::delete("/test").is_ok());
-//     assert!(File::open("/test").is_none());
-//     super::dismount();
-// }
+#[test_case]
+fn test_file_delete() {
+    super::mount_mem();
+    super::format_mem();
+    assert!(File::open("/test").is_none());
+    assert!(File::create("/test").is_some());
+    assert!(File::open("/test").is_some());
+    assert!(File::delete("/test").is_ok());
+    assert!(File::open("/test").is_none());
+    super::dismount();
+}

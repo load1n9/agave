@@ -41,7 +41,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
     unsafe {
         let q = 0;
         virtio.queue_select(q);
-        let queue = read_volatile(virtio.common.cap);
+        let _queue = read_volatile(virtio.common.cap);
 
         let virtio = Arc::new(Mutex::new(virtio));
 
@@ -94,7 +94,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             }
             let conf_ptr: *mut VirtioGpuConfig =
                 core::intrinsics::transmute((virtio.lock().device.cap) as *const ());
-            let mut rconf = conf_ptr.read_volatile();
+            let rconf = conf_ptr.read_volatile();
 
             for i in 0..rconf.num_capsets {
                 let response_desc = request(
@@ -129,7 +129,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let edid = (response_desc.addr as *const VirtioGpuRespEdid).read_volatile();
+        let _edid = (response_desc.addr as *const VirtioGpuRespEdid).read_volatile();
         // log::info!("{:?}", edid);
 
         let response_desc = request(
@@ -273,8 +273,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 buffer: &mut Vec<u32>,
                 buffers: u32,
                 rgba: [u8; 4],
-                depth: f64,
-                stencil: u32,
+                _depth: f64,
+                _stencil: u32,
             ) {
                 let len = 8;
                 buffer.push((len << 16) + (0 << 8) + Cmd3d::VirglCcmdClear as u32);
@@ -306,7 +306,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 let len = 5;
                 buffer.push(
                     (len << 16)
-                        | ((VirglObjectType::VIRGL_OBJECT_SURFACE as u32) << 8)
+                        | ((VirglObjectType::VirglObjectSurface as u32) << 8)
                         | Cmd3d::VirglCcmdCreateObject as u32,
                 );
                 //Buffer select
@@ -365,7 +365,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 let pages_needed = 1 + framebuffer_bytes / 4096;
                 let pages = create_identity_virt_from_phys_n(pages_needed).unwrap();
                 let addr = pages.start_address().as_u64();
-                let mut framebuffer: Vec<RGBA> =
+                let framebuffer: Vec<RGBA> =
                     Vec::from_raw_parts(addr as *mut RGBA, capacity, capacity);
                 framebuffer
             };
@@ -417,7 +417,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             log::info!("VirtioGpuCmdSubmit3d {:?}", nodata.type_);
         }
 
-        let mut b: u8 = 0;
+        let _b: u8 = 0;
 
         // spawner.new(async move {
         //     loop {
@@ -487,7 +487,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 )
             );
             let now = global_time_ms();
-            let elapsed = now - LAST_FLUSH_MS.load(Ordering::Relaxed);
+            let _elapsed = now - LAST_FLUSH_MS.load(Ordering::Relaxed);
             LAST_FLUSH_MS.store(now, Ordering::Relaxed);
             // log::info!("gpu start {} elapsed {}", now, elapsed);
             // while elapsed < 10 {
@@ -913,7 +913,7 @@ impl Default for VirglRendererResourceCreateArgs {
         Self {
             handle: 0,
             target: PipeTextureTarget::PipeTexture2d,
-            format: VirglFormats::VIRGL_FORMAT_R8G8B8A8_UNORM,
+            format: VirglFormats::VirglFormatR8g8b8a8Unorm,
             bind: PIPE_BIND_RENDER_TARGET,
             width: 128,
             height: 128,
@@ -982,201 +982,201 @@ enum PipeTextureTarget {
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VirglFormats {
-    VIRGL_FORMAT_NONE = 0,
-    VIRGL_FORMAT_B8G8R8A8_UNORM = 1,
-    VIRGL_FORMAT_B8G8R8X8_UNORM = 2,
-    VIRGL_FORMAT_A8R8G8B8_UNORM = 3,
-    VIRGL_FORMAT_X8R8G8B8_UNORM = 4,
-    VIRGL_FORMAT_B5G5R5A1_UNORM = 5,
-    VIRGL_FORMAT_B4G4R4A4_UNORM = 6,
-    VIRGL_FORMAT_B5G6R5_UNORM = 7,
-    VIRGL_FORMAT_R10G10B10A2_UNORM = 8,
-    VIRGL_FORMAT_L8_UNORM = 9,
+    VirglFormatNone = 0,
+    VirglFormatB8g8r8a8Unorm = 1,
+    VirglFormatB8g8r8x8Unorm = 2,
+    VirglFormatA8r8g8b8Unorm = 3,
+    VirglFormatX8r8g8b8Unorm = 4,
+    VirglFormatB5g5r5a1Unorm = 5,
+    VirglFormatB4g4r4a4Unorm = 6,
+    VirglFormatB5g6r5Unorm = 7,
+    VirglFormatR10g10b10a2Unorm = 8,
+    VirglFormatL8Unorm = 9,
     /**< ubyte luminance */
-    VIRGL_FORMAT_A8_UNORM = 10,
+    VirglFormatA8Unorm = 10,
     /**< ubyte alpha */
-    VIRGL_FORMAT_I8_UNORM = 11,
-    VIRGL_FORMAT_L8A8_UNORM = 12,
+    VirglFormatI8Unorm = 11,
+    VirglFormatL8a8Unorm = 12,
     /**< ubyte alpha, luminance */
-    VIRGL_FORMAT_L16_UNORM = 13,
+    VirglFormatL16Unorm = 13,
     /**< ushort luminance */
-    VIRGL_FORMAT_UYVY = 14,
-    VIRGL_FORMAT_YUYV = 15,
-    VIRGL_FORMAT_Z16_UNORM = 16,
-    VIRGL_FORMAT_Z32_UNORM = 17,
-    VIRGL_FORMAT_Z32_FLOAT = 18,
-    VIRGL_FORMAT_Z24_UNORM_S8_UINT = 19,
-    VIRGL_FORMAT_S8_UINT_Z24_UNORM = 20,
-    VIRGL_FORMAT_Z24X8_UNORM = 21,
-    VIRGL_FORMAT_X8Z24_UNORM = 22,
-    VIRGL_FORMAT_S8_UINT = 23,
+    VirglFormatUyvy = 14,
+    VirglFormatYuyv = 15,
+    VirglFormatZ16Unorm = 16,
+    VirglFormatZ32Unorm = 17,
+    VirglFormatZ32Float = 18,
+    VirglFormatZ24UnormS8Uint = 19,
+    VirglFormatS8UintZ24Unorm = 20,
+    VirglFormatZ24x8Unorm = 21,
+    VirglFormatX8z24Unorm = 22,
+    VirglFormatS8Uint = 23,
     /**< ubyte stencil */
-    VIRGL_FORMAT_R64_FLOAT = 24,
-    VIRGL_FORMAT_R64G64_FLOAT = 25,
-    VIRGL_FORMAT_R64G64B64_FLOAT = 26,
-    VIRGL_FORMAT_R64G64B64A64_FLOAT = 27,
-    VIRGL_FORMAT_R32_FLOAT = 28,
-    VIRGL_FORMAT_R32G32_FLOAT = 29,
-    VIRGL_FORMAT_R32G32B32_FLOAT = 30,
-    VIRGL_FORMAT_R32G32B32A32_FLOAT = 31,
+    VirglFormatR64Float = 24,
+    VirglFormatR64g64Float = 25,
+    VirglFormatR64g64b64Float = 26,
+    VirglFormatR64g64b64a64Float = 27,
+    VirglFormatR32Float = 28,
+    VirglFormatR32g32Float = 29,
+    VirglFormatR32g32b32Float = 30,
+    VirglFormatR32g32b32a32Float = 31,
 
-    VIRGL_FORMAT_R32_UNORM = 32,
-    VIRGL_FORMAT_R32G32_UNORM = 33,
-    VIRGL_FORMAT_R32G32B32_UNORM = 34,
-    VIRGL_FORMAT_R32G32B32A32_UNORM = 35,
-    VIRGL_FORMAT_R32_USCALED = 36,
-    VIRGL_FORMAT_R32G32_USCALED = 37,
-    VIRGL_FORMAT_R32G32B32_USCALED = 38,
-    VIRGL_FORMAT_R32G32B32A32_USCALED = 39,
-    VIRGL_FORMAT_R32_SNORM = 40,
-    VIRGL_FORMAT_R32G32_SNORM = 41,
-    VIRGL_FORMAT_R32G32B32_SNORM = 42,
-    VIRGL_FORMAT_R32G32B32A32_SNORM = 43,
-    VIRGL_FORMAT_R32_SSCALED = 44,
-    VIRGL_FORMAT_R32G32_SSCALED = 45,
-    VIRGL_FORMAT_R32G32B32_SSCALED = 46,
-    VIRGL_FORMAT_R32G32B32A32_SSCALED = 47,
+    VirglFormatR32Unorm = 32,
+    VirglFormatR32g32Unorm = 33,
+    VirglFormatR32g32b32Unorm = 34,
+    VirglFormatR32g32b32a32Unorm = 35,
+    VirglFormatR32Uscaled = 36,
+    VirglFormatR32g32Uscaled = 37,
+    VirglFormatR32g32b32Uscaled = 38,
+    VirglFormatR32g32b32a32Uscaled = 39,
+    VirglFormatR32Snorm = 40,
+    VirglFormatR32g32Snorm = 41,
+    VirglFormatR32g32b32Snorm = 42,
+    VirglFormatR32g32b32a32Snorm = 43,
+    VirglFormatR32Sscaled = 44,
+    VirglFormatR32g32Sscaled = 45,
+    VirglFormatR32g32b32Sscaled = 46,
+    VirglFormatR32g32b32a32Sscaled = 47,
 
-    VIRGL_FORMAT_R16_UNORM = 48,
-    VIRGL_FORMAT_R16G16_UNORM = 49,
-    VIRGL_FORMAT_R16G16B16_UNORM = 50,
-    VIRGL_FORMAT_R16G16B16A16_UNORM = 51,
+    VirglFormatR16Unorm = 48,
+    VirglFormatR16g16Unorm = 49,
+    VirglFormatR16g16b16Unorm = 50,
+    VirglFormatR16g16b16a16Unorm = 51,
 
-    VIRGL_FORMAT_R16_USCALED = 52,
-    VIRGL_FORMAT_R16G16_USCALED = 53,
-    VIRGL_FORMAT_R16G16B16_USCALED = 54,
-    VIRGL_FORMAT_R16G16B16A16_USCALED = 55,
+    VirglFormatR16Uscaled = 52,
+    VirglFormatR16g16Uscaled = 53,
+    VirglFormatR16g16b16Uscaled = 54,
+    VirglFormatR16g16b16a16Uscaled = 55,
 
-    VIRGL_FORMAT_R16_SNORM = 56,
-    VIRGL_FORMAT_R16G16_SNORM = 57,
-    VIRGL_FORMAT_R16G16B16_SNORM = 58,
-    VIRGL_FORMAT_R16G16B16A16_SNORM = 59,
+    VirglFormatR16Snorm = 56,
+    VirglFormatR16g16Snorm = 57,
+    VirglFormatR16g16b16Snorm = 58,
+    VirglFormatR16g16b16a16Snorm = 59,
 
-    VIRGL_FORMAT_R16_SSCALED = 60,
-    VIRGL_FORMAT_R16G16_SSCALED = 61,
-    VIRGL_FORMAT_R16G16B16_SSCALED = 62,
-    VIRGL_FORMAT_R16G16B16A16_SSCALED = 63,
+    VirglFormatR16Sscaled = 60,
+    VirglFormatR16g16Sscaled = 61,
+    VirglFormatR16g16b16Sscaled = 62,
+    VirglFormatR16g16b16a16Sscaled = 63,
 
-    VIRGL_FORMAT_R8_UNORM = 64,
-    VIRGL_FORMAT_R8G8_UNORM = 65,
-    VIRGL_FORMAT_R8G8B8_UNORM = 66,
-    VIRGL_FORMAT_R8G8B8A8_UNORM = 67,
-    VIRGL_FORMAT_X8B8G8R8_UNORM = 68,
+    VirglFormatR8Unorm = 64,
+    VirglFormatR8g8Unorm = 65,
+    VirglFormatR8g8b8Unorm = 66,
+    VirglFormatR8g8b8a8Unorm = 67,
+    VirglFormatX8b8g8r8Unorm = 68,
 
-    VIRGL_FORMAT_R8_USCALED = 69,
-    VIRGL_FORMAT_R8G8_USCALED = 70,
-    VIRGL_FORMAT_R8G8B8_USCALED = 71,
-    VIRGL_FORMAT_R8G8B8A8_USCALED = 72,
+    VirglFormatR8Uscaled = 69,
+    VirglFormatR8g8Uscaled = 70,
+    VirglFormatR8g8b8Uscaled = 71,
+    VirglFormatR8g8b8a8Uscaled = 72,
 
-    VIRGL_FORMAT_R8_SNORM = 74,
-    VIRGL_FORMAT_R8G8_SNORM = 75,
-    VIRGL_FORMAT_R8G8B8_SNORM = 76,
-    VIRGL_FORMAT_R8G8B8A8_SNORM = 77,
+    VirglFormatR8Snorm = 74,
+    VirglFormatR8g8Snorm = 75,
+    VirglFormatR8g8b8Snorm = 76,
+    VirglFormatR8g8b8a8Snorm = 77,
 
-    VIRGL_FORMAT_R8_SSCALED = 82,
-    VIRGL_FORMAT_R8G8_SSCALED = 83,
-    VIRGL_FORMAT_R8G8B8_SSCALED = 84,
-    VIRGL_FORMAT_R8G8B8A8_SSCALED = 85,
+    VirglFormatR8Sscaled = 82,
+    VirglFormatR8g8Sscaled = 83,
+    VirglFormatR8g8b8Sscaled = 84,
+    VirglFormatR8g8b8a8Sscaled = 85,
 
-    VIRGL_FORMAT_R32_FIXED = 87,
-    VIRGL_FORMAT_R32G32_FIXED = 88,
-    VIRGL_FORMAT_R32G32B32_FIXED = 89,
-    VIRGL_FORMAT_R32G32B32A32_FIXED = 90,
+    VirglFormatR32Fixed = 87,
+    VirglFormatR32g32Fixed = 88,
+    VirglFormatR32g32b32Fixed = 89,
+    VirglFormatR32g32b32a32Fixed = 90,
 
-    VIRGL_FORMAT_R16_FLOAT = 91,
-    VIRGL_FORMAT_R16G16_FLOAT = 92,
-    VIRGL_FORMAT_R16G16B16_FLOAT = 93,
-    VIRGL_FORMAT_R16G16B16A16_FLOAT = 94,
+    VirglFormatR16Float = 91,
+    VirglFormatR16g16Float = 92,
+    VirglFormatR16g16b16Float = 93,
+    VirglFormatR16g16b16a16Float = 94,
 
-    VIRGL_FORMAT_L8_SRGB = 95,
-    VIRGL_FORMAT_L8A8_SRGB = 96,
-    VIRGL_FORMAT_R8G8B8_SRGB = 97,
-    VIRGL_FORMAT_A8B8G8R8_SRGB = 98,
-    VIRGL_FORMAT_X8B8G8R8_SRGB = 99,
-    VIRGL_FORMAT_B8G8R8A8_SRGB = 100,
-    VIRGL_FORMAT_B8G8R8X8_SRGB = 101,
-    VIRGL_FORMAT_A8R8G8B8_SRGB = 102,
-    VIRGL_FORMAT_X8R8G8B8_SRGB = 103,
-    VIRGL_FORMAT_R8G8B8A8_SRGB = 104,
+    VirglFormatL8Srgb = 95,
+    VirglFormatL8a8Srgb = 96,
+    VirglFormatR8g8b8Srgb = 97,
+    VirglFormatA8b8g8r8Srgb = 98,
+    VirglFormatX8b8g8r8Srgb = 99,
+    VirglFormatB8g8r8a8Srgb = 100,
+    VirglFormatB8g8r8x8Srgb = 101,
+    VirglFormatA8r8g8b8Srgb = 102,
+    VirglFormatX8r8g8b8Srgb = 103,
+    VirglFormatR8g8b8a8Srgb = 104,
 
     /* compressed formats */
-    VIRGL_FORMAT_DXT1_RGB = 105,
-    VIRGL_FORMAT_DXT1_RGBA = 106,
-    VIRGL_FORMAT_DXT3_RGBA = 107,
-    VIRGL_FORMAT_DXT5_RGBA = 108,
+    VirglFormatDxt1Rgb = 105,
+    VirglFormatDxt1Rgba = 106,
+    VirglFormatDxt3Rgba = 107,
+    VirglFormatDxt5Rgba = 108,
 
     /* sRGB, compressed */
-    VIRGL_FORMAT_DXT1_SRGB = 109,
-    VIRGL_FORMAT_DXT1_SRGBA = 110,
-    VIRGL_FORMAT_DXT3_SRGBA = 111,
-    VIRGL_FORMAT_DXT5_SRGBA = 112,
+    VirglFormatDxt1Srgb = 109,
+    VirglFormatDxt1Srgba = 110,
+    VirglFormatDxt3Srgba = 111,
+    VirglFormatDxt5Srgba = 112,
 
     /* rgtc compressed */
-    VIRGL_FORMAT_RGTC1_UNORM = 113,
-    VIRGL_FORMAT_RGTC1_SNORM = 114,
-    VIRGL_FORMAT_RGTC2_UNORM = 115,
-    VIRGL_FORMAT_RGTC2_SNORM = 116,
+    VirglFormatRgtc1Unorm = 113,
+    VirglFormatRgtc1Snorm = 114,
+    VirglFormatRgtc2Unorm = 115,
+    VirglFormatRgtc2Snorm = 116,
 
-    VIRGL_FORMAT_R8G8_B8G8_UNORM = 117,
-    VIRGL_FORMAT_G8R8_G8B8_UNORM = 118,
+    VirglFormatR8g8B8g8Unorm = 117,
+    VirglFormatG8r8G8b8Unorm = 118,
 
-    VIRGL_FORMAT_R8SG8SB8UX8U_NORM = 119,
-    VIRGL_FORMAT_R5SG5SB6U_NORM = 120,
+    VirglFormatR8sg8sb8ux8uNorm = 119,
+    VirglFormatR5sg5sb6uNorm = 120,
 
-    VIRGL_FORMAT_A8B8G8R8_UNORM = 121,
-    VIRGL_FORMAT_B5G5R5X1_UNORM = 122,
-    VIRGL_FORMAT_R10G10B10A2_USCALED = 123,
-    VIRGL_FORMAT_R11G11B10_FLOAT = 124,
-    VIRGL_FORMAT_R9G9B9E5_FLOAT = 125,
-    VIRGL_FORMAT_Z32_FLOAT_S8X24_UINT = 126,
-    VIRGL_FORMAT_R1_UNORM = 127,
-    VIRGL_FORMAT_R10G10B10X2_USCALED = 128,
-    VIRGL_FORMAT_R10G10B10X2_SNORM = 129,
+    VirglFormatA8b8g8r8Unorm = 121,
+    VirglFormatB5g5r5x1Unorm = 122,
+    VirglFormatR10g10b10a2Uscaled = 123,
+    VirglFormatR11g11b10Float = 124,
+    VirglFormatR9g9b9e5Float = 125,
+    VirglFormatZ32FloatS8x24Uint = 126,
+    VirglFormatR1Unorm = 127,
+    VirglFormatR10g10b10x2Uscaled = 128,
+    VirglFormatR10g10b10x2Snorm = 129,
 
-    VIRGL_FORMAT_L4A4_UNORM = 130,
-    VIRGL_FORMAT_B10G10R10A2_UNORM = 131,
-    VIRGL_FORMAT_R10SG10SB10SA2U_NORM = 132,
-    VIRGL_FORMAT_R8G8Bx_SNORM = 133,
-    VIRGL_FORMAT_R8G8B8X8_UNORM = 134,
-    VIRGL_FORMAT_B4G4R4X4_UNORM = 135,
-    VIRGL_FORMAT_X24S8_UINT = 136,
-    VIRGL_FORMAT_S8X24_UINT = 137,
-    VIRGL_FORMAT_X32_S8X24_UINT = 138,
-    VIRGL_FORMAT_B2G3R3_UNORM = 139,
+    VirglFormatL4a4Unorm = 130,
+    VirglFormatB10g10r10a2Unorm = 131,
+    VirglFormatR10sg10sb10sa2uNorm = 132,
+    VirglFormatR8g8bxSnorm = 133,
+    VirglFormatR8g8b8x8Unorm = 134,
+    VirglFormatB4g4r4x4Unorm = 135,
+    VirglFormatX24s8Uint = 136,
+    VirglFormatS8x24Uint = 137,
+    VirglFormatX32S8x24Uint = 138,
+    VirglFormatB2g3r3Unorm = 139,
 
-    VIRGL_FORMAT_L16A16_UNORM = 140,
-    VIRGL_FORMAT_A16_UNORM = 141,
-    VIRGL_FORMAT_I16_UNORM = 142,
+    VirglFormatL16a16Unorm = 140,
+    VirglFormatA16Unorm = 141,
+    VirglFormatI16Unorm = 142,
 
-    VIRGL_FORMAT_LATC1_UNORM = 143,
-    VIRGL_FORMAT_LATC1_SNORM = 144,
-    VIRGL_FORMAT_LATC2_UNORM = 145,
-    VIRGL_FORMAT_LATC2_SNORM = 146,
+    VirglFormatLatc1Unorm = 143,
+    VirglFormatLatc1Snorm = 144,
+    VirglFormatLatc2Unorm = 145,
+    VirglFormatLatc2Snorm = 146,
 
-    VIRGL_FORMAT_A8_SNORM = 147,
-    VIRGL_FORMAT_L8_SNORM = 148,
-    VIRGL_FORMAT_L8A8_SNORM = 149,
-    VIRGL_FORMAT_I8_SNORM = 150,
-    VIRGL_FORMAT_A16_SNORM = 151,
-    VIRGL_FORMAT_L16_SNORM = 152,
-    VIRGL_FORMAT_L16A16_SNORM = 153,
-    VIRGL_FORMAT_I16_SNORM = 154,
+    VirglFormatA8Snorm = 147,
+    VirglFormatL8Snorm = 148,
+    VirglFormatL8a8Snorm = 149,
+    VirglFormatI8Snorm = 150,
+    VirglFormatA16Snorm = 151,
+    VirglFormatL16Snorm = 152,
+    VirglFormatL16a16Snorm = 153,
+    VirglFormatI16Snorm = 154,
 
-    VIRGL_FORMAT_A16_FLOAT = 155,
-    VIRGL_FORMAT_L16_FLOAT = 156,
-    VIRGL_FORMAT_L16A16_FLOAT = 157,
-    VIRGL_FORMAT_I16_FLOAT = 158,
-    VIRGL_FORMAT_A32_FLOAT = 159,
-    VIRGL_FORMAT_L32_FLOAT = 160,
-    VIRGL_FORMAT_L32A32_FLOAT = 161,
-    VIRGL_FORMAT_I32_FLOAT = 162,
+    VirglFormatA16Float = 155,
+    VirglFormatL16Float = 156,
+    VirglFormatL16a16Float = 157,
+    VirglFormatI16Float = 158,
+    VirglFormatA32Float = 159,
+    VirglFormatL32Float = 160,
+    VirglFormatL32a32Float = 161,
+    VirglFormatI32Float = 162,
 
-    VIRGL_FORMAT_YV12 = 163,
-    VIRGL_FORMAT_YV16 = 164,
-    VIRGL_FORMAT_IYUV = 165,
+    VirglFormatYv12 = 163,
+    VirglFormatYv16 = 164,
+    VirglFormatIyuv = 165,
     /**< aka I420 */
-    VIRGL_FORMAT_NV12 = 166,
-    VIRGL_FORMAT_NV21 = 167,
+    VirglFormatNv12 = 166,
+    VirglFormatNv21 = 167,
 
     VIRGL_FORMAT_A4R4_UNORM = 168,
     VIRGL_FORMAT_R4A4_UNORM = 169,
@@ -1263,137 +1263,136 @@ enum VirglFormats {
     VIRGL_FORMAT_R16G16B16X16_SNORM = 235,
     VIRGL_FORMAT_R16G16B16X16_FLOAT = 236,
     VIRGL_FORMAT_R16G16B16X16_UINT = 237,
-    VIRGL_FORMAT_R16G16B16X16_SINT = 238,
-    VIRGL_FORMAT_R32G32B32X32_FLOAT = 239,
-    VIRGL_FORMAT_R32G32B32X32_UINT = 240,
-    VIRGL_FORMAT_R32G32B32X32_SINT = 241,
-    VIRGL_FORMAT_R8A8_SNORM = 242,
-    VIRGL_FORMAT_R16A16_UNORM = 243,
-    VIRGL_FORMAT_R16A16_SNORM = 244,
-    VIRGL_FORMAT_R16A16_FLOAT = 245,
-    VIRGL_FORMAT_R32A32_FLOAT = 246,
-    VIRGL_FORMAT_R8A8_UINT = 247,
-    VIRGL_FORMAT_R8A8_SINT = 248,
-    VIRGL_FORMAT_R16A16_UINT = 249,
-    VIRGL_FORMAT_R16A16_SINT = 250,
-    VIRGL_FORMAT_R32A32_UINT = 251,
-    VIRGL_FORMAT_R32A32_SINT = 252,
+    VirglFormatR16g16b16x16Sint = 238,
+    VirglFormatR32g32b32x32Float = 239,
+    VirglFormatR32g32b32x32Uint = 240,
+    VirglFormatR32g32b32x32Sint = 241,
+    VirglFormatR8a8Snorm = 242,
+    VirglFormatR16a16Unorm = 243,
+    VirglFormatR16a16Snorm = 244,
+    VirglFormatR16a16Float = 245,
+    VirglFormatR32a32Float = 246,
+    VirglFormatR8a8Uint = 247,
+    VirglFormatR8a8Sint = 248,
+    VirglFormatR16a16Uint = 249,
+    VirglFormatR16a16Sint = 250,
+    VirglFormatR32a32Uint = 251,
+    VirglFormatR32a32Sint = 252,
 
-    VIRGL_FORMAT_R10G10B10A2_UINT = 253,
-    VIRGL_FORMAT_B5G6R5_SRGB = 254,
+    VirglFormatR10g10b10a2Uint = 253,
+    VirglFormatB5g6r5Srgb = 254,
 
-    VIRGL_FORMAT_BPTC_RGBA_UNORM = 255,
-    VIRGL_FORMAT_BPTC_SRGBA = 256,
-    VIRGL_FORMAT_BPTC_RGB_FLOAT = 257,
-    VIRGL_FORMAT_BPTC_RGB_UFLOAT = 258,
+    VirglFormatBptcRgbaUnorm = 255,
+    VirglFormatBptcSrgba = 256,
+    VirglFormatBptcRgbFloat = 257,
+    VirglFormatBptcRgbUfloat = 258,
 
-    VIRGL_FORMAT_A16L16_UNORM = 262,
+    VirglFormatA16l16Unorm = 262,
 
-    VIRGL_FORMAT_G8R8_UNORM = 263,
-    VIRGL_FORMAT_G8R8_SNORM = 264,
-    VIRGL_FORMAT_G16R16_UNORM = 265,
-    VIRGL_FORMAT_G16R16_SNORM = 266,
-    VIRGL_FORMAT_A8B8G8R8_SNORM = 267,
+    VirglFormatG8r8Unorm = 263,
+    VirglFormatG8r8Snorm = 264,
+    VirglFormatG16r16Unorm = 265,
+    VirglFormatG16r16Snorm = 266,
+    VirglFormatA8b8g8r8Snorm = 267,
 
-    VIRGL_FORMAT_A8L8_UNORM = 259,
-    VIRGL_FORMAT_A8L8_SNORM = 260,
-    VIRGL_FORMAT_A8L8_SRGB = 261,
+    VirglFormatA8l8Unorm = 259,
+    VirglFormatA8l8Snorm = 260,
+    VirglFormatA8l8Srgb = 261,
 
-    // VIRGL_FORMAT_A1B5G5R5_UNORM = 262,
-    // VIRGL_FORMAT_A1R5G5B5_UNORM = 263,
-    // VIRGL_FORMAT_A2B10G10R10_UNORM = 264,
-    // VIRGL_FORMAT_A2R10G10B10_UNORM = 265,
-    // VIRGL_FORMAT_A4R4G4B4_UNORM = 266,
-    VIRGL_FORMAT_X8B8G8R8_SNORM = 268,
+    // VirglFormatA1b5g5r5Unorm = 262,
+    // VirglFormatA1r5g5b5Unorm = 263,
+    // VirglFormatA2b10g10r10Unorm = 264,
+    // VirglFormatA2r10g10b10Unorm = 265,
+    // VirglFormatA4r4g4b4Unorm = 266,
+    VirglFormatX8b8g8r8Snorm = 268,
 
     /* etc2 compressed */
-    VIRGL_FORMAT_ETC2_RGB8 = 269,
-    VIRGL_FORMAT_ETC2_SRGB8 = 270,
-    VIRGL_FORMAT_ETC2_RGB8A1 = 271,
-    VIRGL_FORMAT_ETC2_SRGB8A1 = 272,
-    VIRGL_FORMAT_ETC2_RGBA8 = 273,
-    VIRGL_FORMAT_ETC2_SRGBA8 = 274,
-    VIRGL_FORMAT_ETC2_R11_UNORM = 275,
-    VIRGL_FORMAT_ETC2_R11_SNORM = 276,
-    VIRGL_FORMAT_ETC2_RG11_UNORM = 277,
-    VIRGL_FORMAT_ETC2_RG11_SNORM = 278,
+    VirglFormatEtc2Rgb8 = 269,
+    VirglFormatEtc2Srgb8 = 270,
+    VirglFormatEtc2Rgb8a1 = 271,
+    VirglFormatEtc2Srgb8a1 = 272,
+    VirglFormatEtc2Rgba8 = 273,
+    VirglFormatEtc2Srgba8 = 274,
+    VirglFormatEtc2R11Unorm = 275,
+    VirglFormatEtc2R11Snorm = 276,
+    VirglFormatEtc2Rg11Unorm = 277,
+    VirglFormatEtc2Rg11Snorm = 278,
 
-    VIRGL_FORMAT_ASTC_4x4 = 279,
-    VIRGL_FORMAT_ASTC_5x4 = 280,
-    VIRGL_FORMAT_ASTC_5x5 = 281,
-    VIRGL_FORMAT_ASTC_6x5 = 282,
-    VIRGL_FORMAT_ASTC_6x6 = 283,
-    VIRGL_FORMAT_ASTC_8x5 = 284,
-    VIRGL_FORMAT_ASTC_8x6 = 285,
-    VIRGL_FORMAT_ASTC_8x8 = 286,
-    VIRGL_FORMAT_ASTC_10x5 = 287,
-    VIRGL_FORMAT_ASTC_10x6 = 288,
-    VIRGL_FORMAT_ASTC_10x8 = 289,
-    VIRGL_FORMAT_ASTC_10x10 = 290,
-    VIRGL_FORMAT_ASTC_12x10 = 291,
-    VIRGL_FORMAT_ASTC_12x12 = 292,
-    VIRGL_FORMAT_ASTC_4x4_SRGB = 293,
-    VIRGL_FORMAT_ASTC_5x4_SRGB = 294,
-    VIRGL_FORMAT_ASTC_5x5_SRGB = 295,
-    VIRGL_FORMAT_ASTC_6x5_SRGB = 296,
-    VIRGL_FORMAT_ASTC_6x6_SRGB = 297,
-    VIRGL_FORMAT_ASTC_8x5_SRGB = 298,
-    VIRGL_FORMAT_ASTC_8x6_SRGB = 299,
-    VIRGL_FORMAT_ASTC_8x8_SRGB = 300,
-    VIRGL_FORMAT_ASTC_10x5_SRGB = 301,
-    VIRGL_FORMAT_ASTC_10x6_SRGB = 302,
-    VIRGL_FORMAT_ASTC_10x8_SRGB = 303,
-    VIRGL_FORMAT_ASTC_10x10_SRGB = 304,
-    VIRGL_FORMAT_ASTC_12x10_SRGB = 305,
-    VIRGL_FORMAT_ASTC_12x12_SRGB = 306,
+    VirglFormatAstc4x4 = 279,
+    VirglFormatAstc5x4 = 280,
+    VirglFormatAstc5x5 = 281,
+    VirglFormatAstc6x5 = 282,
+    VirglFormatAstc6x6 = 283,
+    VirglFormatAstc8x5 = 284,
+    VirglFormatAstc8x6 = 285,
+    VirglFormatAstc8x8 = 286,
+    VirglFormatAstc10x5 = 287,
+    VirglFormatAstc10x6 = 288,
+    VirglFormatAstc10x8 = 289,
+    VirglFormatAstc10x10 = 290,
+    VirglFormatAstc12x10 = 291,
+    VirglFormatAstc12x12 = 292,
+    VirglFormatAstc4x4Srgb = 293,
+    VirglFormatAstc5x4Srgb = 294,
+    VirglFormatAstc5x5Srgb = 295,
+    VirglFormatAstc6x5Srgb = 296,
+    VirglFormatAstc6x6Srgb = 297,
+    VirglFormatAstc8x5Srgb = 298,
+    VirglFormatAstc8x6Srgb = 299,
+    VirglFormatAstc8x8Srgb = 300,
+    VirglFormatAstc10x5Srgb = 301,
+    VirglFormatAstc10x6Srgb = 302,
+    VirglFormatAstc10x8Srgb = 303,
+    VirglFormatAstc10x10Srgb = 304,
+    VirglFormatAstc12x10Srgb = 305,
+    VirglFormatAstc12x12Srgb = 306,
 
-    VIRGL_FORMAT_R10G10B10X2_UNORM = 308,
-    VIRGL_FORMAT_A4B4G4R4_UNORM = 311,
+    VirglFormatR10g10b10x2Unorm = 308,
+    VirglFormatA4b4g4r4Unorm = 311,
 
-    VIRGL_FORMAT_R8_SRGB = 312,
-    VIRGL_FORMAT_R8G8_SRGB = 313,
+    VirglFormatR8Srgb = 312,
+    VirglFormatR8g8Srgb = 313,
 
-    VIRGL_FORMAT_P010 = 314,
-    VIRGL_FORMAT_P012 = 315,
-    VIRGL_FORMAT_P016 = 316,
+    VirglFormatP010 = 314,
+    VirglFormatP012 = 315,
+    VirglFormatP016 = 316,
 
-    VIRGL_FORMAT_B8G8R8_UNORM = 317,
-    VIRGL_FORMAT_R3G3B2_UNORM = 318,
-    VIRGL_FORMAT_R4G4B4A4_UNORM = 319,
-    VIRGL_FORMAT_R5G5B5A1_UNORM = 320,
-    VIRGL_FORMAT_R5G6B5_UNORM = 321,
+    VirglFormatB8g8r8Unorm = 317,
+    VirglFormatR3g3b2Unorm = 318,
+    VirglFormatR4g4b4a4Unorm = 319,
+    VirglFormatR5g5b5a1Unorm = 320,
+    VirglFormatR5g6b5Unorm = 321,
 
-    VIRGL_FORMAT_MAX, /* = PIPE_FORMAT_COUNT */
+    VirglFormatMax, /* = PIPE_FORMAT_COUNT */
 
     /* Below formats must not be used in the guest. */
-    VIRGL_FORMAT_B8G8R8X8_UNORM_EMULATED,
-    VIRGL_FORMAT_B8G8R8A8_UNORM_EMULATED,
-    VIRGL_FORMAT_MAX_EXTENDED,
+    VirglFormatB8g8r8x8UnormEmulated,
+    VirglFormatB8g8r8a8UnormEmulated,
+    VirglFormatMaxExtended,
 }
 
 impl VirglFormats {
-    pub const VIRGL_FORMAT_A1B5G5R5_UNORM: VirglFormats = VirglFormats::VIRGL_FORMAT_A16L16_UNORM;
-    pub const VIRGL_FORMAT_A1R5G5B5_UNORM: VirglFormats = VirglFormats::VIRGL_FORMAT_G8R8_UNORM;
-    pub const VIRGL_FORMAT_A2B10G10R10_UNORM: VirglFormats = VirglFormats::VIRGL_FORMAT_G8R8_SNORM;
-    pub const VIRGL_FORMAT_A2R10G10B10_UNORM: VirglFormats =
-        VirglFormats::VIRGL_FORMAT_G16R16_UNORM;
-    pub const VIRGL_FORMAT_A4R4G4B4_UNORM: VirglFormats = VirglFormats::VIRGL_FORMAT_G16R16_SNORM;
+    pub const VIRGL_FORMAT_A1B5G5R5_UNORM: VirglFormats = VirglFormats::VirglFormatA16l16Unorm;
+    pub const VIRGL_FORMAT_A1R5G5B5_UNORM: VirglFormats = VirglFormats::VirglFormatG8r8Unorm;
+    pub const VIRGL_FORMAT_A2B10G10R10_UNORM: VirglFormats = VirglFormats::VirglFormatG8r8Snorm;
+    pub const VIRGL_FORMAT_A2R10G10B10_UNORM: VirglFormats = VirglFormats::VirglFormatG16r16Unorm;
+    pub const VIRGL_FORMAT_A4R4G4B4_UNORM: VirglFormats = VirglFormats::VirglFormatG16r16Snorm;
 }
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VirglObjectType {
-    VIRGL_OBJECT_NULL,
-    VIRGL_OBJECT_BLEND,
-    VIRGL_OBJECT_RASTERIZER,
-    VIRGL_OBJECT_DSA,
-    VIRGL_OBJECT_SHADER,
-    VIRGL_OBJECT_VERTEX_ELEMENTS,
-    VIRGL_OBJECT_SAMPLER_VIEW,
-    VIRGL_OBJECT_SAMPLER_STATE,
-    VIRGL_OBJECT_SURFACE,
-    VIRGL_OBJECT_QUERY,
-    VIRGL_OBJECT_STREAMOUT_TARGET,
-    VIRGL_OBJECT_MSAA_SURFACE,
-    VIRGL_MAX_OBJECTS,
+    VirglObjectNull,
+    VirglObjectBlend,
+    VirglObjectRasterizer,
+    VirglObjectDsa,
+    VirglObjectShader,
+    VirglObjectVertexElements,
+    VirglObjectSamplerView,
+    VirglObjectSamplerState,
+    VirglObjectSurface,
+    VirglObjectQuery,
+    VirglObjectStreamoutTarget,
+    VirglObjectMsaaSurface,
+    VirglMaxObjects,
 }

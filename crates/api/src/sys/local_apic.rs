@@ -1,10 +1,7 @@
 use conquer_once::spin::OnceCell;
 use core::intrinsics::{volatile_load, volatile_store};
 use raw_cpuid::{CpuId, CpuIdResult};
-use x86_64::{
-    registers::model_specific::Msr,
-    PhysAddr, VirtAddr,
-};
+use x86_64::{registers::model_specific::Msr, PhysAddr, VirtAddr};
 
 use crate::sys::phys_to_virt;
 

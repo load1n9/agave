@@ -100,7 +100,7 @@ impl Executor {
             tasks,
             task_queue,
             waker_cache,
-            spawn_queue,
+            spawn_queue: _,
         } = self;
 
         while let Some(task_id) = task_queue.pop() {

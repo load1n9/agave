@@ -56,7 +56,7 @@ pub struct Spawner(Arc<ArrayQueue<Task>>);
 
 impl Spawner {
     pub fn run(&self, future: impl Future<Output = ()> + 'static) {
-        self.0.push(Task::new(future));
+        let _ = self.0.push(Task::new(future));
     }
 }
 
@@ -67,7 +67,7 @@ pub struct Executor {
     waker_cache: BTreeMap<TaskId, Waker>,
 }
 pub fn qpush(queue: Arc<ArrayQueue<Task>>, f: impl Future<Output = ()> + 'static) {
-    queue.push(Task::new(f));
+    let _ = queue.push(Task::new(f));
 }
 
 impl Executor {
@@ -193,7 +193,7 @@ impl futures::future::Future for YieldOnce {
             self.as_mut().0 = true;
             let aw = AtomicWaker::new();
             aw.register(&cx.waker());
-            YIELDERS.push(aw);
+            let _ = YIELDERS.push(aw);
             core::task::Poll::Pending
         } else {
             core::task::Poll::Ready(())

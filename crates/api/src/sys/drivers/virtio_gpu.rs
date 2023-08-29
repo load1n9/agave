@@ -204,9 +204,9 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
 
         for i in 0..capacity {
             framebuffer[i] = RGBA {
-                r: 100,
-                g: 120,
-                b: 140,
+                r: 24,
+                g: 27,
+                b: 36,
                 a: 125,
             };
         }
@@ -419,18 +419,19 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             log::info!("VirtioGpuCmdSubmit3d {:?}", nodata.type_);
         }
 
-        let _b: u8 = 0;
+        // test fb manipulation
+        // let mut b: u8 = 0;
 
-        // spawner.new(async move {
+        // spawner.run(async move {
         //     loop {
         //         b = b.wrapping_add(1);
         //         for i in 0..capacity {
-        //             framebuffer[i] = (RGBA {
+        //             framebuffer[i] = RGBA {
         //                 r: 100,
         //                 g: 120,
         //                 b: b.wrapping_add((i % 256) as u8),
         //                 a: 125,
-        //             });
+        //             };
         //         }
 
         //         yield_once().await;

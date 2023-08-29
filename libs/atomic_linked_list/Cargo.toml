@@ -1,9 +1,0 @@
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "atomic_linked_list"
-version = "0.1.0"
-
-[dependencies]
-
-[lib]
-crate-type = ["rlib"]

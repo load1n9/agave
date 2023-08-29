@@ -31,6 +31,7 @@ dependencies = [
  "futures",
  "futures-util",
  "hashbrown",
+ "iced-x86",
  "lazy_static",
  "linked_list_allocator 0.9.1",
  "lite-json",
@@ -340,9 +341,9 @@ dependencies = [
 
 [[package]]
 name = "bootloader"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a623ba99dacbbdd212c750acdf90e54efc49fa6b01e136d7ef6600d59d411709"
+checksum = "e092090f6e2b68cee8dc291ec60e4706f6b0c5cd90b666a5248a20f30591ccb0"
 dependencies = [
  "anyhow",
  "async-process",
@@ -856,6 +857,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest",
+]
+
+[[package]]
+name = "iced-x86"
+version = "1.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdd366a53278429c028367e0ba22a46cab6d565a57afb959f06e92c7a69e7828"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]

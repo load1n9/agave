@@ -2,6 +2,7 @@
     "tasks": {
         "build": "cargo build",
         "run": "cargo build",
+        "build:app_test": "cd app_test && RUSTFLAGS='-C relocation-model=pie -C link-arg=-pie' cargo build --release && cd ..",
         "run-qemu": "cargo run --bin qemu-bios"
     }
 }

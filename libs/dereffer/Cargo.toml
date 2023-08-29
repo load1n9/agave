@@ -1,5 +1,0 @@
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "dereffer"
-description = "Type wrappers for deref-ing the inner value in arbitrary ways"
-version = "0.1.0"

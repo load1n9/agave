@@ -1,11 +1,12 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
+use core::{alloc::GlobalAlloc, panic::PanicInfo};
 
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
-    allocator, drivers,
+    allocator::{self, ALLOCATOR},
+    drivers,
     framebuffer::FB,
     gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
@@ -26,6 +27,28 @@ use x86_64::{
 
 extern crate agave_api;
 extern crate alloc;
+
+extern "C" fn log_fn(s: *const u8, l: u32) {
+    unsafe {
+        let slice = core::slice::from_raw_parts(s, l as usize);
+        let str_slice = core::str::from_utf8_unchecked(slice);
+        log::info!("{}", str_slice)
+    }
+}
+
+extern "C" fn calloc(size: usize, align: usize) -> *mut u8 {
+    // log::info!("alloc {} {}", size, align);
+    unsafe { ALLOCATOR.alloc(core::alloc::Layout::from_size_align(size, align).unwrap()) }
+}
+extern "C" fn cdalloc(ptr: *mut u8, size: usize, align: usize) {
+    // log::info!("dealloc {:?} {} {}", ptr, size, align);
+    unsafe {
+        ALLOCATOR.dealloc(
+            ptr,
+            core::alloc::Layout::from_size_align(size, align).unwrap(),
+        );
+    };
+}
 
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -215,7 +238,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     }
 
     let mut fb = Box::new(FB::new(&fbinfo));
-    // fb.flush(fbm2, &fbinfo);
     let fb_clone: *mut FB = &mut *fb;
     log::info!("fbclone {:?}", fb_clone);
 
@@ -235,15 +257,20 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         }
 
         spawner.run(async move {
-            // use app::*;
-            // let mut apps: Vec<App> = Vec::new();
-            
+            use agave_api::sys::app::*;
+            let mut apps: Vec<App> = Vec::new();
+            let apps_raw = [
+                &include_bytes!("../../../app_test/target/x86_64/release/func")[..],
+            ];
+            for app_bytes in apps_raw.iter() {
+                apps.push(App::new(app_bytes, false));
+            }
             loop {
-                let _input = globals::INPUT.read();
-                // for app in apps.iter_mut() {
-                //     let mut arg = Context::new(log_fn, fb.share(), calloc, cdalloc, &input);
-                //     app.call(&mut arg);
-                // }
+                let input = globals::INPUT.read();
+                for app in apps.iter_mut() {
+                    let mut arg = Context::new(log_fn, fb.share(), calloc, cdalloc, &input);
+                    app.call(&mut arg);
+                }
 
                 globals::INPUT.update(|e| e.step());
                 yield_once().await;

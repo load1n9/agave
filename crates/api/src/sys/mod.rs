@@ -1,4 +1,5 @@
 pub mod allocator;
+pub mod app;
 pub mod drivers;
 pub mod framebuffer;
 pub mod gdt;
@@ -13,11 +14,10 @@ pub mod serial;
 pub mod task;
 pub mod virtio;
 
-use self::{allocator::ALLOCATOR, memory::BootInfoFrameAllocator};
+use self::memory::BootInfoFrameAllocator;
 use acpi::{AcpiHandler, PhysicalMapping};
 use conquer_once::spin::OnceCell;
 use core::{
-    alloc::GlobalAlloc,
     ptr::NonNull,
     sync::atomic::{AtomicU64, Ordering},
 };
@@ -29,28 +29,6 @@ use x86_64::{
     },
     PhysAddr, VirtAddr,
 };
-
-extern "C" fn _log_fn(s: *const u8, l: u32) {
-    unsafe {
-        let slice = core::slice::from_raw_parts(s, l as usize);
-        let str_slice = core::str::from_utf8_unchecked(slice);
-        log::info!("{}", str_slice)
-    }
-}
-
-extern "C" fn _calloc(size: usize, align: usize) -> *mut u8 {
-    // log::info!("alloc {} {}", size, align);
-    unsafe { ALLOCATOR.alloc(core::alloc::Layout::from_size_align(size, align).unwrap()) }
-}
-extern "C" fn _cdalloc(ptr: *mut u8, size: usize, align: usize) {
-    // log::info!("dealloc {:?} {} {}", ptr, size, align);
-    unsafe {
-        ALLOCATOR.dealloc(
-            ptr,
-            core::alloc::Layout::from_size_align(size, align).unwrap(),
-        );
-    };
-}
 
 #[derive(Clone)]
 pub struct AcpiHandlerImpl;

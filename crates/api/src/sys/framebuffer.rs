@@ -243,7 +243,7 @@ impl FB {
 
         let _start = global_time_ms();
 
-        // match info.pixel_format {
+        // match _info.pixel_format {
         //     PixelFormat::Bgr => {
         //         for (idx, &i) in self.pixels.iter().enumerate() {
         //             self.backbuffer[idx].r = i.b;
@@ -255,7 +255,7 @@ impl FB {
         //     _ => {}
         // }
 
-        // let time0 = get_time_ms() - start;
+        // let time0 = _get_time_ms() - start;
 
         // let start = get_time_ms();
         framebuffer.copy_from_slice(unsafe {

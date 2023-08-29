@@ -1,20 +1,34 @@
 pub mod allocator;
+pub mod drivers;
 pub mod framebuffer;
 pub mod gdt;
 pub mod globals;
 pub mod interrupts;
 pub mod ioapic;
+pub mod local_apic;
+pub mod logger;
 pub mod memory;
 pub mod pci;
 pub mod serial;
-pub mod local_apic;
+pub mod task;
+pub mod virtio;
 
 use self::{allocator::ALLOCATOR, memory::BootInfoFrameAllocator};
 use acpi::{AcpiHandler, PhysicalMapping};
 use conquer_once::spin::OnceCell;
-use core::{ptr::NonNull, sync::atomic::{AtomicU64, Ordering}, alloc::GlobalAlloc};
+use core::{
+    alloc::GlobalAlloc,
+    ptr::NonNull,
+    sync::atomic::{AtomicU64, Ordering},
+};
 use spin::Mutex;
-use x86_64::{structures::paging::{OffsetPageTable, Mapper, Size4KiB, FrameAllocator, PhysFrame, Page, mapper::MapToError, PageTableFlags}, PhysAddr, VirtAddr};
+use x86_64::{
+    structures::paging::{
+        mapper::MapToError, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags,
+        PhysFrame, Size4KiB,
+    },
+    PhysAddr, VirtAddr,
+};
 
 extern "C" fn _log_fn(s: *const u8, l: u32) {
     unsafe {

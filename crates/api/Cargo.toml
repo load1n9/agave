@@ -18,12 +18,14 @@ noto-sans-mono-bitmap = { version = "0.2.0", default_features = false, features 
 crossbeam = { version = "0.8", default-features = false, features = ["alloc"] }
 conquer-once = { version = "0.3.2", default-features = false }
 bootloader_api = "0.11.4"
+bootloader-boot-config = "0.11.4"
 acpi = "4.1.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 linked_list_allocator = "0.9.0"
 uart_16550 = "0.2.18"
 bitflags = "1.3.2"
 spin = "0.9.8"
+spinning_top = "0.2.4"
 raw-cpuid = "10.2.0"
 anyhow = { version = "1.0", default-features = false }
 x86_64 = { version = "0.14.10" }

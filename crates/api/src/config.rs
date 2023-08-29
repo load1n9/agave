@@ -1,1 +1,0 @@
-pub const KERNEL_SIZE: usize = 2 << 20; // 2 MB

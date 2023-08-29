@@ -1,24 +1,18 @@
+cargo-features = ["per-package-target"]
+
 [package]
 name = "agave-kernel"
 version = "0.1.0"
 edition = "2021"
+default-target = "x86_64-unknown-none"
 
 [[bin]]
 name = "agave-kernel"
 test = false
 bench = false
 
-[features]
-default = ["video", "x86_64"]
-x86_64 = ["dep:x86_64"]
-video = []
-serial = []
-
 [dependencies]
 bootloader_api = "0.11.2"
-x86_64 = { version = "0.14.10", optional = true }
-bootloader-x86_64-common = "0.11.3"
-conquer-once = { version = "0.4.0", default-features = false }
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-log = { version = "0.4.17", default-features = false }
+uart_16550 = "0.2.10"
 agave-api = { path = "../api" }
+noto-sans-mono-bitmap = { version = "0.1.2", default_features = false, features = ["regular", "size_14"] }

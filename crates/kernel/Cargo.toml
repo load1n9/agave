@@ -12,7 +12,50 @@ test = false
 bench = false
 
 [dependencies]
-bootloader_api = "0.11.2"
-uart_16550 = "0.2.10"
+arrayvec = { version = "0.7.2", default-features = false }
+noto-sans-mono-bitmap = { version = "0.2.0", default_features = false, features = [
+    "regular",
+    "size_16",
+    "unicode-basic-latin",
+    # required for the fallback char '�'
+    "unicode-specials",
+] }
+crossbeam = { version = "0.8", default-features = false, features = ["alloc"] }
+conquer-once = { version = "0.3.2", default-features = false }
+bootloader_api = "0.11.4"
+bootloader-boot-config = "0.11.4"
+acpi = "4.1.0"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+linked_list_allocator = "0.9.0"
+uart_16550 = "0.2.18"
+bitflags = "1.3.2"
+spin = "0.5.2"
+spinning_top = "0.2.4"
+raw-cpuid = "10.2.0"
+anyhow = { version = "1.0", default-features = false }
+x86_64 = { version = "0.14.10" }
+wasmi = { version = "0.30.0", default-features = false }
+core2 = { version = "0.4.0", default-features = false, features = [
+    "alloc",
+    "nightly",
+] }
+lite-json = { version = "0.2.0", default-features = false, defaults = [
+    "no_std"
+] }
+hashbrown = { version = "0.13.2", features = ["nightly"] }
+wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
+serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
+bootloader-x86_64-common = "0.11.4"
+log = { version = "0.4.17", default-features = false }
+crossbeam-queue = { version = "0.3.8", default-features = false, features = [
+    "alloc"
+] }
+futures = { version = "0.3.4", default-features = false, features = [
+    "alloc",
+    "async-await"
+] }
+futures-util = { version = "0.3.4", default-features = false, features = [
+    "alloc"
+] }
 agave-api = { path = "../api" }
-noto-sans-mono-bitmap = { version = "0.1.2", default_features = false, features = ["regular", "size_14"] }

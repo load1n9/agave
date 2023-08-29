@@ -53,7 +53,7 @@ extern "C" fn _cdalloc(ptr: *mut u8, size: usize, align: usize) {
 }
 
 #[derive(Clone)]
-struct AcpiHandlerImpl;
+pub struct AcpiHandlerImpl;
 impl AcpiHandler for AcpiHandlerImpl {
     unsafe fn map_physical_region<T>(
         &self,
@@ -148,3 +148,5 @@ pub fn create_identity_virt_from_phys_n(pages: usize) -> Result<Page, MapToError
         )));
     })
 }
+
+pub const ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;

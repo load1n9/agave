@@ -165,11 +165,10 @@ unsafe impl Send for FrameBufferWriter {}
 unsafe impl Sync for FrameBufferWriter {}
 
 impl fmt::Write for FrameBufferWriter {
-    fn write_str(&mut self, _s: &str) -> fmt::Result {
-        // for c in s.chars() {
-        //     self.write_char(c);
-        // }
-
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.chars() {
+            self.write_char(c);
+        }
         Ok(())
     }
 }
@@ -266,13 +265,13 @@ impl FB {
         // log::info!("step 1 FB {}ms", get_time_ms() - start);
         // for y in 0..self.h {
         //     for x in 0..self.w {
-        //         let RGBA { r, g, b, a } = self.pixels[x + self.w * y];
-        //         let pixel_offset = y * info.stride + x;
+        //         let RGBA { r, g, b, a: _ } = self.pixels[x + self.w * y];
+        //         let pixel_offset = y * _info.stride + x;
 
-        //         let color = match info.pixel_format {
+        //         let color = match _info.pixel_format {
         //             PixelFormat::Rgb => [r, g, b, 0],
         //             PixelFormat::Bgr => [b, g, r, 0],
-        //             PixelFormat::U8 => [if (g + b + r) as usize > 200 { 0xf } else { 0 }, 0, 0, 0],
+        //             PixelFormat::U8 => [if (g + b + r) as usize > 200 { 0xf } else { 0 }, 0, 255, 0],
         //             other => {
         //                 // set a supported (but invalid) pixel format before panicking to avoid a double
         //                 // panic; it might not be readable though
@@ -280,7 +279,7 @@ impl FB {
         //                 panic!("pixel format {:?} not supported in logger", other)
         //             }
         //         };
-        //         let bytes_per_pixel = info.bytes_per_pixel;
+        //         let bytes_per_pixel = _info.bytes_per_pixel;
         //         let byte_offset = pixel_offset * bytes_per_pixel;
         //         framebuffer[byte_offset..(byte_offset + bytes_per_pixel)]
         //             .copy_from_slice(&color[..bytes_per_pixel]);

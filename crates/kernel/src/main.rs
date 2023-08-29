@@ -106,6 +106,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     with_mapper_framealloc(|mapper, frame_allocator| {
         allocator::init_heap(mapper, frame_allocator).expect("heap initialization failed");
     });
+    log::trace!("Hello {}!", "World");
 
     let rsdp_addr = boot_info.rsdp_addr.into_option().expect("no rsdp");
     let acpi_tables = unsafe { AcpiTables::from_rsdp(ACPI_HANDLER, rsdp_addr as usize).unwrap() };
@@ -236,13 +237,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         spawner.run(async move {
             // use app::*;
             // let mut apps: Vec<App> = Vec::new();
-
+            
             loop {
                 let _input = globals::INPUT.read();
                 // for app in apps.iter_mut() {
                 //     let mut arg = Context::new(log_fn, fb.share(), calloc, cdalloc, &input);
                 //     app.call(&mut arg);
                 // }
+
                 globals::INPUT.update(|e| e.step());
                 yield_once().await;
             }

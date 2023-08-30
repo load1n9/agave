@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 
-use core::{alloc::GlobalAlloc, panic::PanicInfo};
+use core::panic::PanicInfo;
 
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
-    allocator::{self, ALLOCATOR},
+    allocator,
     drivers,
     framebuffer::FB,
     gdt, globals, interrupts, ioapic, local_apic,
@@ -14,6 +14,7 @@ use agave_api::sys::{
     pci,
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
+    wasm::WasmApp,
     with_mapper_framealloc, ACPI_HANDLER, FRAME_ALLOCATOR, MAPPER, VIRTUAL_MAPPING_OFFSET,
 };
 use alloc::{boxed::Box, slice, vec::Vec};
@@ -28,27 +29,27 @@ use x86_64::{
 extern crate agave_api;
 extern crate alloc;
 
-extern "C" fn log_fn(s: *const u8, l: u32) {
-    unsafe {
-        let slice = core::slice::from_raw_parts(s, l as usize);
-        let str_slice = core::str::from_utf8_unchecked(slice);
-        log::info!("{}", str_slice)
-    }
-}
+// extern "C" fn log_fn(s: *const u8, l: u32) {
+//     unsafe {
+//         let slice = core::slice::from_raw_parts(s, l as usize);
+//         let str_slice = core::str::from_utf8_unchecked(slice);
+//         log::info!("{}", str_slice)
+//     }
+// }
 
-extern "C" fn calloc(size: usize, align: usize) -> *mut u8 {
-    // log::info!("alloc {} {}", size, align);
-    unsafe { ALLOCATOR.alloc(core::alloc::Layout::from_size_align(size, align).unwrap()) }
-}
-extern "C" fn cdalloc(ptr: *mut u8, size: usize, align: usize) {
-    // log::info!("dealloc {:?} {} {}", ptr, size, align);
-    unsafe {
-        ALLOCATOR.dealloc(
-            ptr,
-            core::alloc::Layout::from_size_align(size, align).unwrap(),
-        );
-    };
-}
+// extern "C" fn calloc(size: usize, align: usize) -> *mut u8 {
+//     // log::info!("alloc {} {}", size, align);
+//     unsafe { ALLOCATOR.alloc(core::alloc::Layout::from_size_align(size, align).unwrap()) }
+// }
+// extern "C" fn cdalloc(ptr: *mut u8, size: usize, align: usize) {
+//     // log::info!("dealloc {:?} {} {}", ptr, size, align);
+//     unsafe {
+//         ALLOCATOR.dealloc(
+//             ptr,
+//             core::alloc::Layout::from_size_align(size, align).unwrap(),
+//         );
+//     };
+// }
 
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -58,6 +59,8 @@ const CONFIG: BootloaderConfig = {
 };
 
 entry_point!(main, config = &CONFIG);
+
+#[allow(unused_variables)]
 fn main(boot_info: &'static mut BootInfo) -> ! {
     gdt::init();
     interrupts::init_idt();
@@ -66,7 +69,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let fbinfo = framebuffer.info();
 
     let fbm = framebuffer.buffer_mut();
-    let _fbm2 = unsafe {
+    let fbm2 = unsafe {
         let p = fbm.as_mut_ptr();
         slice::from_raw_parts_mut(p, fbinfo.byte_len)
     };
@@ -79,7 +82,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             .into_option()
             .expect("no physical_memory_offset"),
     );
-    log::info!("physical_memory_offset {:x}", virtual_full_mapping_offset);
+    // log::info!("physical_memory_offset {:x}", virtual_full_mapping_offset);
     unsafe {
         VIRTUAL_MAPPING_OFFSET = virtual_full_mapping_offset;
     }
@@ -88,7 +91,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     MAPPER.init_once(|| Mutex::new(mapper));
     FRAME_ALLOCATOR.init_once(|| Mutex::new(frame_allocator));
     {
-        log::info!("Complete Bootloader Map physical memory");
+        // log::info!("Complete Bootloader Map physical memory");
         type VirtualMappingPageSize = Size2MiB; // Size2MiB;Size1GiB Size4KiB
 
         let start_frame: PhysFrame<VirtualMappingPageSize> =
@@ -123,17 +126,16 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 }
             };
         }
-        log::info!("new:{} already_mapped:{}", news, olds);
+        // log::info!("new:{} already_mapped:{}", news, olds);
     }
 
     with_mapper_framealloc(|mapper, frame_allocator| {
         allocator::init_heap(mapper, frame_allocator).expect("heap initialization failed");
     });
-    log::trace!("Hello {}!", "World");
 
     let rsdp_addr = boot_info.rsdp_addr.into_option().expect("no rsdp");
     let acpi_tables = unsafe { AcpiTables::from_rsdp(ACPI_HANDLER, rsdp_addr as usize).unwrap() };
-    log::info!("acpi_read");
+    // log::info!("acpi_read");
 
     let _x = HpetInfo::new(&acpi_tables).expect("hpet");
     // log::info!("{:#?}]", x);
@@ -144,34 +146,34 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         // log::info!("{:#?}", apic);
 
         unsafe {
-            log::info!("init apic");
+            // log::info!("init apic");
             let lapic = local_apic::LocalApic::init(PhysAddr::new(apic.local_apic_address));
-            log::info!("start apic c");
+            // log::info!("start apic c");
             let mut freq = 1000_000_000;
             if let Some(cpuid) = local_apic::cpuid() {
-                log::info!("cpuid");
+                // log::info!("cpuid");
                 if let Some(tsc) = cpuid.get_tsc_info() {
-                    log::info!(
-                        "{} {}",
-                        tsc.nominal_frequency(),
-                        tsc.tsc_frequency().unwrap()
-                    );
+                    // log::info!(
+                    //     "{} {}",
+                    //     tsc.nominal_frequency(),
+                    //     tsc.tsc_frequency().unwrap()
+                    // );
                     freq = tsc.nominal_frequency();
                 } else {
                 }
             }
             lapic.set_div_conf(0b1011);
-            log::info!("start apic c");
+            // log::info!("start apic c");
             lapic.set_lvt_timer((1 << 17) + 48);
             let wanted_freq_hz = 1000;
             lapic.set_init_count(freq / wanted_freq_hz);
         }
 
         for io_apic in apic.io_apics.iter() {
-            log::info!("{:x}", io_apic.address);
+            // log::info!("{:x}", io_apic.address);
             let ioa = ioapic::IoApic::init(io_apic);
             let val = ioa.read(ioapic::IOAPICVER);
-            log::info!("{:x}", val);
+            // log::info!("{:x}", val);
             for i in 0..24 {
                 let n = ioa.read_redtlb(i);
                 let mut red = ioapic::RedTbl::new(n);
@@ -212,19 +214,19 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     {
         for (pci_index, pci) in pcis.devs.iter().enumerate() {
             let _vector_base = 50 + 2 * pci_index;
-            let status = pci.config_read_u16(pci::PCIConfigRegisters::PCIStatus as u8);
+            let _status = pci.config_read_u16(pci::PCIConfigRegisters::PCIStatus as u8);
             let vendor = pci.config_read_u16(pci::PCIConfigRegisters::PCIVendorID as u8);
-            let device_id =
+            let _device_id =
                 pci.config_read_u16(pci::PCIConfigRegisters::PCIDeviceID as u8) as isize - 0x1040;
-            log::info!(
-                "{:?} status {} irq:{} ipin:{}, {:x} {} ________________",
-                pci,
-                status,
-                pci.get_irq(),
-                pci.get_ipin(),
-                vendor,
-                device_id,
-            );
+            // log::info!(
+            //     "{:?} status {} irq:{} ipin:{}, {:x} {} ________________",
+            //     pci,
+            //     status,
+            //     pci.get_irq(),
+            //     pci.get_ipin(),
+            //     vendor,
+            //     device_id,
+            // );
             const VIRTIO_VENDOR_ID: u16 = 0x1af4;
             if vendor == VIRTIO_VENDOR_ID {
                 let virtio = with_mapper_framealloc(|mapper, frame_allocator| {
@@ -239,7 +241,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
     let mut fb = Box::new(FB::new(&fbinfo));
     let fb_clone: *mut FB = &mut *fb;
-    log::info!("fbclone {:?}", fb_clone);
+    // log::info!("fbclone {:?}", fb_clone);
 
     {
         let mut executor = task::executor::Executor::new();
@@ -257,21 +259,17 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         }
 
         spawner.run(async move {
-            use agave_api::sys::app::*;
-            let mut apps: Vec<App> = Vec::new();
-            let apps_raw = [
-                &include_bytes!("../../../app_test/target/x86_64/release/func")[..],
-            ];
+            let mut apps: Vec<WasmApp<i32>> = Vec::new();
+            let apps_raw = [&include_bytes!("../../../disk/bin/test.wasm")[..]];
             for app_bytes in apps_raw.iter() {
-                apps.push(App::new(app_bytes, false));
+                apps.push(WasmApp::new(app_bytes.to_vec(), 0));
             }
-            loop {
+            for app in apps.iter_mut() {
                 let input = globals::INPUT.read();
-                for app in apps.iter_mut() {
-                    let mut arg = Context::new(log_fn, fb.share(), calloc, cdalloc, &input);
-                    app.call(&mut arg);
-                }
+                app.call();
+            }
 
+            loop {
                 globals::INPUT.update(|e| e.step());
                 yield_once().await;
             }

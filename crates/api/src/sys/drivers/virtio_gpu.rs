@@ -83,7 +83,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         .await;
         let mut display_info =
             (response_desc.addr as *const VirtioGpuRespOkDisplayInfo).read_volatile();
-        log::info!("{:?}", display_info);
+        // log::info!("{:?}", display_info);
 
         {
             #[repr(C)]
@@ -111,9 +111,9 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                     },
                 )
                 .await;
-                let capsetinfo =
+                let _capsetinfo =
                     (response_desc.addr as *const VirtioGpuRespCapsetInfo).read_volatile();
-                log::info!("CAP {}, {:?}", i, capsetinfo);
+                // log::info!("CAP {}, {:?}", i, capsetinfo);
             }
             yield_once().await;
         }
@@ -148,8 +148,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("{:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("{:?}", nodata.type_);
 
         let capacity = (display_info.pmodes.rect.w * display_info.pmodes.rect.h) as usize;
 
@@ -160,7 +160,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         // let framebuffer_ptr =
         //     ALLOCATOR.alloc(Layout::from_size_align_unchecked(capacity * 4, 4096));
         let mut framebuffer: Vec<RGBA> = Vec::from_raw_parts(addr as *mut RGBA, capacity, capacity);
-        log::info!("(*fb).update {:?}", addr as *mut RGBA);
+        // log::info!("(*fb).update {:?}", addr as *mut RGBA);
         (*fb).update(
             addr as *mut RGBA,
             display_info.pmodes.rect.w as usize,
@@ -183,8 +183,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("{:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("{:?}", nodata.type_);
 
         let response_desc = request(
             Arc::clone(&virtio),
@@ -199,8 +199,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("{:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("{:?}", nodata.type_);
 
         for i in 0..capacity {
             framebuffer[i] = RGBA {
@@ -226,8 +226,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("{:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("{:?}", nodata.type_);
 
         let response_desc = request(
             Arc::clone(&virtio),
@@ -242,8 +242,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("{:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("{:?}", nodata.type_);
 
         let mut debug_name: [char; 64] = ['1'; 64];
         let name = "Debug\0";
@@ -264,8 +264,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             },
         )
         .await;
-        let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        log::info!("VirtioGpuCmdCtxCreate {:?}", nodata.type_);
+        let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+        // log::info!("VirtioGpuCmdCtxCreate {:?}", nodata.type_);
 
         //FIRST 3D SUBMIT
         {
@@ -341,8 +341,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 },
             )
             .await;
-            let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-            log::info!("VirtioGpuCmdResourceCreate3d {:?}", nodata.type_);
+            let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+            // log::info!("VirtioGpuCmdResourceCreate3d {:?}", nodata.type_);
 
             let response_desc = request(
                 Arc::clone(&virtio),
@@ -357,9 +357,9 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 },
             )
             .await;
-            let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+            let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
 
-            log::info!("VirtioGpuCmdCtxAttachResource {:?}", nodata.type_);
+            // log::info!("VirtioGpuCmdCtxAttachResource {:?}", nodata.type_);
 
             let resource_example = {
                 let capacity = (256 * 256) as usize;
@@ -389,8 +389,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 },
             )
             .await;
-            let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-            log::info!("{:?}", nodata.type_);
+            let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+            // log::info!("{:?}", nodata.type_);
 
             cmd_create_surface(&mut buffer, res_handle, args.format);
             cmd_set_framebuffer_state(&mut buffer, &[res_handle]);
@@ -415,8 +415,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 },
             )
             .await;
-            let nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-            log::info!("VirtioGpuCmdSubmit3d {:?}", nodata.type_);
+            let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+            // log::info!("VirtioGpuCmdSubmit3d {:?}", nodata.type_);
         }
 
         // test fb manipulation

@@ -43,7 +43,7 @@ dependencies = [
  "spinning_top",
  "uart_16550",
  "wasi 0.10.0+wasi-snapshot-preview1",
- "wasmi",
+ "wasmi 0.30.0",
  "x86_64",
  "xmas-elf 0.6.2",
 ]
@@ -78,7 +78,7 @@ dependencies = [
  "spinning_top",
  "uart_16550",
  "wasi 0.10.0+wasi-snapshot-preview1",
- "wasmi",
+ "wasmi 0.31.0",
  "x86_64",
  "xmas-elf 0.6.2",
 ]
@@ -143,7 +143,7 @@ dependencies = [
  "volatile 0.2.6",
  "vte",
  "wasi 0.10.0+wasi-snapshot-preview1",
- "wasmi",
+ "wasmi 0.30.0",
  "x86_64",
  "xmas-elf 0.6.2",
  "zerocopy",
@@ -1878,7 +1878,20 @@ dependencies = [
  "smallvec",
  "spin 0.9.8",
  "wasmi_arena",
- "wasmi_core",
+ "wasmi_core 0.12.0",
+ "wasmparser-nostd",
+]
+
+[[package]]
+name = "wasmi"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f341edb80021141d4ae6468cbeefc50798716a347d4085c3811900049ea8945"
+dependencies = [
+ "smallvec",
+ "spin 0.9.8",
+ "wasmi_arena",
+ "wasmi_core 0.13.0",
  "wasmparser-nostd",
 ]
 
@@ -1893,6 +1906,18 @@ name = "wasmi_core"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624e6333e861ef49095d2d678b76ebf30b06bf37effca845be7e5b87c90071b7"
+dependencies = [
+ "downcast-rs",
+ "libm",
+ "num-traits",
+ "paste",
+]
+
+[[package]]
+name = "wasmi_core"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcf1a7db34bff95b85c261002720c00c3a6168256dcb93041d3fa2054d19856a"
 dependencies = [
  "downcast-rs",
  "libm",

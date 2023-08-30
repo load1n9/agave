@@ -15,6 +15,7 @@ pub struct AllocFromCtx {
     a: extern "C" fn(alloc::alloc::Layout) -> *mut u8,
     d: extern "C" fn(*mut u8, alloc::alloc::Layout),
 }
+
 impl AllocFromCtx {
     pub fn init() -> Self {
         Self {
@@ -29,6 +30,7 @@ impl AllocFromCtx {
         Self { a, d }
     }
 }
+
 unsafe impl GlobalAlloc for AllocFromCtx {
     unsafe fn alloc(&self, layout: alloc::alloc::Layout) -> *mut u8 {
         (self.a)(layout)
@@ -38,6 +40,7 @@ unsafe impl GlobalAlloc for AllocFromCtx {
         (self.d)(ptr, layout)
     }
 }
+
 // #[global_allocator]
 // static ALLOCATOR: AllocFromCtx = AllocFromCtx;
 

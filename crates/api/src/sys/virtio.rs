@@ -339,8 +339,8 @@ impl Virtio {
                 read_volatile(&cap_common.device_status) | VIRTIO_STATUS_DRIVER,
             );
 
-            let current = read_volatile(*cap_common);
-            log::info!("{:?}", current);
+            let _current = read_volatile(*cap_common);
+            // log::info!("{:?}", current);
             match device_type {
                 DeviceType::Gpu => {
                     write_volatile(&mut cap_common.driver_feature, 0b11);
@@ -378,7 +378,7 @@ impl Virtio {
                 {
                     let descs = cap_common.queue_desc as *mut Desc;
                     let qsize = read_volatile(&mut cap_common.queue_size) as isize;
-                    log::info!("qsize {} {}", qsize, cap_common.queue_desc);
+                    // log::info!("qsize {} {}", qsize, cap_common.queue_desc);
                     for idesc in 0..qsize {
                         let elem_ptr = descs.offset(idesc);
                         elem_ptr.write_volatile(Desc {
@@ -449,8 +449,8 @@ impl Virtio {
                     }
                     let conf_ptr: *mut VirtioGpuConfig =
                         core::intrinsics::transmute((*cap_device) as *mut ());
-                    let rconf = conf_ptr.read_volatile();
-                    log::info!("{:?}", rconf);
+                    let _rconf = conf_ptr.read_volatile();
+                    // log::info!("{:?}", rconf);
                     // rconf.events_clear = 1;
                     // conf_ptr.write_volatile(rconf);
                 }

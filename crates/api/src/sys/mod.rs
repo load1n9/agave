@@ -1,5 +1,4 @@
 pub mod allocator;
-pub mod app;
 pub mod drivers;
 pub mod framebuffer;
 pub mod gdt;
@@ -13,6 +12,7 @@ pub mod pci;
 pub mod serial;
 pub mod task;
 pub mod virtio;
+pub mod wasm;
 
 use self::memory::BootInfoFrameAllocator;
 use acpi::{AcpiHandler, PhysicalMapping};

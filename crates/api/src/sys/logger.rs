@@ -97,7 +97,7 @@ pub fn init_logger(
     });
     log::set_logger(logger).expect("logger already set");
     log::set_max_level(convert_level(log_level));
-    log::info!("Framebuffer info: {:?}", info);
+    // log::info!("Framebuffer info: {:?}", info);
 }
 fn convert_level(level: LevelFilter) -> log::LevelFilter {
     match level {

@@ -32,7 +32,7 @@ impl LocalApic {
         let this = LOCAL_APIC.get_or_init(|| Self {
             virt_address: virtaddr,
         });
-        log::info!("LocalApic {:?}", virtaddr);
+        // log::info!("LocalApic {:?}", virtaddr);
 
         let mut msr = Msr::new(0x1B);
         let r = msr.read();

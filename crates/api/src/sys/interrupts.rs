@@ -173,7 +173,7 @@ use futures::task::AtomicWaker;
 static WAKER: AtomicWaker = AtomicWaker::new();
 
 extern "x86-interrupt" fn lapic_timer2(_stack_frame: InterruptStackFrame) {
-    log::info!("timer2");
+    // log::info!("timer2");
 
     // unsafe {
     //     self::local_apic::LocalApic.get().unwrap().eoi();
@@ -271,14 +271,14 @@ extern "x86-interrupt" fn page_fault_handler(
 }
 
 extern "x86-interrupt" fn ioapic_handler_0(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_0_____");
+    // log::info!("______ioapic_handler_0_____");
 }
 extern "x86-interrupt" fn ioapic_handler_1(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_1_____");
+    // log::info!("______ioapic_handler_1_____");
     let ioa = ioapic::IO_APIC_0.get().expect("IoApic0");
     let n = ioa.read_redtlb(1);
-    let red = ioapic::RedTbl::new(n);
-    log::info!("{:?}", red);
+    let _red = ioapic::RedTbl::new(n);
+    // log::info!("{:?}", red);
     // let stored = red.store();
 
     unsafe {
@@ -300,75 +300,75 @@ extern "x86-interrupt" fn ioapic_handler_2(_stack_frame: InterruptStackFrame) {
     };
 }
 extern "x86-interrupt" fn ioapic_handler_3(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_3_____");
+    // log::info!("______ioapic_handler_3_____");
 }
 extern "x86-interrupt" fn ioapic_handler_4(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_4_____");
+    // log::info!("______ioapic_handler_4_____");
 }
 extern "x86-interrupt" fn ioapic_handler_5(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_5_____");
+    // log::info!("______ioapic_handler_5_____");
 }
 extern "x86-interrupt" fn ioapic_handler_6(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_6_____");
+    // log::info!("______ioapic_handler_6_____");
 }
 extern "x86-interrupt" fn ioapic_handler_7(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_7_____");
+    // log::info!("______ioapic_handler_7_____");
 }
 extern "x86-interrupt" fn ioapic_handler_8(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_8_____");
+    // log::info!("______ioapic_handler_8_____");
 }
 extern "x86-interrupt" fn ioapic_handler_9(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_9_____");
+    // log::info!("______ioapic_handler_9_____");
 }
 extern "x86-interrupt" fn ioapic_handler_10(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_10_____");
+    // log::info!("______ioapic_handler_10_____");
     unsafe {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
     };
 }
 extern "x86-interrupt" fn ioapic_handler_11(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_11_____");
+    // log::info!("______ioapic_handler_11_____");
 
     unsafe {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
     };
 }
 extern "x86-interrupt" fn ioapic_handler_12(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_12_____");
+    // log::info!("______ioapic_handler_12_____");
 }
 extern "x86-interrupt" fn ioapic_handler_13(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_13_____");
+    // log::info!("______ioapic_handler_13_____");
 }
 extern "x86-interrupt" fn ioapic_handler_14(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_14_____");
+    // log::info!("______ioapic_handler_14_____");
 }
 extern "x86-interrupt" fn ioapic_handler_15(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_15_____");
+    // log::info!("______ioapic_handler_15_____");
 }
 extern "x86-interrupt" fn ioapic_handler_16(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_16_____");
+    // log::info!("______ioapic_handler_16_____");
 }
 extern "x86-interrupt" fn ioapic_handler_17(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_17_____");
+    // log::info!("______ioapic_handler_17_____");
 }
 extern "x86-interrupt" fn ioapic_handler_18(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_18_____");
+    // log::info!("______ioapic_handler_18_____");
 }
 extern "x86-interrupt" fn ioapic_handler_19(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_19_____");
+    // log::info!("______ioapic_handler_19_____");
 }
 extern "x86-interrupt" fn ioapic_handler_20(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_20_____");
+    // log::info!("______ioapic_handler_20_____");
 }
 extern "x86-interrupt" fn ioapic_handler_21(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_21_____");
+    // log::info!("______ioapic_handler_21_____");
 }
 extern "x86-interrupt" fn ioapic_handler_22(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_22_____");
+    // log::info!("______ioapic_handler_22_____");
 }
 extern "x86-interrupt" fn ioapic_handler_23(_stack_frame: InterruptStackFrame) {
-    log::info!("______ioapic_handler_23_____");
+    // log::info!("______ioapic_handler_23_____");
 }
 extern "x86-interrupt" fn generic_handler(_stack_frame: InterruptStackFrame) {
-    log::info!("______generic_handler_____");
+    // log::info!("______generic_handler_____");
 }

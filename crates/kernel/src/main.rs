@@ -5,8 +5,7 @@ use core::panic::PanicInfo;
 
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
-    allocator,
-    drivers,
+    allocator, drivers,
     framebuffer::FB,
     gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
@@ -28,28 +27,6 @@ use x86_64::{
 
 extern crate agave_api;
 extern crate alloc;
-
-// extern "C" fn log_fn(s: *const u8, l: u32) {
-//     unsafe {
-//         let slice = core::slice::from_raw_parts(s, l as usize);
-//         let str_slice = core::str::from_utf8_unchecked(slice);
-//         log::info!("{}", str_slice)
-//     }
-// }
-
-// extern "C" fn calloc(size: usize, align: usize) -> *mut u8 {
-//     // log::info!("alloc {} {}", size, align);
-//     unsafe { ALLOCATOR.alloc(core::alloc::Layout::from_size_align(size, align).unwrap()) }
-// }
-// extern "C" fn cdalloc(ptr: *mut u8, size: usize, align: usize) {
-//     // log::info!("dealloc {:?} {} {}", ptr, size, align);
-//     unsafe {
-//         ALLOCATOR.dealloc(
-//             ptr,
-//             core::alloc::Layout::from_size_align(size, align).unwrap(),
-//         );
-//     };
-// }
 
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -260,7 +237,11 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
         spawner.run(async move {
             let mut apps: Vec<WasmApp<i32>> = Vec::new();
-            let apps_raw = [&include_bytes!("../../../disk/bin/test.wasm")[..]];
+            let apps_raw = [
+                &include_bytes!("../../../disk/bin/test.wasm")[..],
+                &include_bytes!("../../../disk/bin/hello.wasm")[..],
+                // &include_bytes!("../../../disk/bin/sqlite.wasm")[..],
+            ];
             for app_bytes in apps_raw.iter() {
                 apps.push(WasmApp::new(app_bytes.to_vec(), 0));
             }

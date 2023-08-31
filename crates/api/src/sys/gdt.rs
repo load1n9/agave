@@ -4,11 +4,18 @@ use x86_64::VirtAddr;
 
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector};
 
+const STACK_SIZE: usize = 1024 * 8;
+pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
+pub const PAGE_FAULT_IST_INDEX: u16 = 1;
+pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 2;
+
 lazy_static! {
-    static ref GDT: (GlobalDescriptorTable, Selectors) = {
+    pub static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
         let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
         let data_selector = gdt.add_entry(Descriptor::kernel_data_segment());
+        let user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
+        let user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
         let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
         (
             gdt,
@@ -16,22 +23,25 @@ lazy_static! {
                 code_selector,
                 tss_selector,
                 data_selector,
+                user_code_selector,
+                user_data_selector
             },
         )
     };
 }
-struct Selectors {
+pub struct Selectors {
     code_selector: SegmentSelector,
     data_selector: SegmentSelector,
     tss_selector: SegmentSelector,
+    pub user_code_selector: SegmentSelector,
+    pub user_data_selector: SegmentSelector,
 }
-pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 lazy_static! {
-    static ref TSS: TaskStateSegment = {
+    pub static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
-            const STACK_SIZE: usize = 4*1024 ; //4096 * 5;
+            // const STACK_SIZE: usize = 4*1024 ; //4096 * 5;
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
             let stack_start = VirtAddr::from_ptr(unsafe { &STACK });

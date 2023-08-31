@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(core_intrinsics)]
 #![feature(abi_x86_interrupt)]
+#![feature(slice_first_last_chunk)]
 
 extern crate alloc;
 extern crate lazy_static;
@@ -27,4 +28,5 @@ pub fn hlt_loop() -> ! {
     }
 }
 
+pub mod path;
 pub mod sys;

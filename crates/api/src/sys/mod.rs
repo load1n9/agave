@@ -1,6 +1,7 @@
 pub mod allocator;
 pub mod drivers;
 pub mod framebuffer;
+pub mod fs;
 pub mod gdt;
 pub mod globals;
 pub mod interrupts;
@@ -9,6 +10,8 @@ pub mod local_apic;
 pub mod logger;
 pub mod memory;
 pub mod pci;
+pub mod pic;
+pub mod random;
 pub mod serial;
 pub mod task;
 pub mod virtio;

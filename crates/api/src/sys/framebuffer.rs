@@ -189,6 +189,8 @@ pub struct RGBA {
 pub struct FB {
     pub pixels: Vec<RGBA>,
     pub backbuffer: Vec<RGBA>,
+    pub bytes_per_pixel: usize,
+    pub stride: usize,
     pub w: usize,
     pub h: usize,
 }
@@ -205,6 +207,8 @@ impl FB {
         let h = info.height;
         let mut pixels = Vec::with_capacity(w * h);
         let mut backbuffer = Vec::with_capacity(w * h);
+        let bytes_per_pixel = info.bytes_per_pixel;
+        let stride = info.stride;
         for y in 0..h {
             for x in 0..w {
                 pixels.push(RGBA {
@@ -221,6 +225,8 @@ impl FB {
             w,
             h,
             backbuffer,
+            bytes_per_pixel,
+            stride,
         }
     }
 

@@ -6,6 +6,7 @@ default-run = "agave-os"
 
 [workspace]
 members = ["crates/*", "libs/*"]
+exclude = ["apps/test-app"]
 
 [dependencies]
 ovmf-prebuilt = "0.1.0-alpha"

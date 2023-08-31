@@ -1,5 +1,10 @@
-// ported from https://github.com/Ruddle/Fomos/
 use alloc::alloc::GlobalAlloc;
+use x86_64::{
+    structures::paging::{
+        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
+    },
+    VirtAddr,
+};
 
 #[allow(improper_ctypes_definitions)]
 extern "C" fn a_init(_l: alloc::alloc::Layout) -> *mut u8 {
@@ -52,13 +57,6 @@ pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 128 * 1024 * 1024; // 100 KiB
 
-use x86_64::{
-    structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
-    },
-    VirtAddr,
-};
-
 pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
@@ -85,4 +83,16 @@ pub fn init_heap(
     }
 
     Ok(())
+}
+
+pub fn memory_size() -> usize {
+    ALLOCATOR.lock().size()
+}
+
+pub fn memory_used() -> usize {
+    ALLOCATOR.lock().used()
+}
+
+pub fn memory_free() -> usize {
+    ALLOCATOR.lock().free()
 }

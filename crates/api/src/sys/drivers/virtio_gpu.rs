@@ -802,7 +802,7 @@ struct VirtioGpuCmdSubmit3d {
 
 #[repr(u32)]
 #[derive(Clone, Debug)]
-enum Cmd3d {
+pub enum Cmd3d {
     VirglCcmdNop = 0,
     VirglCcmdCreateObject = 1,
     VirglCcmdBindObject,

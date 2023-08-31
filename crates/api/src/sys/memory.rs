@@ -1,8 +1,10 @@
 use arrayvec::ArrayVec;
+use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
 use x86_64::PhysAddr;
 use x86_64::{structures::paging::PageTable, VirtAddr};
 
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PhysFrame, Size4KiB};
+
 /// Initialize a new OffsetPageTable.
 ///
 /// This function is unsafe because the caller must guarantee that the
@@ -40,7 +42,6 @@ pub unsafe fn kern_phy_to_virt(physical_memory_offset: VirtAddr, target_phy: Phy
 }
 
 const BUFFER_SIZE_ADVANCE: usize = 32;
-use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryRegions,
@@ -97,4 +98,9 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
         // self.next += 1;
         // frame
     }
+}
+
+pub unsafe fn mapper(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let level_4_table = active_level_4_table(physical_memory_offset);
+    OffsetPageTable::new(level_4_table, physical_memory_offset)
 }

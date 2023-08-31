@@ -1,4 +1,5 @@
 use core::sync::atomic::AtomicU64;
+use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 use core::task::Waker;
 
@@ -31,7 +32,6 @@ lazy_static! {
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
         idt.stack_segment_fault.set_handler_fn(stack_segment_fault_handler);
         idt.alignment_check.set_handler_fn(alignment_check_handler);
-
 
 
         idt.page_fault.set_handler_fn(page_fault_handler);
@@ -74,6 +74,17 @@ lazy_static! {
 }
 
 pub static TIME_MS: AtomicU64 = AtomicU64::new(0);
+pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0;
+const PIT_DIVIDER: usize = 1193;
+const PIT_INTERVAL: f64 = (PIT_DIVIDER as f64) / PIT_FREQUENCY;
+pub static RANDTHING1: AtomicUsize = AtomicUsize::new(1);
+pub static RANDTHING2: AtomicUsize = AtomicUsize::new(1);
+
+pub fn time_between_ticks() -> f64 {
+    PIT_INTERVAL
+}
+
+
 extern "x86-interrupt" fn lapic_timer(_stack_frame: InterruptStackFrame) {
     unsafe {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
@@ -91,6 +102,7 @@ extern "x86-interrupt" fn lapic_timer(_stack_frame: InterruptStackFrame) {
 }
 
 pub fn global_time_ms() -> u64 {
+    let _ = RANDTHING1.fetch_add(2, Ordering::Relaxed);
     TIME_MS.load(Ordering::Relaxed)
 }
 
@@ -155,6 +167,7 @@ lazy_static! {
 }
 
 pub fn add_waker(waker: &Waker) -> u64 {
+    let _ = RANDTHING2.fetch_add(2, Ordering::Relaxed);
     let mut arr = WAKERS.lock();
     for (index, aw) in arr.iter_mut().enumerate() {
         if aw.is_none() {
@@ -181,6 +194,7 @@ extern "x86-interrupt" fn lapic_timer2(_stack_frame: InterruptStackFrame) {
 }
 pub fn init_idt() {
     IDT.load();
+
 }
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     log::error!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
@@ -261,7 +275,7 @@ extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
-
+    let _ = RANDTHING1.fetch_add(2, Ordering::Relaxed);
     log::error!("EXCEPTION: PAGE FAULT");
     log::error!("Accessed Address: {:?}", Cr2::read());
     log::error!("Error Code: {:?}", error_code);

@@ -1,6 +1,7 @@
 {
     "tasks": {
         "build": "cargo build --release",
+        "build:app:test": "cd apps/test-app && cargo wasi build --release && cd ../..",
         "run": "cargo build --release",
         "run-qemu": "cargo run --release --bin qemu-bios"
     }

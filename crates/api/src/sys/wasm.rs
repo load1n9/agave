@@ -3,26 +3,25 @@
 use alloc::{string::String, vec::Vec};
 use wasmi::{core::Trap, Caller, Engine, Extern, Func, Instance, Linker, Module, Store};
 
+use super::{framebuffer::FB, globals::Input};
+
 // use crate::api::wasi::ctx::WasiCtx;
 
-pub struct WasmApp<T> {
-    store: Store<T>,
+pub struct WasmApp {
+    store: Store<*mut FB>,
     instance: Instance,
 }
 
-impl<T> WasmApp<T>
-where
-    T: core::fmt::Display + core::fmt::Debug,
-{
-    pub fn new(wasm: Vec<u8>, val: T) -> Self {
+impl WasmApp {
+    pub fn new(wasm: Vec<u8>, val: *mut FB) -> Self {
         let engine = Engine::default();
         let module = Module::new(&engine, &wasm[..]).unwrap();
 
         let mut store = Store::new(&engine, val);
 
-        let mut linker = <Linker<T>>::new(&engine);
+        let mut linker = <Linker<*mut FB>>::new(&engine);
 
-        let host_hello = Func::wrap(&mut store, |mut caller: Caller<'_, T>, param: i32| {
+        let host_hello = Func::wrap(&mut store, |mut caller: Caller<'_, *mut FB>, param: i32| {
             log::info!("Received {} from WebAssembly", param);
             let _result = async {
                 let memory = match caller.get_export("memory") {
@@ -35,140 +34,149 @@ where
                 };
 
                 let (memory, ctx) = memory.data_and_store_mut(&mut caller);
-                log::info!("{:?}", ctx);
+                log::info!("ctx:{:?}", ctx);
                 Ok(memory)
             };
-            log::info!("host state: {}", caller.data());
+            let fb = unsafe { caller.data().as_mut().unwrap() };
+            log::info!("host state: {:?}", caller.data());
+            for p in fb.pixels[0..200].iter_mut() {
+                p.r = 255;
+            }
         });
         linker.define("temp", "hello", host_hello).unwrap();
 
         let args_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _argv: i32, _argv_buf: i32| {
+            |_caller: Caller<'_, *mut FB>, _argv: i32, _argv_buf: i32| {
                 return 0;
             },
         );
 
         linker
-            .define("wasi_unstable", "args_get", args_get)
+            .define("wasi_snapshot_preview1", "args_get", args_get)
             .unwrap();
 
         let args_sizes_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, offset0: i32, offset1: i32| {
+            |_caller: Caller<'_, *mut FB>, offset0: i32, offset1: i32| {
                 log::info!("args_sizes_get({}, {})", offset0, offset1);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "args_sizes_get", args_sizes_get)
+            .define("wasi_snapshot_preview1", "args_sizes_get", args_sizes_get)
             .unwrap();
 
         let environ_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, environ: i32, environ_buf: i32| {
+            |_caller: Caller<'_, *mut FB>, environ: i32, environ_buf: i32| {
                 log::info!("environ_get({}, {})", environ, environ_buf);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "environ_get", environ_get)
+            .define("wasi_snapshot_preview1", "environ_get", environ_get)
             .unwrap();
 
         let environ_sizes_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, offset0: i32, offset1: i32| {
+            |_caller: Caller<'_, *mut FB>, offset0: i32, offset1: i32| {
                 log::info!("environ_sizes_get({}, {})", offset0, offset1);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "environ_sizes_get", environ_sizes_get)
+            .define("wasi_snapshot_preview1", "environ_sizes_get", environ_sizes_get)
             .unwrap();
 
         let clock_res_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, id: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, id: i32, offset0: i32| {
                 log::info!("clock_res_get({}, {})", id, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "clock_res_get", clock_res_get)
+            .define("wasi_snapshot_preview1", "clock_res_get", clock_res_get)
             .unwrap();
 
         let clock_time_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, id: i32, precision: i64, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, id: i32, precision: i64, offset0: i32| {
                 log::info!("clock_time_get({}, {}, {})", id, precision, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "clock_time_get", clock_time_get)
+            .define("wasi_snapshot_preview1", "clock_time_get", clock_time_get)
             .unwrap();
 
         let fd_advise = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i64, len: i64, advice: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i64, len: i64, advice: i32| {
                 log::info!("fd_advise({}, {}, {}, {})", fd, offset, len, advice);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_advise", fd_advise)
+            .define("wasi_snapshot_preview1", "fd_advise", fd_advise)
             .unwrap();
 
         let fd_allocate = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i64, len: i64| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i64, len: i64| {
                 log::info!("fd_allocate({}, {}, {})", fd, offset, len);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_allocate", fd_allocate)
+            .define("wasi_snapshot_preview1", "fd_allocate", fd_allocate)
             .unwrap();
 
-        let fd_close = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+        let fd_close = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, fd: i32| {
             log::info!("fd_close({})", fd);
             return 0;
         });
         linker
-            .define("wasi_unstable", "fd_close", fd_close)
+            .define("wasi_snapshot_preview1", "fd_close", fd_close)
             .unwrap();
 
-        let fd_datasync = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+        let fd_datasync = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, fd: i32| {
             log::info!("fd_datasync({})", fd);
             return 0;
         });
         linker
-            .define("wasi_unstable", "fd_datasync", fd_datasync)
+            .define("wasi_snapshot_preview1", "fd_datasync", fd_datasync)
             .unwrap();
 
         let fd_fdstat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset0: i32| {
                 log::info!("fd_fdstat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_fdstat_get", fd_fdstat_get)
+            .define("wasi_snapshot_preview1", "fd_fdstat_get", fd_fdstat_get)
             .unwrap();
 
-        let fd_fdstat_set_flags =
-            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, flags: i32| {
+        let fd_fdstat_set_flags = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, fd: i32, flags: i32| {
                 log::info!("fd_fdstat_set_flags({}, {})", fd, flags);
                 return 0;
-            });
+            },
+        );
         linker
-            .define("wasi_unstable", "fd_fdstat_set_flags", fd_fdstat_set_flags)
+            .define("wasi_snapshot_preview1", "fd_fdstat_set_flags", fd_fdstat_set_flags)
             .unwrap();
 
         let fd_fdstat_set_rights = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, fs_rights_base: i64, fs_rights_inheriting: i64| {
+            |_caller: Caller<'_, *mut FB>,
+             fd: i32,
+             fs_rights_base: i64,
+             fs_rights_inheriting: i64| {
                 log::info!(
                     "fd_fdstat_set_rights({}, {}, {})",
                     fd,
@@ -180,7 +188,7 @@ where
         );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "fd_fdstat_set_rights",
                 fd_fdstat_set_rights,
             )
@@ -188,23 +196,25 @@ where
 
         let fd_filestat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset0: i32| {
                 log::info!("fd_filestat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_filestat_get", fd_filestat_get)
+            .define("wasi_snapshot_preview1", "fd_filestat_get", fd_filestat_get)
             .unwrap();
 
-        let fd_filestat_set_size =
-            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, size: i64| {
+        let fd_filestat_set_size = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, fd: i32, size: i64| {
                 log::info!("fd_filestat_set_size({}, {})", fd, size);
                 return 0;
-            });
+            },
+        );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "fd_filestat_set_size",
                 fd_filestat_set_size,
             )
@@ -212,7 +222,7 @@ where
 
         let fd_filestat_set_times = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, atim: i64, mtim: i64, fst_flags: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, atim: i64, mtim: i64, fst_flags: i32| {
                 log::info!(
                     "fd_filestat_set_times({}, {}, {}, {})",
                     fd,
@@ -225,7 +235,7 @@ where
         );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "fd_filestat_set_times",
                 fd_filestat_set_times,
             )
@@ -233,7 +243,7 @@ where
 
         let fd_pread = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              iov_buf: i32,
              iov_buf_len: i32,
@@ -251,34 +261,34 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "fd_pread", fd_pread)
+            .define("wasi_snapshot_preview1", "fd_pread", fd_pread)
             .unwrap();
 
         let fd_prestat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset0: i32| {
                 log::info!("fd_prestat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_prestat_get", fd_prestat_get)
+            .define("wasi_snapshot_preview1", "fd_prestat_get", fd_prestat_get)
             .unwrap();
 
         let fd_prestat_dir_name = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, path: i32, path_len: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, path: i32, path_len: i32| {
                 log::info!("fd_prestat_dir_name({}, {}, {})", fd, path, path_len);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_prestat_dir_name", fd_prestat_dir_name)
+            .define("wasi_snapshot_preview1", "fd_prestat_dir_name", fd_prestat_dir_name)
             .unwrap();
 
         let fd_pwrite = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              ciov_buf: i32,
              ciov_buf_len: i32,
@@ -296,21 +306,30 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "fd_pwrite", fd_pwrite)
+            .define("wasi_snapshot_preview1", "fd_pwrite", fd_pwrite)
             .unwrap();
 
         let fd_read = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, iov_buf: i32, iov_buf_len: i32, offset1: i32| {
+            |_caller: Caller<'_, *mut FB>,
+             fd: i32,
+             iov_buf: i32,
+             iov_buf_len: i32,
+             offset1: i32| {
                 log::info!("fd_read({}, {}, {}, {})", fd, iov_buf, iov_buf_len, offset1);
                 return 0;
             },
         );
-        linker.define("wasi_unstable", "fd_read", fd_read).unwrap();
+        linker.define("wasi_snapshot_preview1", "fd_read", fd_read).unwrap();
 
         let fd_readdir = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, buf: i32, buf_len: i32, cookie: i64, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>,
+             fd: i32,
+             buf: i32,
+             buf_len: i32,
+             cookie: i64,
+             offset0: i32| {
                 log::info!(
                     "fd_readdir({}, {}, {}, {}, {})",
                     fd,
@@ -323,66 +342,75 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "fd_readdir", fd_readdir)
+            .define("wasi_snapshot_preview1", "fd_readdir", fd_readdir)
             .unwrap();
 
-        let fd_renumber = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, to: i32| {
-            log::info!("fd_renumber({}, {})", fd, to);
-            return 0;
-        });
+        let fd_renumber = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, fd: i32, to: i32| {
+                log::info!("fd_renumber({}, {})", fd, to);
+                return 0;
+            },
+        );
         linker
-            .define("wasi_unstable", "fd_renumber", fd_renumber)
+            .define("wasi_snapshot_preview1", "fd_renumber", fd_renumber)
             .unwrap();
 
         let fd_seek = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i64, whence: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i64, whence: i32, offset0: i32| {
                 log::info!("fd_seek({}, {}, {}, {})", fd, offset, whence, offset0);
                 return 0;
             },
         );
-        linker.define("wasi_unstable", "fd_seek", fd_seek).unwrap();
+        linker.define("wasi_snapshot_preview1", "fd_seek", fd_seek).unwrap();
 
-        let fd_sync = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+        let fd_sync = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, fd: i32| {
             log::info!("fd_sync({})", fd);
             return 0;
         });
-        linker.define("wasi_unstable", "fd_sync", fd_sync).unwrap();
+        linker.define("wasi_snapshot_preview1", "fd_sync", fd_sync).unwrap();
 
         let fd_tell = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset0: i32| {
                 log::info!("fd_tell({}, {})", fd, offset0);
                 return 0;
             },
         );
-        linker.define("wasi_unstable", "fd_tell", fd_tell).unwrap();
+        linker.define("wasi_snapshot_preview1", "fd_tell", fd_tell).unwrap();
 
         let fd_write = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              ciov_buf: i32,
              ciov_buf_len: i32,
              offset0: i32| {
-                log::info!("fd_write({}, {}, {}, {})", fd, ciov_buf, ciov_buf_len, offset0);
+                log::info!(
+                    "fd_write({}, {}, {}, {})",
+                    fd,
+                    ciov_buf,
+                    ciov_buf_len,
+                    offset0
+                );
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "fd_write", fd_write)
+            .define("wasi_snapshot_preview1", "fd_write", fd_write)
             .unwrap();
 
         let path_create_directory = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i32, length: i32| {
                 log::info!("path_create_directory({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "path_create_directory",
                 path_create_directory,
             )
@@ -390,7 +418,7 @@ where
 
         let path_filestat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              flags: i32,
              offset: i32,
@@ -408,12 +436,12 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_filestat_get", path_filestat_get)
+            .define("wasi_snapshot_preview1", "path_filestat_get", path_filestat_get)
             .unwrap();
 
         let path_filestat_set_times = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              flags: i32,
              offset: i32,
@@ -436,7 +464,7 @@ where
         );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "path_filestat_set_times",
                 path_filestat_set_times,
             )
@@ -444,7 +472,7 @@ where
 
         let path_link = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              old_fd: i32,
              old_flags: i32,
              old_offset: i32,
@@ -466,12 +494,12 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_link", path_link)
+            .define("wasi_snapshot_preview1", "path_link", path_link)
             .unwrap();
 
         let path_open = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              dirflags: i32,
              offset: i32,
@@ -497,12 +525,12 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_open", path_open)
+            .define("wasi_snapshot_preview1", "path_open", path_open)
             .unwrap();
 
         let path_readlink = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              offset: i32,
              length: i32,
@@ -522,19 +550,19 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_readlink", path_readlink)
+            .define("wasi_snapshot_preview1", "path_readlink", path_readlink)
             .unwrap();
 
         let path_remove_directory = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i32, length: i32| {
                 log::info!("path_remove_directory({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
         linker
             .define(
-                "wasi_unstable",
+                "wasi_snapshot_preview1",
                 "path_remove_directory",
                 path_remove_directory,
             )
@@ -542,7 +570,7 @@ where
 
         let path_rename = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              old_offset: i32,
              old_length: i32,
@@ -562,12 +590,12 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_rename", path_rename)
+            .define("wasi_snapshot_preview1", "path_rename", path_rename)
             .unwrap();
 
         let path_symlink = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              old_offset: i32,
              old_length: i32,
              fd: i32,
@@ -585,23 +613,27 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "path_symlink", path_symlink)
+            .define("wasi_snapshot_preview1", "path_symlink", path_symlink)
             .unwrap();
 
         let path_unlink_file = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, offset: i32, length: i32| {
                 log::info!("path_unlink_file({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "path_unlink_file", path_unlink_file)
+            .define("wasi_snapshot_preview1", "path_unlink_file", path_unlink_file)
             .unwrap();
 
         let poll_oneoff = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, in_: i32, out: i32, nsubscriptions: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>,
+             in_: i32,
+             out: i32,
+             nsubscriptions: i32,
+             offset0: i32| {
                 log::info!(
                     "poll_oneoff({}, {}, {}, {})",
                     in_,
@@ -613,58 +645,57 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "poll_oneoff", poll_oneoff)
+            .define("wasi_snapshot_preview1", "poll_oneoff", poll_oneoff)
             .unwrap();
 
-        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, T>, rval: i32| {
+        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, rval: i32| {
             log::info!("proc_exit({})", rval);
-            return;
         });
         linker
-            .define("wasi_unstable", "proc_exit", proc_exit)
+            .define("wasi_snapshot_preview1", "proc_exit", proc_exit)
             .unwrap();
 
-        let proc_raise = Func::wrap(&mut store, |_caller: Caller<'_, T>, rval: i32| {
+        let proc_raise = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, rval: i32| {
             log::info!("proc_raise({})", rval);
             return 0;
         });
         linker
-            .define("wasi_unstable", "proc_raise", proc_raise)
+            .define("wasi_snapshot_preview1", "proc_raise", proc_raise)
             .unwrap();
 
-        let sched_yield = Func::wrap(&mut store, |_caller: Caller<'_, T>| {
+        let sched_yield = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| {
             log::info!("sched_yield()");
             return 0;
         });
         linker
-            .define("wasi_unstable", "sched_yield", sched_yield)
+            .define("wasi_snapshot_preview1", "sched_yield", sched_yield)
             .unwrap();
 
         let random_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, buf: i32, buf_len: i32| {
+            |_caller: Caller<'_, *mut FB>, buf: i32, buf_len: i32| {
                 log::info!("random_get({}, {})", buf, buf_len);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "random_get", random_get)
+            .define("wasi_snapshot_preview1", "random_get", random_get)
             .unwrap();
 
         let sock_accept = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, fd: i32, flags: i32, offset0: i32| {
+            |_caller: Caller<'_, *mut FB>, fd: i32, flags: i32, offset0: i32| {
                 log::info!("sock_accept({}, {}, {})", fd, flags, offset0);
                 return 0;
             },
         );
         linker
-            .define("wasi_unstable", "sock_accept", sock_accept)
+            .define("wasi_snapshot_preview1", "sock_accept", sock_accept)
             .unwrap();
 
         let sock_recv = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              iov_buf: i32,
              iov_buf_len: i32,
@@ -684,12 +715,12 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "sock_recv", sock_recv)
+            .define("wasi_snapshot_preview1", "sock_recv", sock_recv)
             .unwrap();
 
         let sock_send = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
+            |_caller: Caller<'_, *mut FB>,
              fd: i32,
              ciov_buf: i32,
              ciov_buf_len: i32,
@@ -707,16 +738,18 @@ where
             },
         );
         linker
-            .define("wasi_unstable", "sock_send", sock_send)
+            .define("wasi_snapshot_preview1", "sock_send", sock_send)
             .unwrap();
 
-        let sock_shutdown =
-            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, how: i32| {
+        let sock_shutdown = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, fd: i32, how: i32| {
                 log::info!("sock_shutdown({}, {})", fd, how);
                 return 0;
-            });
+            },
+        );
         linker
-            .define("wasi_unstable", "sock_shutdown", sock_shutdown)
+            .define("wasi_snapshot_preview1", "sock_shutdown", sock_shutdown)
             .unwrap();
 
         let instance = linker
@@ -734,5 +767,23 @@ where
             .get_typed_func::<(), ()>(&self.store, "_start")
             .unwrap();
         start.call(&mut self.store, ()).unwrap();
+    }
+
+    pub fn call_update(&mut self, _input: Input) {
+        let update = self
+            .instance
+            .get_typed_func::<(), ()>(&self.store, "update");
+        match update {
+            Ok(update) => {
+                log::info!("update");
+                update
+                    .call(
+                        &mut self.store,
+                        (), // (input.mouse_x as i32, input.mouse_y as i32),
+                    )
+                    .unwrap();
+            }
+            Err(_) => {}
+        }
     }
 }

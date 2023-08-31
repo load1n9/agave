@@ -236,23 +236,26 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         }
 
         spawner.run(async move {
-            let mut apps: Vec<WasmApp<i32>> = Vec::new();
+            let mut apps: Vec<WasmApp> = Vec::new();
             let apps_raw = [
-                &include_bytes!("../../../disk/bin/test.wasm")[..],
+                &include_bytes!("../../../apps/test-app/target/wasm32-wasi/release/test_app.wasm")[..],
                 // &include_bytes!("../../../disk/bin/hello.wasm")[..],
                 // &include_bytes!("../../../disk/bin/sqlite.wasm")[..],
             ];
             for app_bytes in apps_raw.iter() {
-                apps.push(WasmApp::new(app_bytes.to_vec(), 0));
+                apps.push(WasmApp::new(app_bytes.to_vec(), fb_clone));
             }
 
             for app in apps.iter_mut() {
-                let input = globals::INPUT.read();
                 app.call();
             }
 
             loop {
                 globals::INPUT.update(|e| e.step());
+                let input = globals::INPUT.read();
+                for app in apps.iter_mut() {
+                    app.call_update(input);
+                }
                 yield_once().await;
             }
         });

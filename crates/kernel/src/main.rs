@@ -239,12 +239,13 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             let mut apps: Vec<WasmApp<i32>> = Vec::new();
             let apps_raw = [
                 &include_bytes!("../../../disk/bin/test.wasm")[..],
-                &include_bytes!("../../../disk/bin/hello.wasm")[..],
+                // &include_bytes!("../../../disk/bin/hello.wasm")[..],
                 // &include_bytes!("../../../disk/bin/sqlite.wasm")[..],
             ];
             for app_bytes in apps_raw.iter() {
                 apps.push(WasmApp::new(app_bytes.to_vec(), 0));
             }
+
             for app in apps.iter_mut() {
                 let input = globals::INPUT.read();
                 app.call();

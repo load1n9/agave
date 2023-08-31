@@ -55,7 +55,8 @@ where
 
         let args_sizes_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _offset0: i32, _offset1: i32| {
+            |_caller: Caller<'_, T>, offset0: i32, offset1: i32| {
+                log::info!("args_sizes_get({}, {})", offset0, offset1);
                 return 0;
             },
         );
@@ -65,7 +66,8 @@ where
 
         let environ_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _environ: i32, _environ_buf: i32| {
+            |_caller: Caller<'_, T>, environ: i32, environ_buf: i32| {
+                log::info!("environ_get({}, {})", environ, environ_buf);
                 return 0;
             },
         );
@@ -75,7 +77,8 @@ where
 
         let environ_sizes_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _offset0: i32, _offset1: i32| {
+            |_caller: Caller<'_, T>, offset0: i32, offset1: i32| {
+                log::info!("environ_sizes_get({}, {})", offset0, offset1);
                 return 0;
             },
         );
@@ -85,7 +88,8 @@ where
 
         let clock_res_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _id: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, id: i32, offset0: i32| {
+                log::info!("clock_res_get({}, {})", id, offset0);
                 return 0;
             },
         );
@@ -95,7 +99,8 @@ where
 
         let clock_time_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _id: i32, _precision: i64, _offset0: i32| {
+            |_caller: Caller<'_, T>, id: i32, precision: i64, offset0: i32| {
+                log::info!("clock_time_get({}, {}, {})", id, precision, offset0);
                 return 0;
             },
         );
@@ -105,7 +110,8 @@ where
 
         let fd_advise = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i64, _len: i64, _advice: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i64, len: i64, advice: i32| {
+                log::info!("fd_advise({}, {}, {}, {})", fd, offset, len, advice);
                 return 0;
             },
         );
@@ -115,7 +121,8 @@ where
 
         let fd_allocate = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i64, _len: i64| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i64, len: i64| {
+                log::info!("fd_allocate({}, {}, {})", fd, offset, len);
                 return 0;
             },
         );
@@ -123,14 +130,16 @@ where
             .define("wasi_unstable", "fd_allocate", fd_allocate)
             .unwrap();
 
-        let fd_close = Func::wrap(&mut store, |_caller: Caller<'_, T>, _fd: i32| {
+        let fd_close = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+            log::info!("fd_close({})", fd);
             return 0;
         });
         linker
             .define("wasi_unstable", "fd_close", fd_close)
             .unwrap();
 
-        let fd_datasync = Func::wrap(&mut store, |_caller: Caller<'_, T>, _fd: i32| {
+        let fd_datasync = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+            log::info!("fd_datasync({})", fd);
             return 0;
         });
         linker
@@ -139,7 +148,8 @@ where
 
         let fd_fdstat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+                log::info!("fd_fdstat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
@@ -147,19 +157,24 @@ where
             .define("wasi_unstable", "fd_fdstat_get", fd_fdstat_get)
             .unwrap();
 
-        let fd_fdstat_set_flags = Func::wrap(
-            &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _flags: i32| {
+        let fd_fdstat_set_flags =
+            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, flags: i32| {
+                log::info!("fd_fdstat_set_flags({}, {})", fd, flags);
                 return 0;
-            },
-        );
+            });
         linker
             .define("wasi_unstable", "fd_fdstat_set_flags", fd_fdstat_set_flags)
             .unwrap();
 
         let fd_fdstat_set_rights = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _fs_rights_base: i64, _fs_rights_inheriting: i64| {
+            |_caller: Caller<'_, T>, fd: i32, fs_rights_base: i64, fs_rights_inheriting: i64| {
+                log::info!(
+                    "fd_fdstat_set_rights({}, {}, {})",
+                    fd,
+                    fs_rights_base,
+                    fs_rights_inheriting
+                );
                 return 0;
             },
         );
@@ -173,7 +188,8 @@ where
 
         let fd_filestat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+                log::info!("fd_filestat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
@@ -181,12 +197,11 @@ where
             .define("wasi_unstable", "fd_filestat_get", fd_filestat_get)
             .unwrap();
 
-        let fd_filestat_set_size = Func::wrap(
-            &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _size: i64| {
+        let fd_filestat_set_size =
+            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, size: i64| {
+                log::info!("fd_filestat_set_size({}, {})", fd, size);
                 return 0;
-            },
-        );
+            });
         linker
             .define(
                 "wasi_unstable",
@@ -197,7 +212,14 @@ where
 
         let fd_filestat_set_times = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _atim: i64, _mtim: i64, _fst_flags: i32| {
+            |_caller: Caller<'_, T>, fd: i32, atim: i64, mtim: i64, fst_flags: i32| {
+                log::info!(
+                    "fd_filestat_set_times({}, {}, {}, {})",
+                    fd,
+                    atim,
+                    mtim,
+                    fst_flags
+                );
                 return 0;
             },
         );
@@ -212,11 +234,19 @@ where
         let fd_pread = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _iov_buf: i32,
-             _iov_buf_len: i32,
-             _offset: i64,
-             _offset0: i32| {
+             fd: i32,
+             iov_buf: i32,
+             iov_buf_len: i32,
+             offset: i64,
+             offset0: i32| {
+                log::info!(
+                    "fd_pread({}, {}, {}, {}, {})",
+                    fd,
+                    iov_buf,
+                    iov_buf_len,
+                    offset,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -226,7 +256,8 @@ where
 
         let fd_prestat_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+                log::info!("fd_prestat_get({}, {})", fd, offset0);
                 return 0;
             },
         );
@@ -236,7 +267,8 @@ where
 
         let fd_prestat_dir_name = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _path: i32, _path_len: i32| {
+            |_caller: Caller<'_, T>, fd: i32, path: i32, path_len: i32| {
+                log::info!("fd_prestat_dir_name({}, {}, {})", fd, path, path_len);
                 return 0;
             },
         );
@@ -247,11 +279,19 @@ where
         let fd_pwrite = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _ciov_buf: i32,
-             _ciov_buf_len: i32,
-             _offset: i64,
-             _offset0: i32| {
+             fd: i32,
+             ciov_buf: i32,
+             ciov_buf_len: i32,
+             offset: i64,
+             offset0: i32| {
+                log::info!(
+                    "fd_pwrite({}, {}, {}, {}, {})",
+                    fd,
+                    ciov_buf,
+                    ciov_buf_len,
+                    offset,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -261,7 +301,8 @@ where
 
         let fd_read = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _iov_buf: i32, _iov_buf_len: i32, _offset1: i32| {
+            |_caller: Caller<'_, T>, fd: i32, iov_buf: i32, iov_buf_len: i32, offset1: i32| {
+                log::info!("fd_read({}, {}, {}, {})", fd, iov_buf, iov_buf_len, offset1);
                 return 0;
             },
         );
@@ -269,12 +310,15 @@ where
 
         let fd_readdir = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>,
-             _fd: i32,
-             _buf: i32,
-             _buf_len: i32,
-             _cookie: i64,
-             _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, buf: i32, buf_len: i32, cookie: i64, offset0: i32| {
+                log::info!(
+                    "fd_readdir({}, {}, {}, {}, {})",
+                    fd,
+                    buf,
+                    buf_len,
+                    cookie,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -282,7 +326,8 @@ where
             .define("wasi_unstable", "fd_readdir", fd_readdir)
             .unwrap();
 
-        let fd_renumber = Func::wrap(&mut store, |_caller: Caller<'_, T>, _fd: i32, _to: i32| {
+        let fd_renumber = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, to: i32| {
+            log::info!("fd_renumber({}, {})", fd, to);
             return 0;
         });
         linker
@@ -291,20 +336,23 @@ where
 
         let fd_seek = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i64, _whence: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i64, whence: i32, offset0: i32| {
+                log::info!("fd_seek({}, {}, {}, {})", fd, offset, whence, offset0);
                 return 0;
             },
         );
         linker.define("wasi_unstable", "fd_seek", fd_seek).unwrap();
 
-        let fd_sync = Func::wrap(&mut store, |_caller: Caller<'_, T>, _fd: i32| {
+        let fd_sync = Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32| {
+            log::info!("fd_sync({})", fd);
             return 0;
         });
         linker.define("wasi_unstable", "fd_sync", fd_sync).unwrap();
 
         let fd_tell = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset0: i32| {
+                log::info!("fd_tell({}, {})", fd, offset0);
                 return 0;
             },
         );
@@ -313,10 +361,11 @@ where
         let fd_write = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _ciov_buf: i32,
-             _ciov_buf_len: i32,
-             _offset0: i32| {
+             fd: i32,
+             ciov_buf: i32,
+             ciov_buf_len: i32,
+             offset0: i32| {
+                log::info!("fd_write({}, {}, {}, {})", fd, ciov_buf, ciov_buf_len, offset0);
                 return 0;
             },
         );
@@ -326,7 +375,8 @@ where
 
         let path_create_directory = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i32, _length: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+                log::info!("path_create_directory({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
@@ -341,11 +391,19 @@ where
         let path_filestat_get = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _flags: i32,
-             _offset: i32,
-             _length: i32,
-             _offset0: i32| {
+             fd: i32,
+             flags: i32,
+             offset: i32,
+             length: i32,
+             offset0: i32| {
+                log::info!(
+                    "path_filestat_get({}, {}, {}, {}, {})",
+                    fd,
+                    flags,
+                    offset,
+                    length,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -356,13 +414,23 @@ where
         let path_filestat_set_times = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _flags: i32,
-             _offset: i32,
-             _length: i32,
-             _atim: i64,
-             _mtim: i64,
-             _fst_flags: i32| {
+             fd: i32,
+             flags: i32,
+             offset: i32,
+             length: i32,
+             atim: i64,
+             mtim: i64,
+             fst_flags: i32| {
+                log::info!(
+                    "path_filestat_set_times({}, {}, {}, {}, {}, {}, {})",
+                    fd,
+                    flags,
+                    offset,
+                    length,
+                    atim,
+                    mtim,
+                    fst_flags
+                );
                 return 0;
             },
         );
@@ -377,13 +445,23 @@ where
         let path_link = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _old_fd: i32,
-             _old_flags: i32,
-             _old_offset: i32,
-             _old_length: i32,
-             _new_fd: i32,
-             _new_offset: i32,
-             _new_length: i32| {
+             old_fd: i32,
+             old_flags: i32,
+             old_offset: i32,
+             old_length: i32,
+             new_fd: i32,
+             new_offset: i32,
+             new_length: i32| {
+                log::info!(
+                    "path_link({}, {}, {}, {}, {}, {}, {})",
+                    old_fd,
+                    old_flags,
+                    old_offset,
+                    old_length,
+                    new_fd,
+                    new_offset,
+                    new_length
+                );
                 return 0;
             },
         );
@@ -394,15 +472,27 @@ where
         let path_open = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _dirflags: i32,
-             _offset: i32,
-             _length: i32,
-             _oflags: i32,
-             _fs_rights_base: i64,
-             _fdflags: i64,
-             _fs_rights_inheriting: i32,
-             _offset0: i32| {
+             fd: i32,
+             dirflags: i32,
+             offset: i32,
+             length: i32,
+             oflags: i32,
+             fs_rights_base: i64,
+             fdflags: i64,
+             fs_rights_inheriting: i32,
+             offset0: i32| {
+                log::info!(
+                    "path_open({}, {}, {}, {}, {}, {}, {}, {}, {})",
+                    fd,
+                    dirflags,
+                    offset,
+                    length,
+                    oflags,
+                    fs_rights_base,
+                    fdflags,
+                    fs_rights_inheriting,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -413,12 +503,21 @@ where
         let path_readlink = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _offset: i32,
-             _length: i32,
-             _buf: i32,
-             _buf_len: i32,
-             _offset0: i32| {
+             fd: i32,
+             offset: i32,
+             length: i32,
+             buf: i32,
+             buf_len: i32,
+             offset0: i32| {
+                log::info!(
+                    "path_readlink({}, {}, {}, {}, {}, {})",
+                    fd,
+                    offset,
+                    length,
+                    buf,
+                    buf_len,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -428,7 +527,8 @@ where
 
         let path_remove_directory = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i32, _length: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+                log::info!("path_remove_directory({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
@@ -443,12 +543,21 @@ where
         let path_rename = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _old_offset: i32,
-             _old_length: i32,
-             _new_fd: i32,
-             _new_offset: i32,
-             _new_length: i32| {
+             fd: i32,
+             old_offset: i32,
+             old_length: i32,
+             new_fd: i32,
+             new_offset: i32,
+             new_length: i32| {
+                log::info!(
+                    "path_rename({}, {}, {}, {}, {}, {})",
+                    fd,
+                    old_offset,
+                    old_length,
+                    new_fd,
+                    new_offset,
+                    new_length
+                );
                 return 0;
             },
         );
@@ -459,11 +568,19 @@ where
         let path_symlink = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _old_offset: i32,
-             _old_length: i32,
-             _fd: i32,
-             _new_offset: i32,
-             _new_length: i32| {
+             old_offset: i32,
+             old_length: i32,
+             fd: i32,
+             new_offset: i32,
+             new_length: i32| {
+                log::info!(
+                    "path_symlink({}, {}, {}, {}, {})",
+                    old_offset,
+                    old_length,
+                    fd,
+                    new_offset,
+                    new_length
+                );
                 return 0;
             },
         );
@@ -473,7 +590,8 @@ where
 
         let path_unlink_file = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _offset: i32, _length: i32| {
+            |_caller: Caller<'_, T>, fd: i32, offset: i32, length: i32| {
+                log::info!("path_unlink_file({}, {}, {})", fd, offset, length);
                 return 0;
             },
         );
@@ -483,7 +601,14 @@ where
 
         let poll_oneoff = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _in_: i32, _out: i32, _nsubscriptions: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, in_: i32, out: i32, nsubscriptions: i32, offset0: i32| {
+                log::info!(
+                    "poll_oneoff({}, {}, {}, {})",
+                    in_,
+                    out,
+                    nsubscriptions,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -491,12 +616,16 @@ where
             .define("wasi_unstable", "poll_oneoff", poll_oneoff)
             .unwrap();
 
-        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, T>, _rval: i32| {});
+        let proc_exit = Func::wrap(&mut store, |_caller: Caller<'_, T>, rval: i32| {
+            log::info!("proc_exit({})", rval);
+            return;
+        });
         linker
             .define("wasi_unstable", "proc_exit", proc_exit)
             .unwrap();
 
-        let proc_raise = Func::wrap(&mut store, |_caller: Caller<'_, T>, _rval: i32| {
+        let proc_raise = Func::wrap(&mut store, |_caller: Caller<'_, T>, rval: i32| {
+            log::info!("proc_raise({})", rval);
             return 0;
         });
         linker
@@ -504,6 +633,7 @@ where
             .unwrap();
 
         let sched_yield = Func::wrap(&mut store, |_caller: Caller<'_, T>| {
+            log::info!("sched_yield()");
             return 0;
         });
         linker
@@ -512,7 +642,8 @@ where
 
         let random_get = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _buf: i32, _buf_len: i32| {
+            |_caller: Caller<'_, T>, buf: i32, buf_len: i32| {
+                log::info!("random_get({}, {})", buf, buf_len);
                 return 0;
             },
         );
@@ -522,7 +653,8 @@ where
 
         let sock_accept = Func::wrap(
             &mut store,
-            |_caller: Caller<'_, T>, _fd: i32, _flags: i32, _offset0: i32| {
+            |_caller: Caller<'_, T>, fd: i32, flags: i32, offset0: i32| {
+                log::info!("sock_accept({}, {}, {})", fd, flags, offset0);
                 return 0;
             },
         );
@@ -533,12 +665,21 @@ where
         let sock_recv = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _iov_buf: i32,
-             _iov_buf_len: i32,
-             _ri_flags: i32,
-             _offset0: i32,
-             _offset1: i32| {
+             fd: i32,
+             iov_buf: i32,
+             iov_buf_len: i32,
+             ri_flags: i32,
+             offset0: i32,
+             offset1: i32| {
+                log::info!(
+                    "sock_recv({}, {}, {}, {}, {}, {})",
+                    fd,
+                    iov_buf,
+                    iov_buf_len,
+                    ri_flags,
+                    offset0,
+                    offset1
+                );
                 return 0;
             },
         );
@@ -549,11 +690,19 @@ where
         let sock_send = Func::wrap(
             &mut store,
             |_caller: Caller<'_, T>,
-             _fd: i32,
-             _ciov_buf: i32,
-             _ciov_buf_len: i32,
-             _si_flags: i32,
-             _offset0: i32| {
+             fd: i32,
+             ciov_buf: i32,
+             ciov_buf_len: i32,
+             si_flags: i32,
+             offset0: i32| {
+                log::info!(
+                    "sock_send({}, {}, {}, {}, {})",
+                    fd,
+                    ciov_buf,
+                    ciov_buf_len,
+                    si_flags,
+                    offset0
+                );
                 return 0;
             },
         );
@@ -562,7 +711,8 @@ where
             .unwrap();
 
         let sock_shutdown =
-            Func::wrap(&mut store, |_caller: Caller<'_, T>, _fd: i32, _how: i32| {
+            Func::wrap(&mut store, |_caller: Caller<'_, T>, fd: i32, how: i32| {
+                log::info!("sock_shutdown({}, {})", fd, how);
                 return 0;
             });
         linker

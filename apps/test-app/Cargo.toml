@@ -7,4 +7,4 @@ edition = "2021"
 crate-type = ['cdylib']
 
 [dependencies]
-agave-lib = { git = "https://github.com/load1n9/agave", branch = "v2"}
+agave-lib = { path = "../../crates/lib"}

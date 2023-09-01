@@ -3,5 +3,13 @@
 version = 3
 
 [[package]]
+name = "agave-lib"
+version = "0.1.0"
+source = "git+https://github.com/load1n9/agave?branch=v2#4215e9ba3eb3e6e4dc5ac88ce6c54c968031e7ea"
+
+[[package]]
 name = "test-app"
 version = "0.1.0"
+dependencies = [
+ "agave-lib",
+]

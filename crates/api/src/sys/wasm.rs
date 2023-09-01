@@ -45,6 +45,23 @@ impl WasmApp {
         });
         linker.define("temp", "hello", host_hello).unwrap();
 
+        let set_pixel = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>, x: i32, y: i32, r: i32, g: i32, b: i32, a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.pixels
+                    .get_mut((y * (fb.w as i32) + x) as usize)
+                    .map(|p| {
+                        p.r = r as u8;
+                        p.g = g as u8;
+                        p.b = b as u8;
+                        p.a = a as u8;
+                    });
+            },
+        );
+
+        linker.define("agave", "set_pixel", set_pixel).unwrap();
+
         let args_get = Func::wrap(
             &mut store,
             |_caller: Caller<'_, *mut FB>, _argv: i32, _argv_buf: i32| {
@@ -86,7 +103,11 @@ impl WasmApp {
             },
         );
         linker
-            .define("wasi_snapshot_preview1", "environ_sizes_get", environ_sizes_get)
+            .define(
+                "wasi_snapshot_preview1",
+                "environ_sizes_get",
+                environ_sizes_get,
+            )
             .unwrap();
 
         let clock_res_get = Func::wrap(
@@ -168,7 +189,11 @@ impl WasmApp {
             },
         );
         linker
-            .define("wasi_snapshot_preview1", "fd_fdstat_set_flags", fd_fdstat_set_flags)
+            .define(
+                "wasi_snapshot_preview1",
+                "fd_fdstat_set_flags",
+                fd_fdstat_set_flags,
+            )
             .unwrap();
 
         let fd_fdstat_set_rights = Func::wrap(
@@ -283,7 +308,11 @@ impl WasmApp {
             },
         );
         linker
-            .define("wasi_snapshot_preview1", "fd_prestat_dir_name", fd_prestat_dir_name)
+            .define(
+                "wasi_snapshot_preview1",
+                "fd_prestat_dir_name",
+                fd_prestat_dir_name,
+            )
             .unwrap();
 
         let fd_pwrite = Func::wrap(
@@ -320,7 +349,9 @@ impl WasmApp {
                 return 0;
             },
         );
-        linker.define("wasi_snapshot_preview1", "fd_read", fd_read).unwrap();
+        linker
+            .define("wasi_snapshot_preview1", "fd_read", fd_read)
+            .unwrap();
 
         let fd_readdir = Func::wrap(
             &mut store,
@@ -363,13 +394,17 @@ impl WasmApp {
                 return 0;
             },
         );
-        linker.define("wasi_snapshot_preview1", "fd_seek", fd_seek).unwrap();
+        linker
+            .define("wasi_snapshot_preview1", "fd_seek", fd_seek)
+            .unwrap();
 
         let fd_sync = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, fd: i32| {
             log::info!("fd_sync({})", fd);
             return 0;
         });
-        linker.define("wasi_snapshot_preview1", "fd_sync", fd_sync).unwrap();
+        linker
+            .define("wasi_snapshot_preview1", "fd_sync", fd_sync)
+            .unwrap();
 
         let fd_tell = Func::wrap(
             &mut store,
@@ -378,7 +413,9 @@ impl WasmApp {
                 return 0;
             },
         );
-        linker.define("wasi_snapshot_preview1", "fd_tell", fd_tell).unwrap();
+        linker
+            .define("wasi_snapshot_preview1", "fd_tell", fd_tell)
+            .unwrap();
 
         let fd_write = Func::wrap(
             &mut store,
@@ -436,7 +473,11 @@ impl WasmApp {
             },
         );
         linker
-            .define("wasi_snapshot_preview1", "path_filestat_get", path_filestat_get)
+            .define(
+                "wasi_snapshot_preview1",
+                "path_filestat_get",
+                path_filestat_get,
+            )
             .unwrap();
 
         let path_filestat_set_times = Func::wrap(
@@ -624,7 +665,11 @@ impl WasmApp {
             },
         );
         linker
-            .define("wasi_snapshot_preview1", "path_unlink_file", path_unlink_file)
+            .define(
+                "wasi_snapshot_preview1",
+                "path_unlink_file",
+                path_unlink_file,
+            )
             .unwrap();
 
         let poll_oneoff = Func::wrap(
@@ -769,17 +814,16 @@ impl WasmApp {
         start.call(&mut self.store, ()).unwrap();
     }
 
-    pub fn call_update(&mut self, _input: Input) {
+    pub fn call_update(&mut self, input: Input) {
         let update = self
             .instance
-            .get_typed_func::<(), ()>(&self.store, "update");
+            .get_typed_func::<(i32, i32), ()>(&self.store, "update");
         match update {
             Ok(update) => {
-                log::info!("update");
                 update
                     .call(
                         &mut self.store,
-                        (), // (input.mouse_x as i32, input.mouse_y as i32),
+                        (input.mouse_x as i32, input.mouse_y as i32),
                     )
                     .unwrap();
             }

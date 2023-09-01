@@ -1,6 +1,7 @@
 target
 agave.img
-
+zig-cache
+zig-out
 
 # Added by cargo
 

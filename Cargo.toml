@@ -9,7 +9,7 @@ members = ["crates/*", "libs/*"]
 exclude = ["apps/test-app"]
 
 [dependencies]
-ovmf-prebuilt = "0.1.0-alpha"
+ovmf-prebuilt = "0.1.0-alpha.1"
 
 [build-dependencies]
 agave-kernel = { path = "crates/kernel", artifact = "bin", target = "x86_64-unknown-none" }

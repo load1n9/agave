@@ -1,17 +1,26 @@
-use bootloader::DiskImageBuilder;
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
+
+use bootloader::BootConfig;
 
 fn main() {
-    let kernel_path = env::var("CARGO_BIN_FILE_AGAVE_KERNEL").unwrap();
-    let disk_builder = DiskImageBuilder::new(PathBuf::from(kernel_path));
+    let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    let kernel = PathBuf::from(std::env::var_os("CARGO_BIN_FILE_AGAVE_kernel").unwrap());
 
-    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-    let uefi_path = out_dir.join("agave_os-uefi.img");
-    let bios_path = out_dir.join("agave_os-bios.img");
+    let uefi_path = out_dir.join("uefi.img");
 
-    disk_builder.create_uefi_image(&uefi_path).unwrap();
-    disk_builder.create_bios_image(&bios_path).unwrap();
+    let mut conf = BootConfig::default();
+    conf.frame_buffer.minimum_framebuffer_width = Some(1200);
+    bootloader::UefiBoot::new(&kernel)
+        .set_boot_config(&conf)
+        .create_disk_image(&uefi_path)
+        .unwrap();
 
-    println!("cargo:rustc-env=UEFI_IMAGE={}", uefi_path.display());
-    println!("cargo:rustc-env=BIOS_IMAGE={}", bios_path.display());
+    let bios_path = out_dir.join("bios.img");
+    bootloader::BiosBoot::new(&kernel)
+        .create_disk_image(&bios_path)
+        .unwrap();
+
+    // pass the disk image paths as env variables to the `main.rs`
+    println!("cargo:rustc-env=UEFI_PATH={}", uefi_path.display());
+    println!("cargo:rustc-env=BIOS_PATH={}", bios_path.display());
 }

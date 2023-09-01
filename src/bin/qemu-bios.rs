@@ -15,7 +15,7 @@ fn main() {
     qemu.arg("-display").arg("sdl,gl=on");
     qemu.arg("-serial").arg("stdio");
     qemu.arg("-drive");
-    qemu.arg(format!("format=raw,file={}", env!("UEFI_IMAGE")));
+    qemu.arg(format!("format=raw,file={}", env!("UEFI_PATH")));
     qemu.arg("-bios").arg(ovmf_prebuilt::ovmf_pure_efi());
     let exit_status = qemu.status().unwrap();
     process::exit(exit_status.code().unwrap_or(-1));

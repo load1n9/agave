@@ -1,11 +1,11 @@
 {
     "tasks": {
-        "qemu-img": "qemu-img create agave.img 32M",
-        "env-thing": "touch src/lib.rs && env | grep AGAVE",
-        "bootimage": "cargo bootimage --no-default-features --features video --bin agave-os --release",
-        "dd": "dd conv=notrunc if=target/x86_64-agave_os/release/bootimage-agave-os.bin of=agave.img",
-        "image": "deno task qemu-img && deno task env-thing && deno task bootimage && deno task dd",
-        "dev": "qemu-system-x86_64 -drive format=raw,file=target/x86_64-agave_os/release/bootimage-agave-os.bin",
-        "compile": "cargo rustc --release --bin"
+        "install-stuff": "cargo install cargo-wasi",
+        "build": "cargo build --release",
+        "build:app:test": "cd apps/test-app && cargo wasi build --release && cd ../..",
+        "run": "cargo build --release",
+        "run-qemu": "cargo run --release --bin qemu-bios",
+        "run-all": "deno task build:app:test && deno task run-qemu",
+        "qemu": "qemu-system-x86_64 -nodefaults -m 600M -smp 2 -device virtio-mouse-pci -device virtio-keyboard-pci -nic user,model=virtio-net-pci -device virtio-vga-gl -display sdl,gl=on -serial stdio -drive format=raw,file=./target/release/uefi.img -bios ovmf"
     }
 }

@@ -1,1 +1,0 @@
-AGAVE v{x.x.x}

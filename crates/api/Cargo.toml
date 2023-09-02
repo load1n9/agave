@@ -1,17 +1,18 @@
 cargo-features = ["per-package-target"]
 
 [package]
-name = "agave-kernel"
+name = "agave-api"
 version = "0.1.0"
 edition = "2021"
 default-target = "x86_64-unknown-none"
 
-[[bin]]
-name = "agave-kernel"
-test = false
-bench = false
-
 [dependencies]
+object = { version = "0.31.1", default-features = false, features = ["read"] }
+unix_str = { version = "1.0.0", default-features = false, features = [
+    "alloc",
+    "shrink_to"
+] }
+vek = { version = "0.15.10", default-features = false, features = ["libm"] }
 arrayvec = { version = "0.7.2", default-features = false }
 noto-sans-mono-bitmap = { version = "0.2.0", default_features = false, features = [
     "regular",
@@ -26,21 +27,34 @@ bootloader_api = "0.11.4"
 bootloader-boot-config = "0.11.4"
 acpi = "4.1.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+iced-x86 = { version = "1.18.0", default-features = false, features = [
+    "decoder",
+    "no_std",
+    "nasm"
+] }
 linked_list_allocator = "0.9.0"
 uart_16550 = "0.2.18"
 bitflags = "1.3.2"
+time = { version = "0.2.27", default-features = false }
+libm = "0.2.6"
+pic8259 = "0.10.1"
+bit_field = "0.10.2"
 spin = "0.5.2"
 spinning_top = "0.2.4"
 raw-cpuid = "10.2.0"
 anyhow = { version = "1.0", default-features = false }
 x86_64 = { version = "0.14.10" }
+rand = { version = "0.8.5", default-features = false }
+rand_hc = "0.3.1"
 wasmi = { version = "0.31.0", default-features = false }
+wasi = { version = "0.7.0", features = [], default-features = false }
+# wasi-common = { git = "https://github.com/theseus-os/wasmtime", branch = "no_std_support"}
+# wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 core2 = { version = "0.4.0", default-features = false, features = [
     "alloc",
     "nightly",
 ] }
 hashbrown = { version = "0.13.2", features = ["nightly"] }
-wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
 bootloader-x86_64-common = "0.11.4"
@@ -55,4 +69,3 @@ futures = { version = "0.3.4", default-features = false, features = [
 futures-util = { version = "0.3.4", default-features = false, features = [
     "alloc"
 ] }
-agave-api = { path = "../api" }

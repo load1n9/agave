@@ -1,5 +1,3 @@
-cargo-features = ["profile-rustflags"]
-
 [package]
 name = "agave-os"
 version = "0.1.0"
@@ -8,29 +6,11 @@ default-run = "agave-os"
 
 [workspace]
 members = ["crates/*", "libs/*"]
-
-[features]
-default = ["video", "x86_64", "uefi"]
-x86_64 = []
-uefi = []
-multiboot2 = []
-video = []
-serial = []
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
+exclude = ["apps/test-app"]
 
 [dependencies]
-bootloader = { version = "0.9.23", features = ["map_physical_memory"] }
-bootloader_api = { version = "0.11.3" }
-agave-kernel = { path = "crates/kernel", features = [
-    "x86_64",
-    "video"
-], version = "0.1.0" }
-vte = "0.11.0"
+ovmf-prebuilt = "0.1.0-alpha.1"
 
-[package.metadata.bootimage]
-test-success-exit-code = 33 # (0x10 << 1) | 1
+[build-dependencies]
+agave-kernel = { path = "crates/kernel", artifact = "bin", target = "x86_64-unknown-none" }
+bootloader = "0.11.4"

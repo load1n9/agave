@@ -12,31 +12,14 @@ test = false
 bench = false
 
 [dependencies]
-arrayvec = { workspace = true }
-noto-sans-mono-bitmap = { workspace = true }
-crossbeam = { workspace = true }
-conquer-once = { workspace = true }
 bootloader_api = { workspace = true }
 bootloader-boot-config = { workspace = true }
 acpi = { workspace = true }
-lazy_static =  { workspace = true }
-linked_list_allocator =  { workspace = true }
-uart_16550 = { workspace = true }
-bitflags =  { workspace = true }
 spin =  { workspace = true }
-spinning_top =  { workspace = true }
-raw-cpuid = { workspace = true }
-anyhow =  { workspace = true }
-x86_64 =  { workspace = true }
-wasmi =  { workspace = true }
 core2 =  { workspace = true }
-hashbrown =  { workspace = true }
-wasi =  { workspace = true }
-serde =  { workspace = true }
-xmas-elf =  { workspace = true }
-bootloader-x86_64-common =  { workspace = true }
 log = { workspace = true }
-crossbeam-queue =  { workspace = true }
-futures =  { workspace = true }
-futures-util =  { workspace = true }
 agave-api = { path = "../api" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 =  { workspace = true }
+

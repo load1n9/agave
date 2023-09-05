@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
-
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
     allocator, drivers,
@@ -19,6 +17,7 @@ use agave_api::sys::{
 use alloc::{boxed::Box, slice, vec::Vec};
 use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
 use bootloader_boot_config::LevelFilter;
+use core::panic::PanicInfo;
 use spin::Mutex;
 use x86_64::{
     structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
@@ -238,7 +237,8 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         spawner.run(async move {
             let mut apps: Vec<WasmApp> = Vec::new();
             let apps_raw = [
-                &include_bytes!("../../../apps/test-app/target/wasm32-wasi/release/test_app.wasm")[..],
+                &include_bytes!("../../../apps/test-app/target/wasm32-wasi/release/test_app.wasm")
+                    [..],
                 // &include_bytes!("../../../apps/zig-app/zig-out/lib/zig-app.wasm")[..],
                 // &include_bytes!("../../../disk/bin/hello.wasm")[..],
                 // &include_bytes!("../../../disk/bin/sqlite.wasm")[..],

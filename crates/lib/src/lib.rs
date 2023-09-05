@@ -77,3 +77,10 @@ pub fn draw_line(start: Position, end: Position, color: RGBA) {
         )
     }
 }
+
+/// temp function to test stuff
+pub fn temp() {
+    unsafe {
+        raw::temp();
+    }
+}

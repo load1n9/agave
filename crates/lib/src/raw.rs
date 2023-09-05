@@ -8,4 +8,5 @@ extern "C" {
     pub fn fill_rectangle(x: i32, y: i32, width: i32, height: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn draw_rectangle(x: i32, y: i32, width: i32, height: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn draw_line(x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32);
+    pub fn temp();
 }

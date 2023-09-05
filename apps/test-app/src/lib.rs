@@ -1,4 +1,4 @@
-use agave_lib::{draw_circle, get_dimensions, Position, RGBA};
+use agave_lib::{draw_circle, get_dimensions, temp, Position, RGBA};
 
 #[no_mangle]
 pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
@@ -14,4 +14,5 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
             a: 255,
         },
     );
+    temp();
 }

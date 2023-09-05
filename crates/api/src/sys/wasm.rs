@@ -3,7 +3,11 @@ use alloc::vec::Vec;
 use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
 
 use super::{
-    framebuffer::{shapes::Coordinate, FB, RGBA},
+    framebuffer::{
+        display::{text::TextDisplay, Displayable},
+        shapes::Coordinate,
+        FB, RGBA,
+    },
     globals::Input,
 };
 
@@ -20,6 +24,31 @@ impl WasmApp {
         let mut store = Store::new(&engine, val);
 
         let mut linker = <Linker<*mut FB>>::new(&engine);
+
+        let temp = Func::wrap(&mut store, |caller: Caller<'_, *mut FB>| {
+            let fb = unsafe { caller.data().as_mut().unwrap() };
+            let mut text_display = TextDisplay::new(
+                400,
+                400,
+                RGBA {
+                    r: 255,
+                    g: 0,
+                    b: 255,
+                    a: 255,
+                },
+                RGBA {
+                    r: 0,
+                    g: 0,
+                    b: 0,
+                    a: 255,
+                },
+            )
+            .unwrap();
+            text_display.set_text("Hello, world from AGAVE!");
+            text_display.display(Coordinate { x: 0, y: 0 }, fb).unwrap();
+        });
+
+        linker.define("agave", "temp", temp).unwrap();
 
         let draw_circle = Func::wrap(
             &mut store,

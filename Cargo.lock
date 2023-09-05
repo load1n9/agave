@@ -15,7 +15,7 @@ dependencies = [
 
 [[package]]
 name = "agave-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "acpi",
  "anyhow",
@@ -58,7 +58,7 @@ dependencies = [
 
 [[package]]
 name = "agave-kernel"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "acpi",
  "agave-api",
@@ -84,7 +84,7 @@ dependencies = [
  "spin 0.5.2",
  "spinning_top",
  "uart_16550",
- "wasi 0.10.0+wasi-snapshot-preview1",
+ "wasi 0.7.0",
  "wasmi",
  "x86_64",
  "xmas-elf 0.6.2",
@@ -96,7 +96,7 @@ version = "0.1.1"
 
 [[package]]
 name = "agave-os"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "agave-kernel",
  "bootloader",
@@ -1297,11 +1297,6 @@ name = "wasi"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b89c3ce4ce14bdc6fb6beaf9ec7928ca331de5df7e5ea278375642a2f478570d"
-
-[[package]]
-name = "wasi"
-version = "0.10.0+wasi-snapshot-preview1"
-source = "git+https://github.com/bytecodealliance/wasi?rev=45536ac956a6211e3cff047f36cf19d6da82fd95#45536ac956a6211e3cff047f36cf19d6da82fd95"
 
 [[package]]
 name = "wasi"

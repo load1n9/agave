@@ -58,6 +58,7 @@ pic8259 = "0.10.1"
 rand = { version = "0.8.5", default-features = false }
 rand_hc = "0.3.1"
 raw-cpuid = "10.2.0"
+rhai = { version = "1.15.1", features = [ "no_std" ], default_features = false }
 serde = { version = "1.0.164", default-features = false, features = ["alloc"] }
 spin = "0.5.2"
 spinning_top = "0.2.4"

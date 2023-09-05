@@ -35,6 +35,7 @@ raw-cpuid = { workspace = true }
 anyhow = { workspace = true }
 rand = { workspace = true }
 rand_hc = { workspace = true }
+rhai = { workspace = true }
 wasmi = { workspace = true }
 wasi = { workspace = true }
 core2 = { workspace = true }

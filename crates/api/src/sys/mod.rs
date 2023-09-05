@@ -12,6 +12,7 @@ pub mod memory;
 pub mod pci;
 pub mod pic;
 pub mod random;
+pub mod rhai;
 pub mod serial;
 pub mod task;
 pub mod virtio;

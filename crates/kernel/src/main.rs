@@ -237,6 +237,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 )),
             }
         }
+        
+        // fn add(x: i64, y: i64) -> i64 {
+        //     x + y
+        // }
+        // let mut rhai_engine = agave_api::sys::rhai::RhaiEngine::new();
+        // rhai_engine.register_fn("add", add);
+
+        // log::info!("rhai engine: {}",rhai_engine.eval::<i64>("add(40, 2)"));
 
         spawner.run(async move {
             let mut apps: Vec<WasmApp> = Vec::new();

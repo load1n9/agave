@@ -140,10 +140,13 @@ impl Executor {
 
             self.run_ready_tasks();
 
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::interrupts::disable();
             if self.task_queue.is_empty() && self.spawn_queue.is_empty() {
+                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 x86_64::instructions::interrupts::enable_and_hlt();
             } else {
+                #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
                 x86_64::instructions::interrupts::enable();
             }
             while let Some(e) = YIELDERS.pop() {

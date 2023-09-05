@@ -1,7 +1,10 @@
 use arrayvec::ArrayVec;
 use bootloader_api::info::{MemoryRegionKind, MemoryRegions};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PhysFrame, Size4KiB};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::PhysAddr;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{structures::paging::PageTable, VirtAddr};
 
 const BUFFER_SIZE_ADVANCE: usize = 32;
@@ -24,6 +27,7 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
 unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     use x86_64::registers::control::Cr3;
 
     let (level_4_table_frame, _) = Cr3::read();

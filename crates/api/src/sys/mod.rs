@@ -25,6 +25,7 @@ use core::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use spin::Mutex;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags,

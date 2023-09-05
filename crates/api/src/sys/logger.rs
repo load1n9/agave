@@ -59,6 +59,7 @@ impl log::Log for LockedLogger {
     }
 
     fn log(&self, record: &log::Record) {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         x86_64::instructions::interrupts::without_interrupts(|| {
             if let Some(framebuffer) = &self.framebuffer {
                 let mut framebuffer = framebuffer.lock();

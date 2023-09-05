@@ -7,6 +7,7 @@ use core::task::Waker;
 use futures::task::AtomicWaker;
 use lazy_static::lazy_static;
 use spin::Mutex;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
 pub static TIME_MS: AtomicU64 = AtomicU64::new(0);
@@ -114,13 +115,21 @@ pub fn wait_block(ms: u64) {
         if TIME_MS.load(Ordering::Relaxed) > current + ms {
             break;
         } else {
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             x86_64::instructions::nop();
         }
     }
@@ -281,6 +290,7 @@ extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     use x86_64::registers::control::Cr2;
     let _ = RANDTHING1.fetch_add(2, Ordering::Relaxed);
     log::error!("EXCEPTION: PAGE FAULT");

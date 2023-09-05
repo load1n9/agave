@@ -1,12 +1,15 @@
 use lazy_static::lazy_static;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::instructions::{
     segmentation::{Segment, CS, DS, ES, SS},
     tables::load_tss,
 };
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::{
     gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
     tss::TaskStateSegment,
 };
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::VirtAddr;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;

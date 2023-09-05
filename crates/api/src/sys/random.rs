@@ -3,6 +3,7 @@ use crate::sys;
 use core::sync::atomic::Ordering;
 use rand::{RngCore, SeedableRng};
 use rand_hc::Hc128Rng;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::instructions::random::RdRand;
 
 #[derive(Debug, Clone)]

@@ -19,6 +19,7 @@ use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
 use bootloader_boot_config::LevelFilter;
 use core::panic::PanicInfo;
 use spin::Mutex;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
     structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
     PhysAddr, VirtAddr,
@@ -77,6 +78,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
         let end_frame: PhysFrame<VirtualMappingPageSize> = PhysFrame::containing_address(max_phys);
 
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         use x86_64::structures::paging::PageSize;
         let mut news = 0;
         let mut olds = 0;
@@ -161,8 +163,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             }
         }
 
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         x86_64::instructions::interrupts::enable();
 
+        // #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         // x86_64::instructions::interrupts::disable();
     }
 

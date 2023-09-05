@@ -14,6 +14,7 @@ pub enum QemuExitCode {
 }
 
 pub fn exit_qemu(exit_code: QemuExitCode) {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     use x86_64::instructions::port::Port;
 
     unsafe {
@@ -24,6 +25,7 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 
 pub fn hlt_loop() -> ! {
     loop {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         x86_64::instructions::hlt();
     }
 }

@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::fmt::Debug;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
     instructions::port::{Port, PortGeneric, ReadWriteAccess},
     PhysAddr,

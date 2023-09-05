@@ -2,6 +2,7 @@ use crate::sys::phys_to_virt;
 use conquer_once::spin::OnceCell;
 use core::intrinsics::{volatile_load, volatile_store};
 use raw_cpuid::{CpuId, CpuIdResult};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{registers::model_specific::Msr, PhysAddr, VirtAddr};
 
 pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
@@ -9,7 +10,10 @@ pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
 pub fn cpuid() -> Option<CpuId> {
     //TODO: ensure that CPUID exists! https://wiki.osdev.org/CPUID#Checking_CPUID_availability
     Some(CpuId::with_cpuid_fn(|a, c| {
-        let result = unsafe { core::arch::x86_64::__cpuid_count(a, c) };
+        let result = unsafe { 
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            core::arch::x86_64::__cpuid_count(a, c) 
+        };
         CpuIdResult {
             eax: result.eax,
             ebx: result.ebx,
@@ -142,6 +146,7 @@ impl LocalApic {
 }
 
 pub unsafe fn disable_pic() {
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     use x86_64::instructions::port::Port;
     let mut wait_port: Port<u8> = Port::new(0x80);
     let mut wait = || {

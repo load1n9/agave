@@ -16,5 +16,6 @@ pub fn init() {
     unsafe {
         PICS.lock().initialize();
     }
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     x86_64::instructions::interrupts::enable();
 }

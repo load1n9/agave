@@ -5,6 +5,7 @@ use crate::sys::{
 };
 use alloc::{fmt, vec::Vec};
 use core::ptr::{read_volatile, write_volatile};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
     structures::paging::{FrameAllocator, Mapper, Size4KiB},
     PhysAddr, VirtAddr,

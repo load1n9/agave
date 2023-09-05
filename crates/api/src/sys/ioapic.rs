@@ -1,6 +1,7 @@
 use crate::sys::phys_to_virt;
 use conquer_once::spin::OnceCell;
 use core::intrinsics::{volatile_load, volatile_store};
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{PhysAddr, VirtAddr};
 
 pub const IOAPICID: u32 = 0;

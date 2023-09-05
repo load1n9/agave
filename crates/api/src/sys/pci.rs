@@ -1,10 +1,10 @@
-use core::fmt::Debug;
-
 use alloc::vec::Vec;
+use core::fmt::Debug;
 use x86_64::{
     instructions::port::{Port, PortGeneric, ReadWriteAccess},
     PhysAddr,
 };
+
 pub enum PCIConfigRegisters {
     PCIDeviceID = 0x2,
     PCIVendorID = 0x0,
@@ -36,9 +36,12 @@ pub enum PCIConfigRegisters {
 }
 
 const PORT_CONFIG_ADDRESS: PortGeneric<u32, ReadWriteAccess> = Port::new(0xCF8);
+
 const PORT_CONFIG_DATA: PortGeneric<u32, ReadWriteAccess> = Port::new(0xCFC);
+
 #[allow(dead_code)]
 const PORT_CONFIG_DATA_U8: PortGeneric<u8, ReadWriteAccess> = Port::new(0xCFC);
+
 pub fn config_address(bus: u8, slot: u8, func: u8, off: u8) {
     let address: u32 = ((bus as u32) << 16)
         | ((slot as u32) << 11)
@@ -51,6 +54,7 @@ pub fn config_address(bus: u8, slot: u8, func: u8, off: u8) {
         PORT_CONFIG_ADDRESS.write(address);
     }
 }
+
 pub fn config_read_u32(bus: u8, slot: u8, func: u8, off: u8) -> u32 {
     config_address(bus, slot, func, off);
     #[allow(const_item_mutation)]
@@ -108,6 +112,7 @@ pub fn config_write_u8(bus: u8, slot: u8, func: u8, off: u8, data: u8) {
         PORT_CONFIG_DATA.write(val);
     };
 }
+
 #[derive(Clone)]
 pub struct Pci {
     pub bus: u8,
@@ -136,15 +141,19 @@ impl Pci {
     pub fn config_read_u8(&self, off: u8) -> u8 {
         config_read_u8(self.bus, self.slot, self.func, off as u8)
     }
+
     pub fn config_write_u8(&self, off: u8, val: u8) {
         config_write_u8(self.bus, self.slot, self.func, off as u8, val)
     }
+
     pub fn config_read_u16(&self, off: u8) -> u16 {
         config_read_u16(self.bus, self.slot, self.func, off as u8)
     }
+
     pub fn config_write_u16(&self, off: u8, val: u16) {
         config_write_u16(self.bus, self.slot, self.func, off as u8, val)
     }
+
     pub fn config_read_u32(&self, off: u8) -> u32 {
         config_read_u32(self.bus, self.slot, self.func, off as u8)
     }

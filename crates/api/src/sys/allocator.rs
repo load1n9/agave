@@ -1,4 +1,5 @@
 use alloc::alloc::GlobalAlloc;
+use linked_list_allocator::LockedHeap;
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
@@ -6,10 +7,17 @@ use x86_64::{
     VirtAddr,
 };
 
+#[global_allocator]
+pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+pub const HEAP_START: usize = 0x_4444_4444_0000;
+pub const HEAP_SIZE: usize = 128 * 1024 * 1024; // 100 KiB
+
 #[allow(improper_ctypes_definitions)]
 extern "C" fn a_init(_l: alloc::alloc::Layout) -> *mut u8 {
     panic!("")
 }
+
 #[allow(improper_ctypes_definitions)]
 extern "C" fn d_init(_ptr: *mut u8, _layout: alloc::alloc::Layout) {
     panic!("")
@@ -45,17 +53,6 @@ unsafe impl GlobalAlloc for AllocFromCtx {
         (self.d)(ptr, layout)
     }
 }
-
-// #[global_allocator]
-// static ALLOCATOR: AllocFromCtx = AllocFromCtx;
-
-use linked_list_allocator::LockedHeap;
-
-#[global_allocator]
-pub static ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 128 * 1024 * 1024; // 100 KiB
 
 pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,

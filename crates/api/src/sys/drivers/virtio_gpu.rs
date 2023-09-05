@@ -1,14 +1,5 @@
 #![allow(dead_code)]
 
-use core::{
-    ptr::read_volatile,
-    sync::atomic::{AtomicU64, Ordering},
-};
-
-use alloc::{sync::Arc, vec::Vec};
-use futures::task::AtomicWaker;
-use lazy_static::lazy_static;
-
 use crate::sys::{
     create_identity_virt_from_phys_n,
     framebuffer::{FB, RGBA},
@@ -16,7 +7,21 @@ use crate::sys::{
     task::executor::{yield_once, Spawner},
     virtio::{Desc, Virtio},
 };
+use alloc::{sync::Arc, vec::Vec};
+use core::{
+    ptr::read_volatile,
+    sync::atomic::{AtomicU64, Ordering},
+};
+use futures::task::AtomicWaker;
+use lazy_static::lazy_static;
 use spin::Mutex;
+
+static LAST_FLUSH_MS: AtomicU64 = AtomicU64::new(0);
+
+lazy_static! {
+    pub static ref WAKERS: Mutex<[IdWaker; 256]> = Mutex::new([(); 256].map(|_| IdWaker::None));
+}
+
 #[derive(Debug)]
 pub enum IdWaker {
     None,
@@ -33,10 +38,6 @@ impl IdWaker {
             log::error!("Nothing to wake");
         }
     }
-}
-
-lazy_static! {
-    pub static ref WAKERS: Mutex<[IdWaker; 256]> = Mutex::new([(); 256].map(|_| IdWaker::None));
 }
 
 pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
@@ -503,8 +504,6 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
     }
 }
 
-static LAST_FLUSH_MS: AtomicU64 = AtomicU64::new(0);
-
 pub async fn request<T>(virtio: Arc<Mutex<Virtio>>, data: T) -> Desc {
     let twice = { virtio.lock().get_free_twice_desc_id() };
     if let Some((desc_id, desc_next_id)) = twice {
@@ -540,8 +539,10 @@ impl IdWait {
         IdWait { id }
     }
 }
+
 impl futures::future::Future for IdWait {
     type Output = ();
+
     fn poll(
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
@@ -695,6 +696,7 @@ struct VirtioGpuRespEdid {
     padding: u32,
     edid: [u8; 1024],
 }
+
 #[repr(u32)]
 #[derive(Clone, Debug)]
 enum VirtioGpuFormats {
@@ -728,6 +730,7 @@ struct VirtioGpuCmdResourceAttachBacking {
     length: u32,
     padding: u32,
 }
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 struct VirtioGpuCmdSetScanout {
@@ -746,6 +749,7 @@ struct VirtioGpuCmdTransferToHost2d {
     resource_id: u32,
     padding: u32,
 }
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 struct VirtioGpuCmdResourceFlush {
@@ -911,6 +915,7 @@ pub struct VirglRendererResourceCreateArgs {
     nr_samples: u32,
     flags: u32,
 }
+
 impl Default for VirglRendererResourceCreateArgs {
     fn default() -> Self {
         Self {

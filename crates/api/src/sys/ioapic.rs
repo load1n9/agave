@@ -1,9 +1,11 @@
-use core::intrinsics::{volatile_load, volatile_store};
-
+use crate::sys::phys_to_virt;
 use conquer_once::spin::OnceCell;
+use core::intrinsics::{volatile_load, volatile_store};
 use x86_64::{PhysAddr, VirtAddr};
 
-use crate::sys::phys_to_virt;
+pub const IOAPICID: u32 = 0;
+pub const IOAPICVER: u32 = 1;
+
 pub static IO_APIC_0: OnceCell<IoApic> = OnceCell::uninit();
 
 pub struct IoApic {
@@ -12,8 +14,6 @@ pub struct IoApic {
     _id: u8,
 }
 
-pub const IOAPICID: u32 = 0;
-pub const IOAPICVER: u32 = 1;
 impl IoApic {
     pub fn init(info: &acpi::platform::interrupt::IoApic) -> &Self {
         let this = IO_APIC_0.get_or_init(move || Self {
@@ -23,9 +23,11 @@ impl IoApic {
         });
         this
     }
+
     pub unsafe fn set_sel(&self, reg: u32) {
         volatile_store(self.virt_address.as_u64() as *mut u32, reg);
     }
+
     pub fn read(&self, reg: u32) -> u32 {
         unsafe {
             self.set_sel(reg);
@@ -33,6 +35,7 @@ impl IoApic {
             volatile_load(sec.as_u64() as *const u32)
         }
     }
+
     pub fn write(&self, reg: u32, value: u32) {
         unsafe {
             self.set_sel(reg);
@@ -46,11 +49,13 @@ impl IoApic {
         let high = self.read(0x10 + 2 * index + 1) as u64;
         (high << 32) + low
     }
+
     pub fn write_redtlb(&self, index: u32, redtlb: u64) {
         let _low = self.write(0x10 + 2 * index, (redtlb & 0xffff) as u32);
         let _high = self.write(0x10 + 2 * index + 1, (redtlb >> 32) as u32);
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct RedTbl {
     pub vector: u8,
@@ -97,6 +102,7 @@ impl RedTbl {
             destination,
         }
     }
+
     pub fn store(&self) -> u64 {
         let &Self {
             vector,

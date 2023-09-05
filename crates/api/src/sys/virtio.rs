@@ -1,16 +1,27 @@
-use core::ptr::{read_volatile, write_volatile};
-
-use alloc::{fmt, vec::Vec};
-use x86_64::{
-    structures::paging::{FrameAllocator, Mapper, Size4KiB},
-    PhysAddr, VirtAddr,
-};
-
 use crate::sys::{
     create_identity_virt_from_phys,
     pci::{self, Bar, Pci},
     phys_to_virt,
 };
+use alloc::{fmt, vec::Vec};
+use core::ptr::{read_volatile, write_volatile};
+use x86_64::{
+    structures::paging::{FrameAllocator, Mapper, Size4KiB},
+    PhysAddr, VirtAddr,
+};
+
+const MAX_NUM_QUEUE: usize = 256;
+const DEVICE_ID_INPUT: isize = 18;
+const DEVICE_ID_GPU: isize = 16;
+const VIRTIO_PCI_CAP_COMMON_CFG: u8 = 1;
+const VIRTIO_PCI_CAP_NOTIFY_CFG: u8 = 2;
+const VIRTIO_PCI_CAP_ISR_CFG: u8 = 3;
+const VIRTIO_PCI_CAP_DEVICE_CFG: u8 = 4;
+const VIRTIO_PCI_CAP_PCI_CFG: u8 = 5;
+const VIRTQ_DESC_F_NEXT: u16 = 1;
+const VIRTQ_DESC_F_WRITE: u16 = 2;
+#[allow(dead_code)]
+const VIRTQ_DESC_F_INDIRECT: u16 = 4;
 
 pub fn to_bytes<T>(t: &T) -> &[u8] {
     unsafe {
@@ -20,7 +31,6 @@ pub fn to_bytes<T>(t: &T) -> &[u8] {
     }
 }
 
-const MAX_NUM_QUEUE: usize = 256;
 pub struct Virtio {
     pub pci: Pci,
 
@@ -35,9 +45,11 @@ pub struct Virtio {
     pub queues_free: Vec<QueueFreeDescs>,
     pub queue_select: u16,
 }
+
 pub struct QueueFreeDescs {
     free: Vec<u16>,
 }
+
 impl QueueFreeDescs {
     pub fn new(queue_size: u16) -> Self {
         let mut free = Vec::with_capacity(queue_size as usize);
@@ -46,9 +58,11 @@ impl QueueFreeDescs {
         }
         Self { free }
     }
+
     pub fn get_free(&mut self) -> Option<u16> {
         self.free.pop()
     }
+
     pub fn get_free_twice(&mut self) -> Option<(u16, u16)> {
         if self.free.len() >= 2 {
             Some((self.free.pop().unwrap(), self.free.pop().unwrap()))
@@ -56,6 +70,7 @@ impl QueueFreeDescs {
             None
         }
     }
+
     pub fn set_free(&mut self, desc_id: u16) {
         self.free.push(desc_id);
     }
@@ -66,9 +81,6 @@ pub enum DeviceType {
     Input,
     Gpu,
 }
-
-const DEVICE_ID_INPUT: isize = 18;
-const DEVICE_ID_GPU: isize = 16;
 
 fn device_id_to_type(id: isize) -> Option<DeviceType> {
     match id {
@@ -81,7 +93,6 @@ fn device_id_to_type(id: isize) -> Option<DeviceType> {
 impl Virtio {
     pub fn init(
         pci: &Pci,
-
         mapper: &mut impl Mapper<Size4KiB>,
         frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     ) -> Option<Self> {
@@ -483,9 +494,11 @@ impl Virtio {
     pub fn get_free_desc_id(&mut self) -> Option<u16> {
         self.queues_free[self.queue_select as usize].get_free()
     }
+
     pub fn get_free_twice_desc_id(&mut self) -> Option<(u16, u16)> {
         self.queues_free[self.queue_select as usize].get_free_twice()
     }
+
     pub fn set_free_desc_id(&mut self, desc_id: u16) {
         self.queues_free[self.queue_select as usize].set_free(desc_id);
     }
@@ -496,6 +509,7 @@ impl Virtio {
             write_volatile(&mut self.common.cap.queue_select, q);
         }
     }
+
     pub fn set_available(&mut self, desc_id: u16) {
         unsafe {
             let queue = read_volatile(self.common.cap);
@@ -614,6 +628,7 @@ pub struct VirtioPciCommonCfg {
     pub queue_driver: u64,      // read-write
     pub queue_device: u64,      // read-write
 }
+
 #[derive(Debug, PartialEq)]
 pub struct VirtioCap<T> {
     pub cap: T,
@@ -633,12 +648,6 @@ impl<T> VirtioCap<T> {
     }
 }
 
-const VIRTIO_PCI_CAP_COMMON_CFG: u8 = 1;
-const VIRTIO_PCI_CAP_NOTIFY_CFG: u8 = 2;
-const VIRTIO_PCI_CAP_ISR_CFG: u8 = 3;
-const VIRTIO_PCI_CAP_DEVICE_CFG: u8 = 4;
-const VIRTIO_PCI_CAP_PCI_CFG: u8 = 5;
-
 // Device cfg
 #[repr(C)]
 #[derive(Debug)]
@@ -649,6 +658,7 @@ struct VirtioInputConfig {
     reserved: [u8; 5],
     u: VirtioInputUnion,
 }
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 union VirtioInputUnion {
@@ -678,6 +688,7 @@ struct VirtioInputAbsInfo {
     flat: u32,
     resolution: u32,
 }
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioInputDevIds {
@@ -687,10 +698,6 @@ struct VirtioInputDevIds {
     version: u16,
 }
 
-const VIRTQ_DESC_F_NEXT: u16 = 1;
-const VIRTQ_DESC_F_WRITE: u16 = 2;
-#[allow(dead_code)]
-const VIRTQ_DESC_F_INDIRECT: u16 = 4;
 //Queue handle
 #[repr(C, align(16))]
 #[derive(Clone, Debug, PartialEq)]

@@ -1,4 +1,7 @@
 #[link(wasm_import_module = "agave")]
 extern "C" {
     pub fn set_pixel(x: i32, y: i32, r: i32, g: i32, b: i32, a: i32);
+    pub fn set_pixels_from_to(x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32);
+    pub fn get_width() -> i32;
+    pub fn get_height() -> i32;
 }

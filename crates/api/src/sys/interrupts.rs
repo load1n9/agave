@@ -1,14 +1,24 @@
+use crate::sys::gdt;
+use crate::sys::ioapic;
 use core::sync::atomic::AtomicU64;
 use core::sync::atomic::AtomicUsize;
 use core::sync::atomic::Ordering;
 use core::task::Waker;
-
-use crate::sys::gdt;
-use crate::sys::ioapic;
-
+use futures::task::AtomicWaker;
 use lazy_static::lazy_static;
+use spin::Mutex;
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
 
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+pub static TIME_MS: AtomicU64 = AtomicU64::new(0);
+
+pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0;
+const PIT_DIVIDER: usize = 1193;
+const PIT_INTERVAL: f64 = (PIT_DIVIDER as f64) / PIT_FREQUENCY;
+
+pub static RANDTHING1: AtomicUsize = AtomicUsize::new(1);
+
+pub static RANDTHING2: AtomicUsize = AtomicUsize::new(1);
+
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
@@ -73,17 +83,9 @@ lazy_static! {
     };
 }
 
-pub static TIME_MS: AtomicU64 = AtomicU64::new(0);
-pub const PIT_FREQUENCY: f64 = 3_579_545.0 / 3.0;
-const PIT_DIVIDER: usize = 1193;
-const PIT_INTERVAL: f64 = (PIT_DIVIDER as f64) / PIT_FREQUENCY;
-pub static RANDTHING1: AtomicUsize = AtomicUsize::new(1);
-pub static RANDTHING2: AtomicUsize = AtomicUsize::new(1);
-
 pub fn time_between_ticks() -> f64 {
     PIT_INTERVAL
 }
-
 
 extern "x86-interrupt" fn lapic_timer(_stack_frame: InterruptStackFrame) {
     unsafe {
@@ -123,10 +125,12 @@ pub fn wait_block(ms: u64) {
         }
     }
 }
+
 pub async fn a_sleep(ms: u64) {
     let timer = Timer::new(ms);
     timer.await;
 }
+
 pub struct Timer {
     stop: u64,
 }
@@ -138,6 +142,7 @@ impl Timer {
         }
     }
 }
+
 impl futures::future::Future for Timer {
     type Output = ();
     fn poll(
@@ -159,9 +164,9 @@ impl futures::future::Future for Timer {
     }
 }
 
-use spin::Mutex;
-
 type WakersT = [Option<AtomicWaker>; 128];
+static WAKER: AtomicWaker = AtomicWaker::new();
+
 lazy_static! {
     pub static ref WAKERS: Mutex<WakersT> = Mutex::new([(); 128].map(|_| None));
 }
@@ -181,10 +186,6 @@ pub fn add_waker(waker: &Waker) -> u64 {
     0
 }
 
-use futures::task::AtomicWaker;
-
-static WAKER: AtomicWaker = AtomicWaker::new();
-
 extern "x86-interrupt" fn lapic_timer2(_stack_frame: InterruptStackFrame) {
     // log::info!("timer2");
 
@@ -192,10 +193,11 @@ extern "x86-interrupt" fn lapic_timer2(_stack_frame: InterruptStackFrame) {
     //     self::local_apic::LocalApic.get().unwrap().eoi();
     // };
 }
+
 pub fn init_idt() {
     IDT.load();
-
 }
+
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     log::error!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
 }
@@ -204,10 +206,12 @@ extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
     log::error!("EXCEPTION: overflow_handler\n{:#?}", stack_frame);
     panic!("");
 }
+
 extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     log::error!("EXCEPTION: invalid_tss {}\n{:#?}", error_code, stack_frame);
     panic!("");
 }
+
 extern "x86-interrupt" fn segment_not_present_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
@@ -219,6 +223,7 @@ extern "x86-interrupt" fn segment_not_present_handler(
     );
     panic!("");
 }
+
 extern "x86-interrupt" fn stack_segment_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
@@ -230,6 +235,7 @@ extern "x86-interrupt" fn stack_segment_fault_handler(
     );
     panic!("");
 }
+
 extern "x86-interrupt" fn alignment_check_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
@@ -241,6 +247,7 @@ extern "x86-interrupt" fn alignment_check_handler(
     );
     panic!("");
 }
+
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     _error_code: u64,
@@ -251,9 +258,11 @@ extern "x86-interrupt" fn double_fault_handler(
 extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, _error_code: u64) {
     panic!("EXCEPTION: alignment_check{:#?}", stack_frame);
 }
+
 extern "x86-interrupt" fn invalid_opcode(stack_frame: InterruptStackFrame) {
     panic!("EXCEPTION: invalid_opcode{:#?}", stack_frame);
 }
+
 extern "x86-interrupt" fn bound_range_exceeded(stack_frame: InterruptStackFrame) {
     panic!("EXCEPTION: bound_range_exceeded{:#?}", stack_frame);
 }
@@ -267,8 +276,6 @@ extern "x86-interrupt" fn general_protection_fault(
         _error_code, stack_frame
     );
 }
-
-use x86_64::structures::idt::PageFaultErrorCode;
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
@@ -287,6 +294,7 @@ extern "x86-interrupt" fn page_fault_handler(
 extern "x86-interrupt" fn ioapic_handler_0(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_0_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_1(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_1_____");
     let ioa = ioapic::IO_APIC_0.get().expect("IoApic0");
@@ -299,6 +307,7 @@ extern "x86-interrupt" fn ioapic_handler_1(_stack_frame: InterruptStackFrame) {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
     };
 }
+
 extern "x86-interrupt" fn ioapic_handler_2(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_2_____");
 
@@ -331,15 +340,18 @@ extern "x86-interrupt" fn ioapic_handler_7(_stack_frame: InterruptStackFrame) {
 extern "x86-interrupt" fn ioapic_handler_8(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_8_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_9(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_9_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_10(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_10_____");
     unsafe {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
     };
 }
+
 extern "x86-interrupt" fn ioapic_handler_11(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_11_____");
 
@@ -347,42 +359,55 @@ extern "x86-interrupt" fn ioapic_handler_11(_stack_frame: InterruptStackFrame) {
         crate::sys::local_apic::LOCAL_APIC.get().unwrap().eoi();
     };
 }
+
 extern "x86-interrupt" fn ioapic_handler_12(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_12_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_13(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_13_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_14(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_14_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_15(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_15_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_16(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_16_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_17(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_17_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_18(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_18_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_19(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_19_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_20(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_20_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_21(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_21_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_22(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_22_____");
 }
+
 extern "x86-interrupt" fn ioapic_handler_23(_stack_frame: InterruptStackFrame) {
     // log::info!("______ioapic_handler_23_____");
 }
+
 extern "x86-interrupt" fn generic_handler(_stack_frame: InterruptStackFrame) {
     // log::info!("______generic_handler_____");
 }

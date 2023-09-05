@@ -1,8 +1,11 @@
 #[allow(unused_mut)]
-use alloc::{string::String, vec::Vec};
-use wasmi::{core::Trap, Caller, Engine, Extern, Func, Instance, Linker, Module, Store};
+use alloc::vec::Vec;
+use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
 
-use super::{framebuffer::FB, globals::Input};
+use super::{
+    framebuffer::{shapes::Coordinate, FB, RGBA},
+    globals::Input,
+};
 
 pub struct WasmApp {
     store: Store<*mut FB>,
@@ -18,29 +21,33 @@ impl WasmApp {
 
         let mut linker = <Linker<*mut FB>>::new(&engine);
 
-        let host_hello = Func::wrap(&mut store, |mut caller: Caller<'_, *mut FB>, param: i32| {
-            log::info!("Received {} from WebAssembly", param);
-            let _result = async {
-                let memory = match caller.get_export("memory") {
-                    Some(Extern::Memory(m)) => m,
-                    _ => {
-                        return Err(Trap::new(String::from(
-                            "missing required WASI memory export",
-                        )))
-                    }
-                };
-
-                let (memory, ctx) = memory.data_and_store_mut(&mut caller);
-                log::info!("ctx:{:?}", ctx);
-                Ok(memory)
-            };
-            let fb = unsafe { caller.data().as_mut().unwrap() };
-            log::info!("host state: {:?}", caller.data());
-            for p in fb.pixels[0..200].iter_mut() {
-                p.r = 255;
-            }
-        });
-        linker.define("temp", "hello", host_hello).unwrap();
+        let draw_circle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x: i32,
+             y: i32,
+             radius: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.draw_circle(
+                    Coordinate {
+                        x: x as isize,
+                        y: y as isize,
+                    },
+                    radius as usize,
+                    RGBA {
+                        r: r as u8,
+                        g: g as u8,
+                        b: b as u8,
+                        a: a as u8,
+                    },
+                );
+            },
+        );
+        linker.define("agave", "draw_circle", draw_circle).unwrap();
 
         let set_pixel = Func::wrap(
             &mut store,

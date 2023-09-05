@@ -1,9 +1,10 @@
+use crate::sys::phys_to_virt;
 use conquer_once::spin::OnceCell;
 use core::intrinsics::{volatile_load, volatile_store};
 use raw_cpuid::{CpuId, CpuIdResult};
 use x86_64::{registers::model_specific::Msr, PhysAddr, VirtAddr};
 
-use crate::sys::phys_to_virt;
+pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
 
 pub fn cpuid() -> Option<CpuId> {
     //TODO: ensure that CPUID exists! https://wiki.osdev.org/CPUID#Checking_CPUID_availability
@@ -17,8 +18,6 @@ pub fn cpuid() -> Option<CpuId> {
         }
     }))
 }
-
-pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
 
 pub struct LocalApic {
     pub virt_address: VirtAddr,
@@ -83,6 +82,7 @@ impl LocalApic {
 
         self.set_icr(icr);
     }
+
     // Not used just yet, but allows triggering an NMI to another processor.
     pub fn ipi_nmi(&self, apic_id: u32) {
         let shift = { 56 };
@@ -92,43 +92,55 @@ impl LocalApic {
     pub unsafe fn eoi(&self) {
         self.write(0xB0, 0);
     }
+
     /// Reads the Error Status Register.
     pub unsafe fn esr(&self) -> u32 {
         self.write(0x280, 0);
         self.read(0x280)
     }
+
     pub unsafe fn lvt_timer(&self) -> u32 {
         self.read(0x320)
     }
+
     pub unsafe fn set_lvt_timer(&self, value: u32) {
         self.write(0x320, value);
     }
+
     pub unsafe fn init_count(&self) -> u32 {
         self.read(0x380)
     }
+
     pub unsafe fn set_init_count(&self, initial_count: u32) {
         self.write(0x380, initial_count);
     }
+
     pub unsafe fn cur_count(&self) -> u32 {
         self.read(0x390)
     }
+
     pub unsafe fn div_conf(&self) -> u32 {
         self.read(0x3E0)
     }
+
     pub unsafe fn set_div_conf(&self, div_conf: u32) {
         self.write(0x3E0, div_conf);
     }
+
     pub unsafe fn lvt_error(&self) -> u32 {
         self.read(0x370)
     }
+
     pub unsafe fn set_lvt_error(&self, lvt_error: u32) {
         self.write(0x370, lvt_error);
     }
+
     unsafe fn _setup_error_int(&self) {
         let vector = 49u32;
         self.set_lvt_error(vector);
     }
 }
+
 pub unsafe fn disable_pic() {
     use x86_64::instructions::port::Port;
     let mut wait_port: Port<u8> = Port::new(0x80);

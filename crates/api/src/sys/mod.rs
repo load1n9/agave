@@ -17,7 +17,6 @@ pub mod task;
 pub mod virtio;
 pub mod wasi;
 pub mod wasm;
-
 use self::memory::BootInfoFrameAllocator;
 use acpi::{AcpiHandler, PhysicalMapping};
 use conquer_once::spin::OnceCell;
@@ -33,6 +32,18 @@ use x86_64::{
     },
     PhysAddr, VirtAddr,
 };
+
+const _ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;
+
+pub static MAPPER: OnceCell<Mutex<OffsetPageTable>> = OnceCell::uninit();
+
+pub static FRAME_ALLOCATOR: OnceCell<Mutex<BootInfoFrameAllocator>> = OnceCell::uninit();
+
+pub static mut VIRTUAL_MAPPING_OFFSET: VirtAddr = VirtAddr::new_truncate(0);
+
+static OTHER_VIRT: AtomicU64 = AtomicU64::new(0x_5000_0000_0000);
+
+pub const ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;
 
 #[derive(Clone)]
 pub struct AcpiHandlerImpl;
@@ -52,18 +63,14 @@ impl AcpiHandler for AcpiHandlerImpl {
             self.clone(),
         )
     }
+
     fn unmap_physical_region<T>(_region: &PhysicalMapping<Self, T>) {}
 }
-const _ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;
 
-pub static MAPPER: OnceCell<Mutex<OffsetPageTable>> = OnceCell::uninit();
-pub static FRAME_ALLOCATOR: OnceCell<Mutex<BootInfoFrameAllocator>> = OnceCell::uninit();
-
-pub static mut VIRTUAL_MAPPING_OFFSET: VirtAddr = VirtAddr::new_truncate(0);
 pub fn phys_to_virt(addr: PhysAddr) -> VirtAddr {
     unsafe { VIRTUAL_MAPPING_OFFSET + addr.as_u64() }
 }
-static OTHER_VIRT: AtomicU64 = AtomicU64::new(0x_5000_0000_0000);
+
 pub fn create_virt_from_phys(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
@@ -130,5 +137,3 @@ pub fn create_identity_virt_from_phys_n(pages: usize) -> Result<Page, MapToError
         )));
     })
 }
-
-pub const ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;

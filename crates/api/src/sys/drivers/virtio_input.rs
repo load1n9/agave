@@ -7,6 +7,7 @@ struct VirtioInputEvent {
     code: u16,
     value: u32,
 }
+
 ///Handle the virtio device and export all data to globals::Input
 pub async fn drive(mut virtio: Virtio) {
     unsafe {

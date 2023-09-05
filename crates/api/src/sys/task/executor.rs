@@ -1,10 +1,17 @@
 use super::{Task, TaskId};
 use alloc::collections::VecDeque;
+use alloc::task::Wake;
 use alloc::{collections::BTreeMap, sync::Arc};
+use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 use crossbeam::queue::ArrayQueue;
 use futures::task::AtomicWaker;
 use futures::Future;
 use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref YIELDERS: ArrayQueue<AtomicWaker> = ArrayQueue::new(100);
+}
+
 pub struct SimpleExecutor {
     task_queue: VecDeque<Task>,
 }
@@ -20,8 +27,6 @@ impl SimpleExecutor {
         self.task_queue.push_back(task)
     }
 }
-use core::task::RawWakerVTable;
-use core::task::{RawWaker, Waker};
 
 fn dummy_raw_waker() -> RawWaker {
     fn no_op(_: *const ()) {}
@@ -36,7 +41,6 @@ fn dummy_raw_waker() -> RawWaker {
 fn dummy_waker() -> Waker {
     unsafe { Waker::from_raw(dummy_raw_waker()) }
 }
-use core::task::{Context, Poll};
 
 impl SimpleExecutor {
     pub fn run(&mut self) {
@@ -66,6 +70,7 @@ pub struct Executor {
     spawn_queue: Arc<ArrayQueue<Task>>,
     waker_cache: BTreeMap<TaskId, Waker>,
 }
+
 pub fn qpush(queue: Arc<ArrayQueue<Task>>, f: impl Future<Output = ()> + 'static) {
     let _ = queue.push(Task::new(f));
 }
@@ -79,10 +84,12 @@ impl Executor {
             waker_cache: BTreeMap::new(),
         }
     }
+
     pub fn spawner(&self) -> Spawner {
         Spawner(self.spawn_queue.clone())
     }
 }
+
 impl Executor {
     pub fn spawn(&mut self, task: Task) {
         let task_id = task.id;
@@ -150,12 +157,12 @@ struct TaskWaker {
     task_id: TaskId,
     task_queue: Arc<ArrayQueue<TaskId>>,
 }
+
 impl TaskWaker {
     fn wake_task(&self) {
         self.task_queue.push(self.task_id).expect("task_queue full");
     }
 }
-use alloc::task::Wake;
 
 impl Wake for TaskWaker {
     fn wake(self: Arc<Self>) {
@@ -166,6 +173,7 @@ impl Wake for TaskWaker {
         self.wake_task();
     }
 }
+
 impl TaskWaker {
     fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
         Waker::from(Arc::new(TaskWaker {
@@ -174,15 +182,14 @@ impl TaskWaker {
         }))
     }
 }
-lazy_static! {
-    pub static ref YIELDERS: ArrayQueue<AtomicWaker> = ArrayQueue::new(100);
-}
 
 pub async fn yield_once() {
     let timer = YieldOnce(false);
     timer.await;
 }
+
 pub struct YieldOnce(bool);
+
 impl futures::future::Future for YieldOnce {
     type Output = ();
     fn poll(

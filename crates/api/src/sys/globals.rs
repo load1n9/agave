@@ -8,6 +8,7 @@ impl<T: Copy> GLOBAL<T> {
     pub const fn new(t: T) -> Self {
         Self(AtomicCell::new(t))
     }
+
     ///Might lose data if multiple thread calls it simultaneously
     pub fn update<F>(&self, func: F)
     where
@@ -17,6 +18,7 @@ impl<T: Copy> GLOBAL<T> {
         func(&mut v);
         self.0.store(v)
     }
+
     pub fn read(&self) -> T {
         self.0.load()
     }
@@ -70,6 +72,7 @@ pub enum KeyState {
     OnTransientOff = 129,
     On = 130,
 }
+
 impl Default for KeyState {
     fn default() -> Self {
         KeyState::Off
@@ -95,6 +98,7 @@ impl KeyState {
             (_, true) => KeyState::On,
         }
     }
+
     ///To call every kernel loop
     pub fn step(&mut self) {
         *self = match *self {

@@ -1,5 +1,6 @@
+use crate::sys::interrupts::global_time_ms;
+use alloc::{slice, vec::Vec};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
-
 use core::{fmt, ptr};
 use font_constants::BACKUP_CHAR;
 use noto_sans_mono_bitmap::{
@@ -9,6 +10,7 @@ use noto_sans_mono_bitmap::{
 /// Additional vertical space between lines
 #[allow(dead_code)]
 const LINE_SPACING: usize = 2;
+
 /// Additional horizontal space between characters.
 #[allow(dead_code)]
 const LETTER_SPACING: usize = 0;
@@ -172,10 +174,7 @@ impl fmt::Write for FrameBufferWriter {
         Ok(())
     }
 }
-use alloc::{slice, vec::Vec};
 
-use crate::sys::interrupts::global_time_ms;
-// extern crate alloc;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct RGBA {
@@ -184,6 +183,7 @@ pub struct RGBA {
     pub b: u8,
     pub a: u8,
 }
+
 #[derive(Clone)]
 #[repr(C)]
 pub struct FB {
@@ -201,6 +201,7 @@ pub struct FBShare<'a> {
     pub w: usize,
     pub h: usize,
 }
+
 impl FB {
     pub fn new(info: &FrameBufferInfo) -> Self {
         let w = info.width;

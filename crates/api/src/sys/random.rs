@@ -1,8 +1,6 @@
-use core::sync::atomic::Ordering;
-
 use super::fs::FileIO;
 use crate::sys;
-
+use core::sync::atomic::Ordering;
 use rand::{RngCore, SeedableRng};
 use rand_hc::Hc128Rng;
 use x86_64::instructions::random::RdRand;

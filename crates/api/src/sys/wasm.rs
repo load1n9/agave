@@ -1,11 +1,8 @@
 #[allow(unused_mut)]
-// use core::fmt::Write;
 use alloc::{string::String, vec::Vec};
 use wasmi::{core::Trap, Caller, Engine, Extern, Func, Instance, Linker, Module, Store};
 
 use super::{framebuffer::FB, globals::Input};
-
-// use crate::api::wasi::ctx::WasiCtx;
 
 pub struct WasmApp {
     store: Store<*mut FB>,
@@ -61,6 +58,51 @@ impl WasmApp {
         );
 
         linker.define("agave", "set_pixel", set_pixel).unwrap();
+
+        let set_pixels_from_to = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x0: i32,
+             y0: i32,
+             x1: i32,
+             y1: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        fb.pixels
+                            .get_mut((y * (fb.w as i32) + x) as usize)
+                            .map(|p| {
+                                p.r = r as u8;
+                                p.g = g as u8;
+                                p.b = b as u8;
+                                p.a = a as u8;
+                            });
+                    }
+                }
+            },
+        );
+
+        linker
+            .define("agave", "set_pixels_from_to", set_pixels_from_to)
+            .unwrap();
+
+        let get_width = Func::wrap(&mut store, |caller: Caller<'_, *mut FB>| {
+            let fb = unsafe { caller.data().as_mut().unwrap() };
+            fb.w as i32
+        });
+
+        linker.define("agave", "get_width", get_width).unwrap();
+
+        let get_height = Func::wrap(&mut store, |caller: Caller<'_, *mut FB>| {
+            let fb = unsafe { caller.data().as_mut().unwrap() };
+            fb.h as i32
+        });
+
+        linker.define("agave", "get_height", get_height).unwrap();
 
         let args_get = Func::wrap(
             &mut store,
@@ -809,15 +851,21 @@ impl WasmApp {
     pub fn call(&mut self) {
         let start = self
             .instance
-            .get_typed_func::<(), ()>(&self.store, "_start")
-            .unwrap();
-        start.call(&mut self.store, ()).unwrap();
+            .get_typed_func::<(), ()>(&self.store, "_start");
+
+        match start {
+            Ok(start) => {
+                start.call(&mut self.store, ()).unwrap();
+            }
+            Err(_) => {}
+        }
     }
 
     pub fn call_update(&mut self, input: Input) {
         let update = self
             .instance
             .get_typed_func::<(i32, i32), ()>(&self.store, "update");
+
         match update {
             Ok(update) => {
                 update

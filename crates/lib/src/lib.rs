@@ -50,3 +50,30 @@ pub fn draw_circle(center: Position, radius: i32, color: RGBA) {
         )
     }
 }
+
+/// Fill a rectangle with the given position, width, height, and color
+pub fn fill_rectangle(pos: Position, width: i32, height: i32, color: RGBA) {
+    unsafe {
+        raw::fill_rectangle(
+            pos.x, pos.y, width, height, color.r, color.g, color.b, color.a,
+        )
+    }
+}
+
+/// Draw a rectangle with the given position, width, height, and color
+pub fn draw_rectangle(pos: Position, width: i32, height: i32, color: RGBA) {
+    unsafe {
+        raw::draw_rectangle(
+            pos.x, pos.y, width, height, color.r, color.g, color.b, color.a,
+        )
+    }
+}
+
+/// Draw a line from the first position to the second position with the given color
+pub fn draw_line(start: Position, end: Position, color: RGBA) {
+    unsafe {
+        raw::draw_line(
+            start.x, start.y, end.x, end.y, color.r, color.g, color.b, color.a,
+        )
+    }
+}

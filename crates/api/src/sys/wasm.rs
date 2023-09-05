@@ -49,6 +49,105 @@ impl WasmApp {
         );
         linker.define("agave", "draw_circle", draw_circle).unwrap();
 
+        let fill_rectangle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x: i32,
+             y: i32,
+             width: i32,
+             height: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.fill_rectangle(
+                    Coordinate {
+                        x: x as isize,
+                        y: y as isize,
+                    },
+                    width as usize,
+                    height as usize,
+                    RGBA {
+                        r: r as u8,
+                        g: g as u8,
+                        b: b as u8,
+                        a: a as u8,
+                    },
+                );
+            },
+        );
+
+        linker
+            .define("agave", "fill_rectangle", fill_rectangle)
+            .unwrap();
+
+        let draw_rectangle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x: i32,
+             y: i32,
+             width: i32,
+             height: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.draw_rectangle(
+                    Coordinate {
+                        x: x as isize,
+                        y: y as isize,
+                    },
+                    width as usize,
+                    height as usize,
+                    RGBA {
+                        r: r as u8,
+                        g: g as u8,
+                        b: b as u8,
+                        a: a as u8,
+                    },
+                );
+            },
+        );
+
+        linker
+            .define("agave", "draw_rectangle", draw_rectangle)
+            .unwrap();
+
+        let draw_line = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x0: i32,
+             y0: i32,
+             x1: i32,
+             y1: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.draw_line(
+                    Coordinate {
+                        x: x0 as isize,
+                        y: y0 as isize,
+                    },
+                    Coordinate {
+                        x: x1 as isize,
+                        y: y1 as isize,
+                    },
+                    RGBA {
+                        r: r as u8,
+                        g: g as u8,
+                        b: b as u8,
+                        a: a as u8,
+                    },
+                );
+            },
+        );
+
+        linker.define("agave", "draw_line", draw_line).unwrap();
+
         let set_pixel = Func::wrap(
             &mut store,
             |caller: Caller<'_, *mut FB>, x: i32, y: i32, r: i32, g: i32, b: i32, a: i32| {

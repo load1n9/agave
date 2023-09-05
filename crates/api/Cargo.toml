@@ -6,6 +6,10 @@ version = "0.1.1"
 edition = "2021"
 default-target = "x86_64-unknown-none"
 
+[lib]
+test = false
+bench = false
+
 [dependencies]
 object = { workspace = true }
 unix_str = { workspace = true }

@@ -1,9 +1,9 @@
 {
     "tasks": {
         "install-stuff": "cargo install cargo-wasi",
-        "build": "cargo build --release",
+        "build": "cargo run --release build",
         "build:app:test": "cd apps/test-app && cargo wasi build --release && cd ../..",
-        "run": "cargo build --release",
+        "run": "cargo run --release build",
         "run-qemu": "cargo run --release --bin qemu-bios",
         "run-all": "deno task build:app:test && deno task run-qemu",
         "qemu": "qemu-system-x86_64 -nodefaults -m 600M -smp 2 -device virtio-mouse-pci -device virtio-keyboard-pci -nic user,model=virtio-net-pci -device virtio-vga-gl -display sdl,gl=on -serial stdio -drive format=raw,file=./target/release/uefi.img -bios ovmf"

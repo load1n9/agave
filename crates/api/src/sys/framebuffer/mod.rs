@@ -664,3 +664,4 @@ fn get_bit(char_font: u8, i: isize) -> u8 {
 
 pub mod font;
 pub mod shapes;
+pub mod display;

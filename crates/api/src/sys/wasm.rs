@@ -44,7 +44,7 @@ impl WasmApp {
                 },
             )
             .unwrap();
-            text_display.set_text("Hello, world from AGAVE!");
+            text_display.set_text("Agave v0.1.2");
             text_display.display(Coordinate { x: 0, y: 0 }, fb).unwrap();
         });
 

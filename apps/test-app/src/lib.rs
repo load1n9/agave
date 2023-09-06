@@ -1,7 +1,4 @@
 use agave_lib::{draw_circle, get_dimensions, temp, Position, RGBA};
-use std::ffi::CString;
-
-static HELLO: &'static str = "hello from rust";
 
 #[no_mangle]
 pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {

@@ -3,7 +3,6 @@ use agave_lib::{draw_circle, get_dimensions, temp, Position, RGBA};
 #[no_mangle]
 pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
     let dim = get_dimensions();
-
     draw_circle(
         Position {
             x: mouse_x,

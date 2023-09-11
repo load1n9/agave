@@ -1,4 +1,4 @@
-#[allow(unused_mut)]
+#![allow(unused_mut)]
 use alloc::vec::Vec;
 use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
 
@@ -44,7 +44,7 @@ impl WasmApp {
                 },
             )
             .unwrap();
-            text_display.set_text("Agave v0.1.2");
+            text_display.set_text("Agave");
             text_display.display(Coordinate { x: 0, y: 0 }, fb).unwrap();
         });
 
@@ -979,7 +979,6 @@ impl WasmApp {
             .unwrap()
             .start(&mut store)
             .unwrap();
-
         Self { store, instance }
     }
 

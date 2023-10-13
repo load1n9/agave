@@ -1,5 +1,7 @@
 use core::any::Any;
 
+use alloc::string::String;
+
 pub struct RhaiEngine {
     engine: rhai::Engine,
 }
@@ -30,6 +32,10 @@ impl RhaiEngine {
         self.engine.register_fn(name, func);
     }
 
+    pub fn init(&mut self) {
+        self.register_fn("print", |x: String| log::info!("{:#?}", x));
+    }
+    
     pub fn eval<T: Any + Clone>(&mut self, code: &str) -> T {
         self.engine.eval_expression::<T>(code).unwrap()
     }

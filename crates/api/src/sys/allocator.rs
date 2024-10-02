@@ -37,7 +37,7 @@ impl AllocFromCtx {
             d: d_init,
         }
     }
-    pub fn new(
+    pub fn new(   
         a: extern "C" fn(alloc::alloc::Layout) -> *mut u8,
         d: extern "C" fn(*mut u8, alloc::alloc::Layout),
     ) -> Self {

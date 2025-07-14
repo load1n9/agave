@@ -30,8 +30,9 @@ pub struct TerminalApp {
     pub current_screen: Screen,
     pub command_buffer: [u8; 256],
     pub command_length: usize,
-    pub output_lines: [[u8; 80]; 24],
+    pub output_lines: [[u8; 80]; 200], // Increased buffer for scroll history
     pub output_line_count: usize,
+    pub scroll_offset: usize, // Current scroll position (0 = bottom/latest)
     pub uptime: u64,
     pub processes: [Process; 8],
     pub process_count: usize,
@@ -46,8 +47,9 @@ impl TerminalApp {
             current_screen: Screen::Main,
             command_buffer: [0; 256],
             command_length: 0,
-            output_lines: [[0; 80]; 24],
+            output_lines: [[0; 80]; 200], // Increased buffer size
             output_line_count: 0,
+            scroll_offset: 0, // Initialize scroll at bottom
             uptime: 0,
             processes: [
                 Process { pid: 1, name: "init", status: "running", memory: 1024 },
@@ -84,43 +86,57 @@ impl TerminalApp {
     }
 
     pub fn add_output_line(&mut self, text: &[u8]) {
-        if self.output_line_count < 24 {
+        // When adding new content, reset scroll to bottom to show latest
+        self.scroll_offset = 0;
+        
+        if self.output_line_count < 200 {
+            // Still have space in buffer
             let mut line = [0u8; 80];
             let len = text.len().min(79);
             line[..len].copy_from_slice(&text[..len]);
             self.output_lines[self.output_line_count] = line;
             self.output_line_count += 1;
         } else {
-            // Scroll up
-            for i in 0..23 {
+            // Buffer is full, scroll up (shift all lines up by 1)
+            for i in 0..199 {
                 self.output_lines[i] = self.output_lines[i + 1];
             }
+            // Add new line at the end
             let mut line = [0u8; 80];
             let len = text.len().min(79);
             line[..len].copy_from_slice(&text[..len]);
-            self.output_lines[23] = line;
+            self.output_lines[199] = line;
+            // Keep count at 200 (buffer is full)
         }
-        
-        // Auto-clear output when it gets too long to prevent memory issues
-        // Keep only the last 20 lines when we have 24 lines
-        if self.output_line_count >= 24 {
-            // Every so often, clear some old content to free up memory
-            static mut CLEAR_COUNTER: u32 = 0;
-            unsafe {
-                CLEAR_COUNTER += 1;
-                if CLEAR_COUNTER >= 50 { // After 50 scroll operations, do a partial clear
-                    // Keep only the last 15 lines
-                    for i in 0..15 {
-                        self.output_lines[i] = self.output_lines[i + 9];
-                    }
-                    // Clear the rest
-                    for i in 15..24 {
-                        self.output_lines[i] = [0u8; 80];
-                    }
-                    self.output_line_count = 15;
-                    CLEAR_COUNTER = 0;
-                }
-            }
-        }
+    }
+    
+    /// Scroll up in the output history
+    pub fn scroll_up(&mut self, lines: usize) {
+        let max_scroll = if self.output_line_count > 15 {
+            self.output_line_count - 15 // Keep at least 15 lines visible
+        } else {
+            0
+        };
+        self.scroll_offset = (self.scroll_offset + lines).min(max_scroll);
+    }
+    
+    /// Scroll down in the output history
+    pub fn scroll_down(&mut self, lines: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(lines);
+    }
+    
+    /// Jump to top of history
+    pub fn scroll_to_top(&mut self) {
+        let max_scroll = if self.output_line_count > 15 {
+            self.output_line_count - 15
+        } else {
+            0
+        };
+        self.scroll_offset = max_scroll;
+    }
+    
+    /// Jump to bottom of history (latest output)
+    pub fn scroll_to_bottom(&mut self) {
+        self.scroll_offset = 0;
     }
 }

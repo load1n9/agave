@@ -1,5 +1,6 @@
 # <img src="assets/Agave.png" width="70rem" /> Agave OS
 
+![Desktop Environment](assets/terminal.png)
 Agave OS is a simple operating system written in Rust with WASI support. It is designed to be lightweight, fast, and easy to use. It is also designed to be easy to customize and extend. Started from [Fomos](https://github.com/Ruddle/Fomos) and the second edition of
 [Writing an OS in Rust](https://os.phil-opp.com/) by Philipp Oppermann. Also contains code from [Theseus OS](https://github.com/theseus-os/Theseus)
 
@@ -68,27 +69,13 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 }
 ```
 
-### Available Graphics Functions
-
-- `clear_screen(color)` - Clear entire screen
-- `set_pixel(pos, color)` - Set individual pixel
-- `draw_circle(center, radius, color)` - Draw circle outline
-- `fill_circle(center, radius, color)` - Draw filled circle
-- `draw_rectangle(pos, width, height, color)` - Draw rectangle outline
-- `fill_rectangle(pos, width, height, color)` - Draw filled rectangle
-- `draw_line(start, end, color)` - Draw line between points
-- `draw_triangle(p1, p2, p3, color)` - Draw triangle outline
-- `get_dimensions()` - Get screen dimensions
-- `get_time_ms()` - Get system time in milliseconds
-
-### Color Constants
-
-- `RGBA::RED`, `RGBA::GREEN`, `RGBA::BLUE`
-- `RGBA::WHITE`, `RGBA::BLACK`, `RGBA::TRANSPARENT`
-
 ![Enhanced WASM app with animations](assets/demo.png)
 
 ## 🔧 Building and Running
+
+```powershell
+deno task run-all
+```
 
 ### Prerequisites
 
@@ -98,35 +85,7 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 ### Quick Start
 
 ```powershell
-# Build and run in debug mode
-deno task build
-
-# Build release version
-.\build.ps1 -Release
-
-# Build with tests
-.\build.ps1 -Test
-
-# Clean build
-.\build.ps1 -Clean
-
-# Verbose logging
-.\build.ps1 -Verbose -Run
-```
-
-### Manual Building
-
-```bash
-# Build test application
-cd apps/test-app
-cargo build --target wasm32-wasi --release
-
-# Build OS
-cd ../..
-cargo run --release build
-
-# Run with QEMU
-qemu-system-x86_64 -drive format=raw,file=target/release/bios.img -m 512M
+deno task run-all
 ```
 
 ## 📊 System Monitoring

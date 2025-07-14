@@ -7,9 +7,13 @@ use agave_lib::{
 use crate::types::TerminalApp;
 use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
 
-// Add up/down arrow keys for command history
+// Add arrow keys and page keys for navigation
 const KEY_UP: i32 = 103;
 const KEY_DOWN: i32 = 108;
+const KEY_PAGEUP: i32 = 104;
+const KEY_PAGEDOWN: i32 = 109;
+const KEY_HOME: i32 = 102;
+const KEY_END: i32 = 107;
 
 pub fn handle_keyboard_input() {
     unsafe {
@@ -50,9 +54,13 @@ pub fn handle_keyboard_input() {
                         continue;
                     }
                     
-                    // Check for Up arrow (command history)
+                    // Check for Up arrow - scroll history or command history
                     if key_code == KEY_UP {
-                        if COMMAND_HISTORY_INDEX > 0 {
+                        if TERMINAL.command_length == 0 {
+                            // No command typed, scroll up in output history
+                            TERMINAL.scroll_up(3);
+                        } else if COMMAND_HISTORY_INDEX > 0 {
+                            // Command typed, navigate command history
                             COMMAND_HISTORY_INDEX -= 1;
                             // Load command from history
                             TERMINAL.command_length = 0;
@@ -67,9 +75,13 @@ pub fn handle_keyboard_input() {
                         continue;
                     }
                     
-                    // Check for Down arrow (command history)
+                    // Check for Down arrow - scroll history or command history
                     if key_code == KEY_DOWN {
-                        if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
+                        if TERMINAL.command_length == 0 {
+                            // No command typed, scroll down in output history
+                            TERMINAL.scroll_down(3);
+                        } else if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
+                            // Command typed, navigate command history
                             COMMAND_HISTORY_INDEX += 1;
                             if COMMAND_HISTORY_INDEX >= COMMAND_HISTORY_COUNT {
                                 // Clear command line
@@ -89,6 +101,30 @@ pub fn handle_keyboard_input() {
                                 }
                             }
                         }
+                        continue;
+                    }
+                    
+                    // Check for Page Up - scroll up faster
+                    if key_code == KEY_PAGEUP {
+                        TERMINAL.scroll_up(10);
+                        continue;
+                    }
+                    
+                    // Check for Page Down - scroll down faster  
+                    if key_code == KEY_PAGEDOWN {
+                        TERMINAL.scroll_down(10);
+                        continue;
+                    }
+                    
+                    // Check for Home - jump to top of history
+                    if key_code == KEY_HOME && TERMINAL.command_length == 0 {
+                        TERMINAL.scroll_to_top();
+                        continue;
+                    }
+                    
+                    // Check for End - jump to bottom of history
+                    if key_code == KEY_END && TERMINAL.command_length == 0 {
+                        TERMINAL.scroll_to_bottom();
                         continue;
                     }
                     

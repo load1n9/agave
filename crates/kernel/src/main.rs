@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+
+
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
     allocator, drivers,
@@ -8,6 +10,7 @@ use agave_api::sys::{
     gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
     memory::{self, BootInfoFrameAllocator},
+    monitor,
     pci,
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
@@ -24,27 +27,22 @@ use x86_64::{
     structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
     PhysAddr, VirtAddr,
 };
-
 extern crate agave_api;
 extern crate alloc;
 
+// Entry point configuration
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
     config.mappings.physical_memory = Some(Mapping::Dynamic);
     config.kernel_stack_size = 128 * 1024;
     config
 };
-
 entry_point!(main, config = &CONFIG);
 
-#[allow(unused_variables)]
 fn main(boot_info: &'static mut BootInfo) -> ! {
-    gdt::init();
-    interrupts::init_idt();
-
+    // Initialize framebuffer and logger FIRST
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
     let fbinfo = framebuffer.info();
-
     let fbm = framebuffer.buffer_mut();
     let fbm2 = unsafe {
         let p = fbm.as_mut_ptr();
@@ -52,6 +50,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     };
 
     init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
+    log::info!("KERNEL: Starting main() function - logger initialized");
+    
+    // Now initialize GDT and IDT
+    log::info!("KERNEL: Initializing GDT");
+    gdt::init();
+    log::info!("KERNEL: Initializing IDT");
+    interrupts::init_idt();
+    log::info!("KERNEL: Basic initialization complete");
 
     let virtual_full_mapping_offset = VirtAddr::new(
         boot_info
@@ -108,7 +114,13 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     }
 
     with_mapper_framealloc(|mapper, frame_allocator| {
-        allocator::init_heap(mapper, frame_allocator).expect("heap initialization failed");
+        match allocator::init_heap(mapper, frame_allocator) {
+            Ok(()) => log::info!("Heap initialization successful"),
+            Err(e) => {
+                log::error!("Heap initialization failed: {}", e);
+                panic!("Failed to initialize heap");
+            }
+        }
     });
 
     let rsdp_addr = boot_info.rsdp_addr.into_option().expect("no rsdp");
@@ -119,16 +131,21 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     // log::info!("{:#?}]", x);
 
     let pi = acpi_tables.platform_info().expect("platform info");
+    log::info!("ACPI platform info obtained");
 
     if let InterruptModel::Apic(apic) = pi.interrupt_model {
+        log::info!("Setting up APIC interrupts...");
         // log::info!("{:#?}", apic);
 
         unsafe {
+            log::info!("Initializing local APIC...");
             // log::info!("init apic");
             let lapic = local_apic::LocalApic::init(PhysAddr::new(apic.local_apic_address));
+            log::info!("Local APIC initialized");
             // log::info!("start apic c");
             let mut freq = 1000_000_000;
             if let Some(cpuid) = local_apic::cpuid() {
+                log::info!("CPUID info obtained");
                 // log::info!("cpuid");
                 if let Some(tsc) = cpuid.get_tsc_info() {
                     // log::info!(
@@ -140,13 +157,16 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 } else {
                 }
             }
+            log::info!("Setting APIC timer configuration...");
             lapic.set_div_conf(0b1011);
             // log::info!("start apic c");
             lapic.set_lvt_timer((1 << 17) + 48);
             let wanted_freq_hz = 1000;
             lapic.set_init_count(freq / wanted_freq_hz);
+            log::info!("APIC timer configured");
         }
 
+        log::info!("Setting up IO APICs...");
         for io_apic in apic.io_apics.iter() {
             // log::info!("{:x}", io_apic.address);
             let ioa = ioapic::IoApic::init(io_apic);
@@ -162,13 +182,18 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 ioa.write_redtlb(i, stored);
             }
         }
+        log::info!("IO APICs configured");
 
+        log::info!("Enabling interrupts...");
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         x86_64::instructions::interrupts::enable();
+        log::info!("Interrupts enabled");
 
         // #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         // x86_64::instructions::interrupts::disable();
     }
+
+    log::info!("APIC setup complete, proceeding to PCI discovery...");
 
     {
         // aml::AmlContext::new()
@@ -187,11 +212,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     //     log::info!("{:?}", ent);
     // }
 
+    log::info!("Starting PCI device discovery...");
     let pcis = pci::Pcis::new();
+    log::info!("Found {} PCI devices", pcis.devs.len());
 
     let mut virtio_devices = Vec::new();
 
     {
+        log::info!("Scanning for VirtIO devices...");
         for (pci_index, pci) in pcis.devs.iter().enumerate() {
             let _vector_base = 50 + 2 * pci_index;
             let _status = pci.config_read_u16(pci::PCIConfigRegisters::PCIStatus as u8);
@@ -209,67 +237,160 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             // );
             const VIRTIO_VENDOR_ID: u16 = 0x1af4;
             if vendor == VIRTIO_VENDOR_ID {
+                log::info!("Found VirtIO device at PCI index {}", pci_index);
                 let virtio = with_mapper_framealloc(|mapper, frame_allocator| {
                     Virtio::init(pci, mapper, frame_allocator)
                 });
                 if let Some(virtio) = virtio {
+                    log::info!("VirtIO device initialized successfully");
                     virtio_devices.push(virtio);
+                } else {
+                    log::warn!("Failed to initialize VirtIO device");
                 }
             }
         }
+        log::info!("VirtIO device scan complete, found {} devices", virtio_devices.len());
     }
 
+    log::info!("Setting up framebuffer...");
+
+    log::info!("Setting up framebuffer...");
     let mut fb = Box::new(FB::new(&fbinfo));
     let fb_clone: *mut FB = &mut *fb;
+    log::info!("Framebuffer created at {:?}", fb_clone);
     // log::info!("fbclone {:?}", fb_clone);
 
+    // Initialize monitoring system
+    log::info!("Initializing system monitoring...");
+    monitor::init_monitoring();
+    log::info!("System monitoring enabled");
+
+    // Log initial system status
+    log::info!("Logging initial system status...");
+    monitor::log_system_status();
+
+    log::info!("Setting up task executor...");
     {
         let mut executor = task::executor::Executor::new();
         let spawner = executor.spawner();
+        log::info!("Task executor created");
 
+        log::info!("Setting up VirtIO device drivers...");
         for virtio in virtio_devices.into_iter() {
             match virtio.device_type {
-                DeviceType::Input => spawner.run(drivers::virtio_input::drive(virtio)),
-                DeviceType::Gpu => spawner.run(drivers::virtio_gpu::drive(
-                    virtio,
-                    spawner.clone(),
-                    fb_clone,
-                )),
+                DeviceType::Input => {
+                    log::info!("Spawning VirtIO input driver task");
+                    spawner.run(drivers::virtio_input::drive(virtio));
+                }
+                DeviceType::Gpu => {
+                    log::info!("Spawning VirtIO GPU driver task");
+                    spawner.run(drivers::virtio_gpu::drive(
+                        virtio,
+                        spawner.clone(),
+                        fb_clone,
+                    ));
+                }
             }
         }
+        log::info!("VirtIO drivers spawned");
 
+        log::info!("Setting up WASM application task...");
         spawner.run(async move {
+            log::info!("WASM task started - loading applications...");
             let mut apps: Vec<WasmApp> = Vec::new();
             let apps_raw = [
-                &include_bytes!("../../../apps/test-app/target/wasm32-wasi/release/test_app.wasm")
+                &include_bytes!("../../../apps/test-app/target/wasm32-wasip1/release/test_app.wasm")
                     [..],
                 // &include_bytes!("../../../apps/zig-app/zig-out/lib/zig-app.wasm")[..],
                 // &include_bytes!("../../../disk/bin/hello.wasm")[..],
                 // &include_bytes!("../../../disk/bin/sqlite.wasm")[..],
             ];
+            log::info!("Creating WASM app instances...");
             for app_bytes in apps_raw.iter() {
+                log::info!("Creating WASM app from {} bytes", app_bytes.len());
                 apps.push(WasmApp::new(app_bytes.to_vec(), fb_clone));
             }
+            log::info!("Created {} WASM apps", apps.len());
 
+            log::info!("Initializing WASM applications...");
             for app in apps.iter_mut() {
+                log::info!("Calling WASM app initialization...");
                 app.call();
             }
+            log::info!("WASM apps initialized");
 
+            let mut frame_counter = 0u64;
+            let mut last_monitor_check = 0u64;
+            
+            log::info!("Starting main application loop...");
             loop {
                 globals::INPUT.update(|e| e.step());
                 let input = globals::INPUT.read();
                 for app in apps.iter_mut() {
                     app.call_update(input);
                 }
+                
+                frame_counter += 1;
+                
+                // Periodic monitoring (every ~1000 frames, roughly once per second)
+                if frame_counter % 1000 == 0 {
+                    let current_time = agave_api::sys::interrupts::TIME_MS
+                        .load(core::sync::atomic::Ordering::Relaxed);
+                    
+                    // Run monitoring check every 10 seconds
+                    if current_time - last_monitor_check > 10000 {
+                        monitor::periodic_monitor_check();
+                        last_monitor_check = current_time;
+                    }
+                    
+                    // Log system status every 30 seconds
+                    if frame_counter % 30000 == 0 {
+                        monitor::log_system_status();
+                    }
+                }
+                
                 yield_once().await;
             }
         });
+        log::info!("WASM task spawned, starting executor...");
         executor.run();
     }
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    log::error!("{:?}", info);
-    loop {}
+    // Disable interrupts to prevent further issues
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    x86_64::instructions::interrupts::disable();
+    
+    log::error!("=== KERNEL PANIC ===");
+    log::error!("Panic info: {:?}", info);
+    
+    // Log system state at panic
+    log::error!("System uptime: {}ms", 
+        agave_api::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed));
+    
+    // Log memory state
+    let memory_stats = agave_api::sys::allocator::memory_stats();
+    log::error!("Memory usage: {}/{} bytes ({:.1}%)", 
+        memory_stats.allocated, 
+        memory_stats.heap_size,
+        memory_stats.utilization_percent());
+    
+    // Log task metrics
+    {
+        let task_metrics = agave_api::sys::task::executor::TASK_METRICS.lock();
+        log::error!("Tasks: {} spawned, {} completed, {} context switches",
+            task_metrics.total_tasks_spawned,
+            task_metrics.tasks_completed,
+            task_metrics.context_switches);
+    }
+    
+    log::error!("System halted due to panic");
+    
+    loop {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        x86_64::instructions::hlt();
+    }
 }
+

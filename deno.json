@@ -2,7 +2,7 @@
     "tasks": {
         "install-stuff": "cargo install cargo-wasi",
         "build": "cargo run --release build",
-        "build:app:test": "cd apps/test-app && cargo wasi build --release && cd ../..",
+        "build:app:test": "cd apps/test-app && cargo build --release --target wasm32-wasip1 && cd ../..",
         "run": "cargo run --release build",
         "run-qemu": "cargo run --release --bin qemu-bios",
         "run-all": "deno task build:app:test && deno task run-qemu",

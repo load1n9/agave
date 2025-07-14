@@ -19,6 +19,7 @@ pub struct WasmApp {
 
 impl WasmApp {
     pub fn new(wasm: Vec<u8>, val: *mut FB) -> Self {
+        log::info!("WASM: Creating new WASM app with {} bytes", wasm.len());
         let engine = Engine::default();
         let module = Module::new(&engine, &wasm[..]).unwrap();
 
@@ -26,7 +27,10 @@ impl WasmApp {
 
         let mut linker = <Linker<*mut FB>>::new(&engine);
 
+        log::info!("WASM: Setting up function bindings...");
+
         let temp = Func::wrap(&mut store, |caller: Caller<'_, *mut FB>| {
+            log::trace!("WASM: temp function called");
             let fb = unsafe { caller.data().as_mut().unwrap() };
             let mut text_display = TextDisplay::new(
                 400,
@@ -61,6 +65,7 @@ impl WasmApp {
              g: i32,
              b: i32,
              a: i32| {
+                log::trace!("WASM: draw_circle called at ({}, {}) radius {} color ({},{},{},{})", x, y, radius, r, g, b, a);
                 let fb = unsafe { caller.data().as_mut().unwrap() };
                 fb.draw_circle(
                     Coordinate {
@@ -78,6 +83,80 @@ impl WasmApp {
             },
         );
         linker.define("agave", "draw_circle", draw_circle).unwrap();
+
+        // Add fill_circle function
+        let fill_circle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x: i32,
+             y: i32,
+             radius: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                // Fill circle using Bresenham circle algorithm
+                for dy in -radius..=radius {
+                    for dx in -radius..=radius {
+                        if dx * dx + dy * dy <= radius * radius {
+                            let px = x + dx;
+                            let py = y + dy;
+                            if px >= 0 && py >= 0 && px < fb.w as i32 && py < fb.h as i32 {
+                                if let Some(pixel) = fb.pixels.get_mut((py * fb.w as i32 + px) as usize) {
+                                    pixel.r = r as u8;
+                                    pixel.g = g as u8;
+                                    pixel.b = b as u8;
+                                    pixel.a = a as u8;
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        );
+
+        linker.define("agave", "fill_circle", fill_circle).unwrap();
+
+        // Add draw_triangle function  
+        let draw_triangle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x1: i32, y1: i32,
+             x2: i32, y2: i32,
+             x3: i32, y3: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                let color = RGBA {
+                    r: r as u8,
+                    g: g as u8,
+                    b: b as u8,
+                    a: a as u8,
+                };
+                
+                // Draw triangle edges
+                fb.draw_line(
+                    Coordinate { x: x1 as isize, y: y1 as isize },
+                    Coordinate { x: x2 as isize, y: y2 as isize },
+                    color,
+                );
+                fb.draw_line(
+                    Coordinate { x: x2 as isize, y: y2 as isize },
+                    Coordinate { x: x3 as isize, y: y3 as isize },
+                    color,
+                );
+                fb.draw_line(
+                    Coordinate { x: x3 as isize, y: y3 as isize },
+                    Coordinate { x: x1 as isize, y: y1 as isize },
+                    color,
+                );
+            },
+        );
+
+        linker.define("agave", "draw_triangle", draw_triangle).unwrap();
 
         let fill_rectangle = Func::wrap(
             &mut store,
@@ -240,6 +319,12 @@ impl WasmApp {
 
         linker.define("agave", "get_height", get_height).unwrap();
 
+        let get_time_ms = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> u64 {
+            crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed)
+        });
+
+        linker.define("agave", "get_time_ms", get_time_ms).unwrap();
+
         // Link comprehensive WASI Preview 1 implementation
         wasi::preview1::link_preview1_functions(&mut linker, &mut store).unwrap();
 
@@ -252,19 +337,25 @@ impl WasmApp {
     }
 
     pub fn call(&mut self) {
+        log::info!("WASM: Calling _start function");
         let start = self
             .instance
             .get_typed_func::<(), ()>(&self.store, "_start");
 
         match start {
             Ok(start) => {
+                log::info!("WASM: Found _start function, executing...");
                 start.call(&mut self.store, ()).unwrap();
+                log::info!("WASM: _start function completed");
             }
-            Err(_) => {}
+            Err(e) => {
+                log::warn!("WASM: No _start function found: {:?}", e);
+            }
         }
     }
 
     pub fn call_update(&mut self, input: Input) {
+        log::trace!("WASM: Calling update function with mouse: ({}, {})", input.mouse_x, input.mouse_y);
         let update = self
             .instance
             .get_typed_func::<(i32, i32), ()>(&self.store, "update");
@@ -278,7 +369,9 @@ impl WasmApp {
                     )
                     .unwrap();
             }
-            Err(_) => {}
+            Err(e) => {
+                log::trace!("WASM: No update function found: {:?}", e);
+            }
         }
     }
 }

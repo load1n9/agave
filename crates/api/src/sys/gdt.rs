@@ -20,11 +20,11 @@ const STACK_SIZE: usize = 4 * 1024; //4096 * 5; other option: const STACK_SIZE: 
 lazy_static! {
     pub static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
-        let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
-        let data_selector = gdt.add_entry(Descriptor::kernel_data_segment());
-        let user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
-        let user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
-        let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
+        let code_selector = gdt.append(Descriptor::kernel_code_segment());
+        let data_selector = gdt.append(Descriptor::kernel_data_segment());
+        let user_code_selector = gdt.append(Descriptor::user_code_segment());
+        let user_data_selector = gdt.append(Descriptor::user_data_segment());
+        let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
         (
             gdt,
             Selectors {
@@ -52,7 +52,7 @@ lazy_static! {
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
             #[allow(static_mut_refs)]
             let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
-            let stack_end = stack_start + STACK_SIZE;
+            let stack_end = stack_start + STACK_SIZE as u64;
             stack_end
         };
         tss

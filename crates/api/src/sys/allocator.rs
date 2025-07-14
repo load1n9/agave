@@ -37,7 +37,7 @@ impl AllocFromCtx {
             d: d_init,
         }
     }
-    pub fn new(   
+    pub fn new(
         a: extern "C" fn(alloc::alloc::Layout) -> *mut u8,
         d: extern "C" fn(*mut u8, alloc::alloc::Layout),
     ) -> Self {
@@ -61,7 +61,7 @@ pub fn init_heap(
 ) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
+        let heap_end = heap_start + HEAP_SIZE as u64 - 1u64;
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)

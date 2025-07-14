@@ -2,7 +2,6 @@
 #![allow(internal_features)]
 #![feature(core_intrinsics)]
 #![feature(abi_x86_interrupt)]
-#![feature(strict_provenance)]
 #![feature(allocator_api)]
 
 extern crate alloc;

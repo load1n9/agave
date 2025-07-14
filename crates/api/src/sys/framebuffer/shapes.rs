@@ -1,5 +1,5 @@
-use core::ops::{Add, Sub};
 use core::cmp::{Ord, Ordering};
+use core::ops::{Add, Sub};
 
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Coordinate {
@@ -17,7 +17,10 @@ impl Add<(isize, isize)> for Coordinate {
     type Output = Coordinate;
 
     fn add(self, rhs: (isize, isize)) -> Coordinate {
-        Coordinate { x: self.x + rhs.0, y: self.y + rhs.1 }
+        Coordinate {
+            x: self.x + rhs.0,
+            y: self.y + rhs.1,
+        }
     }
 }
 
@@ -25,7 +28,10 @@ impl Sub<(isize, isize)> for Coordinate {
     type Output = Coordinate;
 
     fn sub(self, rhs: (isize, isize)) -> Coordinate {
-        Coordinate { x: self.x - rhs.0, y: self.y - rhs.1 }
+        Coordinate {
+            x: self.x - rhs.0,
+            y: self.y - rhs.1,
+        }
     }
 }
 
@@ -67,8 +73,7 @@ impl PartialOrd for Coordinate {
     }
 }
 
-impl Eq for Coordinate { }
-
+impl Eq for Coordinate {}
 
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Rectangle {

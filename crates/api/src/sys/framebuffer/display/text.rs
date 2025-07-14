@@ -1,16 +1,19 @@
 use alloc::string::String;
 
-use crate::sys::framebuffer::{RGBA, shapes::{Rectangle, Coordinate}, FB, font::{CHARACTER_HEIGHT, CHARACTER_WIDTH}};
+use crate::sys::framebuffer::{
+    font::{CHARACTER_HEIGHT, CHARACTER_WIDTH},
+    shapes::{Coordinate, Rectangle},
+    FB, RGBA,
+};
 
 use super::Displayable;
-
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 #[derive(Debug)]
 pub struct TextDisplay {
     width: usize,
     height: usize,
-    /// The position where the next character will be displayed. 
+    /// The position where the next character will be displayed.
     /// This is updated after each `display()` invocation, and is useful for optimization.
     next_col: usize,
     next_line: usize,
@@ -22,20 +25,21 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display (
+    fn display(
         &mut self,
         coordinate: Coordinate,
         framebuffer: &mut FB,
     ) -> Result<Rectangle, &'static str> {
-        let (string, col, line) = if !self.cache.is_empty() && self.text.starts_with(self.cache.as_str()) {
-            (
-                &self.text.as_str()[self.cache.len()..self.text.len()],
-                self.next_col,
-                self.next_line,
-            )
-        } else {
-            (self.text.as_str(), 0, 0)
-        };
+        let (string, col, line) =
+            if !self.cache.is_empty() && self.text.starts_with(self.cache.as_str()) {
+                (
+                    &self.text.as_str()[self.cache.len()..self.text.len()],
+                    self.next_col,
+                    self.next_line,
+                )
+            } else {
+                (self.text.as_str(), 0, 0)
+            };
 
         let (next_col, next_line, mut bounding_box) = framebuffer.print_string(
             coordinate,
@@ -49,7 +53,7 @@ impl Displayable for TextDisplay {
         );
 
         if next_line < self.next_line as isize {
-            bounding_box.bottom_right.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
+            bounding_box.bottom_right.y = ((self.next_line + 1) * CHARACTER_HEIGHT) as isize
         }
 
         self.next_col = next_col as usize;
@@ -96,7 +100,7 @@ impl TextDisplay {
     pub fn get_bg_color(&self) -> RGBA {
         self.bg_color
     }
-    
+
     /// Clear the cache of the text displayable.
     pub fn reset_cache(&mut self) {
         self.cache = String::new();

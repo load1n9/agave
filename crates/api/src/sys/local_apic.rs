@@ -10,9 +10,9 @@ pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
 pub fn cpuid() -> Option<CpuId> {
     //TODO: ensure that CPUID exists! https://wiki.osdev.org/CPUID#Checking_CPUID_availability
     Some(CpuId::with_cpuid_fn(|a, c| {
-        let result = unsafe { 
+        let result = unsafe {
             #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-            core::arch::x86_64::__cpuid_count(a, c) 
+            core::arch::x86_64::__cpuid_count(a, c)
         };
         CpuIdResult {
             eax: result.eax,

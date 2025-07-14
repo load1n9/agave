@@ -47,7 +47,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = { version = "0.4.17", default-features = false }
 libm = "0.2.6"
 linked_list_allocator = "0.9.0"
-noto-sans-mono-bitmap = { version = "0.3.0", default_features = false, features = [
+noto-sans-mono-bitmap = { version = "0.3.0", default-features = false, features = [
     "regular",
     "size_16",
     "unicode-basic-latin",
@@ -74,7 +74,7 @@ wasi = { version = "0.7.0", features = [], default-features = false }
 # wasi-common = { git = "https://github.com/theseus-os/wasmtime", branch = "no_std_support"}
 wasmi = { version = "0.31.0", default-features = false }
 xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
-x86_64 = { version = "0.14.10" }
+x86_64 = "0.15"
 
 
 [build-dependencies]

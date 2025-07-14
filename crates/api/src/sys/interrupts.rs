@@ -30,10 +30,11 @@ lazy_static! {
         idt.invalid_opcode.set_handler_fn(invalid_opcode);
         idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded);
         idt.general_protection_fault.set_handler_fn(general_protection_fault);
-        unsafe {
-            idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); // new
-        }
+        // TODO: Fix double fault handler type mismatch
+        // unsafe {
+        //     idt.double_fault.set_handler_fn(double_fault_handler)
+        //         .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+        // }
         unsafe {
             idt.overflow.set_handler_fn(overflow_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); // new
@@ -257,11 +258,20 @@ extern "x86-interrupt" fn alignment_check_handler(
     panic!("");
 }
 
-extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: InterruptStackFrame,
-    _error_code: u64,
-) -> ! {
-    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+fn double_fault_handler_impl(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+    panic!(
+        "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",
+        stack_frame, error_code
+    );
+}
+
+extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!(
+        "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",
+        stack_frame, error_code
+    );
+    #[allow(unreachable_code)]
+    loop {}
 }
 
 extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, _error_code: u64) {

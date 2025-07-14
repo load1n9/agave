@@ -656,8 +656,334 @@ impl FB {
             }
         }
     }
-}
 
+    /// Draw a gradient between two colors
+    pub fn fill_gradient(&mut self, start: Coordinate, end: Coordinate, color1: RGBA, color2: RGBA) {
+        let width = (end.x - start.x).abs() as f32;
+        let height = (end.y - start.y).abs() as f32;
+        let is_horizontal = width > height;
+        
+        if is_horizontal {
+            for x in start.x..=end.x {
+                let progress = (x - start.x) as f32 / width;
+                let blended_color = self.blend_colors(color1, color2, progress);
+                
+                for y in start.y..=end.y {
+                    let coord = Coordinate::new(x, y);
+                    if self.contains(coord) {
+                        self.set_pixel(coord, blended_color);
+                    }
+                }
+            }
+        } else {
+            for y in start.y..=end.y {
+                let progress = (y - start.y) as f32 / height;
+                let blended_color = self.blend_colors(color1, color2, progress);
+                
+                for x in start.x..=end.x {
+                    let coord = Coordinate::new(x, y);
+                    if self.contains(coord) {
+                        self.set_pixel(coord, blended_color);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Blend two colors with alpha interpolation
+    fn blend_colors(&self, color1: RGBA, color2: RGBA, progress: f32) -> RGBA {
+        let progress = progress.max(0.0).min(1.0);
+        let inv_progress = 1.0 - progress;
+        
+        RGBA {
+            r: (color1.r as f32 * inv_progress + color2.r as f32 * progress) as u8,
+            g: (color1.g as f32 * inv_progress + color2.g as f32 * progress) as u8,
+            b: (color1.b as f32 * inv_progress + color2.b as f32 * progress) as u8,
+            a: (color1.a as f32 * inv_progress + color2.a as f32 * progress) as u8,
+        }
+    }
+
+    /// Draw an antialiased line using Xiaolin Wu's algorithm
+    pub fn draw_line_aa(&mut self, start: Coordinate, end: Coordinate, color: RGBA) {
+        let dx = (end.x - start.x).abs();
+        let dy = (end.y - start.y).abs();
+        let steep = dy > dx;
+        
+        let (x0, y0, x1, y1) = if steep {
+            (start.y, start.x, end.y, end.x)
+        } else {
+            (start.x, start.y, end.x, end.y)
+        };
+        
+        let (x0, y0, x1, y1) = if x0 > x1 {
+            (x1, y1, x0, y0)
+        } else {
+            (x0, y0, x1, y1)
+        };
+        
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let gradient = if dx == 0 { 1.0 } else { dy as f32 / dx as f32 };
+        
+        // Handle first endpoint
+        let xend = x0;
+        let yend = y0 as f32 + gradient * (xend - x0) as f32;
+        let xgap = 1.0 - ((x0 as f32 + 0.5) - x0 as f32);
+        let xpxl1 = xend;
+        let ypxl1 = yend as isize;
+        
+        if steep {
+            self.plot_aa(ypxl1, xpxl1, color, (1.0 - (yend - ypxl1 as f32)) * xgap);
+            self.plot_aa(ypxl1 + 1, xpxl1, color, (yend - ypxl1 as f32) * xgap);
+        } else {
+            self.plot_aa(xpxl1, ypxl1, color, (1.0 - (yend - ypxl1 as f32)) * xgap);
+            self.plot_aa(xpxl1, ypxl1 + 1, color, (yend - ypxl1 as f32) * xgap);
+        }
+        
+        let mut intery = yend + gradient;
+        
+        // Handle second endpoint
+        let xend = x1;
+        let yend = y1 as f32 + gradient * (xend - x1) as f32;
+        let xgap = (x1 as f32 + 0.5) - x1 as f32;
+        let xpxl2 = xend;
+        let ypxl2 = yend as isize;
+        
+        if steep {
+            self.plot_aa(ypxl2, xpxl2, color, (1.0 - (yend - ypxl2 as f32)) * xgap);
+            self.plot_aa(ypxl2 + 1, xpxl2, color, (yend - ypxl2 as f32) * xgap);
+        } else {
+            self.plot_aa(xpxl2, ypxl2, color, (1.0 - (yend - ypxl2 as f32)) * xgap);
+            self.plot_aa(xpxl2, ypxl2 + 1, color, (yend - ypxl2 as f32) * xgap);
+        }
+        
+        // Main loop
+        for x in (xpxl1 + 1)..xpxl2 {
+            let intery_int = intery as isize;
+            let fract = intery - intery_int as f32;
+            if steep {
+                self.plot_aa(intery_int, x, color, 1.0 - fract);
+                self.plot_aa(intery_int + 1, x, color, fract);
+            } else {
+                self.plot_aa(x, intery_int, color, 1.0 - fract);
+                self.plot_aa(x, intery_int + 1, color, fract);
+            }
+            intery += gradient;
+        }
+    }
+
+    /// Plot a pixel with alpha blending for antialiasing
+    fn plot_aa(&mut self, x: isize, y: isize, color: RGBA, alpha: f32) {
+        let coord = Coordinate::new(x, y);
+        if self.contains(coord) {
+            let blended_color = RGBA {
+                r: color.r,
+                g: color.g,
+                b: color.b,
+                a: (color.a as f32 * alpha) as u8,
+            };
+            self.set_pixel_blend(coord, blended_color);
+        }
+    }
+
+    /// Set pixel with alpha blending
+    pub fn set_pixel_blend(&mut self, coord: Coordinate, color: RGBA) {
+        if !self.contains(coord) {
+            return;
+        }
+        
+        let idx = coord.x as usize + self.w * coord.y as usize;
+        let existing = self.pixels[idx];
+        
+        let alpha = color.a as f32 / 255.0;
+        let inv_alpha = 1.0 - alpha;
+        
+        self.pixels[idx] = RGBA {
+            r: (color.r as f32 * alpha + existing.r as f32 * inv_alpha) as u8,
+            g: (color.g as f32 * alpha + existing.g as f32 * inv_alpha) as u8,
+            b: (color.b as f32 * alpha + existing.b as f32 * inv_alpha) as u8,
+            a: ((color.a as f32 * alpha + existing.a as f32 * inv_alpha)).min(255.0) as u8,
+        };
+    }
+
+    /// Draw a rounded rectangle
+    pub fn draw_rounded_rectangle(&mut self, coordinate: Coordinate, width: usize, height: usize, radius: usize, color: RGBA) {
+        let radius = radius.min(width / 2).min(height / 2);
+        
+        // Draw the main rectangles
+        self.fill_rectangle(
+            coordinate + (radius as isize, 0),
+            width - 2 * radius,
+            height,
+            color
+        );
+        self.fill_rectangle(
+            coordinate + (0, radius as isize),
+            width,
+            height - 2 * radius,
+            color
+        );
+        
+        // Draw the rounded corners
+        let corners = [
+            (coordinate + (radius as isize, radius as isize)),              // Top-left
+            (coordinate + ((width - radius) as isize, radius as isize)),    // Top-right
+            (coordinate + (radius as isize, (height - radius) as isize)),   // Bottom-left
+            (coordinate + ((width - radius) as isize, (height - radius) as isize)), // Bottom-right
+        ];
+        
+        for &corner in &corners {
+            self.draw_circle_filled(corner, radius, color);
+        }
+    }
+
+    /// Draw a filled circle
+    pub fn draw_circle_filled(&mut self, center: Coordinate, radius: usize, color: RGBA) {
+        let radius_sq = (radius * radius) as isize;
+        let r = radius as isize;
+        
+        for y in -r..=r {
+            for x in -r..=r {
+                if x * x + y * y <= radius_sq {
+                    let coord = center + (x, y);
+                    if self.contains(coord) {
+                        self.set_pixel(coord, color);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw a shadow effect
+    pub fn draw_shadow(&mut self, coordinate: Coordinate, width: usize, height: usize, blur_radius: usize, color: RGBA) {
+        let shadow_offset = Coordinate::new(blur_radius as isize / 2, blur_radius as isize / 2);
+        let shadow_coord = coordinate + (shadow_offset.x, shadow_offset.y);
+        
+        for y in 0..height + blur_radius {
+            for x in 0..width + blur_radius {
+                let coord = shadow_coord + (x as isize, y as isize);
+                if self.contains(coord) {
+                    // Simple shadow - could be enhanced with proper gaussian blur
+                    let distance_from_edge = {
+                        let dx = if x < blur_radius { blur_radius - x } else if x >= width { x - width + 1 } else { 0 };
+                        let dy = if y < blur_radius { blur_radius - y } else if y >= height { y - height + 1 } else { 0 };
+                        // Simple integer square root approximation
+                        let dist_sq = dx * dx + dy * dy;
+                        if dist_sq == 0 { 0.0 } else {
+                            // Newton's method approximation
+                            let mut guess = (dist_sq / 2) as f32;
+                            for _ in 0..3 { // 3 iterations for reasonable accuracy
+                                guess = (guess + dist_sq as f32 / guess) / 2.0;
+                            }
+                            guess
+                        }
+                    };
+                    
+                    if distance_from_edge <= blur_radius as f32 {
+                        let alpha_factor = 1.0 - (distance_from_edge / blur_radius as f32);
+                        let shadow_color = RGBA {
+                            r: color.r,
+                            g: color.g,
+                            b: color.b,
+                            a: (color.a as f32 * alpha_factor * 0.3) as u8,
+                        };
+                        self.set_pixel_blend(coord, shadow_color);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw text with enhanced rendering options
+    pub fn draw_text_enhanced(&mut self, coordinate: Coordinate, text: &str, color: RGBA, background: Option<RGBA>, scale: usize) {
+        let scale = scale.max(1);
+        let char_width = CHARACTER_WIDTH * scale;
+        let char_height = CHARACTER_HEIGHT * scale;
+        
+        for (i, byte) in text.bytes().enumerate() {
+            let char_coord = coordinate + ((i * char_width) as isize, 0);
+            
+            // Draw background if specified
+            if let Some(bg_color) = background {
+                self.fill_rectangle(char_coord, char_width, char_height, bg_color);
+            }
+            
+            // Draw character with scaling
+            self.print_ascii_character_scaled(byte, color, char_coord, scale);
+        }
+    }
+
+    /// Print ASCII character with scaling support
+    fn print_ascii_character_scaled(&mut self, character: Ascii, color: RGBA, coordinate: Coordinate, scale: usize) {
+        let scale = scale.max(1);
+        
+        for i in 0..(CHARACTER_HEIGHT) {
+            for j in 0..(CHARACTER_WIDTH - 1) {  // -1 because font is 7 pixels wide
+                let char_font = self::font::FONT_BASIC[character as usize][i];
+                if get_bit(char_font as u8, j as isize) != 0 {
+                    // Draw scaled pixel
+                    for sy in 0..scale {
+                        for sx in 0..scale {
+                            let pixel_coord = coordinate + (
+                                (j * scale + sx) as isize,
+                                (i * scale + sy) as isize
+                            );
+                            if self.contains(pixel_coord) {
+                                self.set_pixel(pixel_coord, color);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Draw a bezier curve
+    pub fn draw_bezier_curve(&mut self, p0: Coordinate, p1: Coordinate, p2: Coordinate, p3: Coordinate, color: RGBA, segments: usize) {
+        let segments = segments.max(10);
+        let mut prev_point = p0;
+        
+        for i in 1..=segments {
+            let t = i as f32 / segments as f32;
+            let t2 = t * t;
+            let t3 = t2 * t;
+            let mt = 1.0 - t;
+            let mt2 = mt * mt;
+            let mt3 = mt2 * mt;
+            
+            let x = (mt3 * p0.x as f32) + (3.0 * mt2 * t * p1.x as f32) + 
+                    (3.0 * mt * t2 * p2.x as f32) + (t3 * p3.x as f32);
+            let y = (mt3 * p0.y as f32) + (3.0 * mt2 * t * p1.y as f32) + 
+                    (3.0 * mt * t2 * p2.y as f32) + (t3 * p3.y as f32);
+                    
+            let current_point = Coordinate::new(x as isize, y as isize);
+            self.draw_line_aa(prev_point, current_point, color);
+            prev_point = current_point;
+        }
+    }
+
+    /// Performance optimized fill for large areas
+    pub fn fill_fast(&mut self, coordinate: Coordinate, width: usize, height: usize, color: RGBA) {
+        if !self.overlaps_with(coordinate, width, height) {
+            return;
+        }
+
+        let start_x = core::cmp::max(coordinate.x, 0) as usize;
+        let start_y = core::cmp::max(coordinate.y, 0) as usize;
+        let end_x = core::cmp::min(coordinate.x + width as isize, self.w as isize) as usize;
+        let end_y = core::cmp::min(coordinate.y + height as isize, self.h as isize) as usize;
+
+        // Use memset-like operation for better performance
+        for y in start_y..end_y {
+            let start_idx = y * self.w + start_x;
+            let end_idx = y * self.w + end_x;
+            
+            for idx in start_idx..end_idx {
+                self.pixels[idx] = color;
+            }
+        }
+    }
+}
 fn get_bit(char_font: u8, i: isize) -> u8 {
     char_font & (0x80 >> i)
 }
@@ -665,3 +991,171 @@ fn get_bit(char_font: u8, i: isize) -> u8 {
 pub mod display;
 pub mod font;
 pub mod shapes;
+
+/// Animation and transition utilities for smooth UI effects
+pub struct Animator {
+    pub duration_ms: u64,
+    pub start_time: u64,
+    pub current_time: u64,
+}
+
+impl Animator {
+    pub fn new(duration_ms: u64) -> Self {
+        Self {
+            duration_ms,
+            start_time: 0,
+            current_time: 0,
+        }
+    }
+
+    pub fn start(&mut self, current_time: u64) {
+        self.start_time = current_time;
+        self.current_time = current_time;
+    }
+
+    pub fn update(&mut self, current_time: u64) {
+        self.current_time = current_time;
+    }
+
+    pub fn progress(&self) -> f32 {
+        if self.duration_ms == 0 {
+            return 1.0;
+        }
+        
+        let elapsed = self.current_time.saturating_sub(self.start_time);
+        (elapsed as f32 / self.duration_ms as f32).min(1.0)
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.progress() >= 1.0
+    }
+
+    /// Ease-in-out cubic animation curve
+    pub fn ease_in_out(&self) -> f32 {
+        let t = self.progress();
+        if t < 0.5 {
+            4.0 * t * t * t
+        } else {
+            let temp = -2.0 * t + 2.0;
+            1.0 - (temp * temp * temp) / 2.0
+        }
+    }
+
+    /// Bounce animation curve
+    pub fn bounce(&self) -> f32 {
+        let t = self.progress();
+        if t < 1.0 / 2.75 {
+            7.5625 * t * t
+        } else if t < 2.0 / 2.75 {
+            let t = t - 1.5 / 2.75;
+            7.5625 * t * t + 0.75
+        } else if t < 2.5 / 2.75 {
+            let t = t - 2.25 / 2.75;
+            7.5625 * t * t + 0.9375
+        } else {
+            let t = t - 2.625 / 2.75;
+            7.5625 * t * t + 0.984375
+        }
+    }
+}
+
+/// Particle system for visual effects
+pub struct Particle {
+    pub position: Coordinate,
+    pub velocity: Coordinate,
+    pub color: RGBA,
+    pub life: f32,
+    pub max_life: f32,
+    pub size: usize,
+}
+
+impl Particle {
+    pub fn new(position: Coordinate, velocity: Coordinate, color: RGBA, life: f32, size: usize) -> Self {
+        Self {
+            position,
+            velocity,
+            color,
+            life,
+            max_life: life,
+            size,
+        }
+    }
+
+    pub fn update(&mut self, delta_time: f32) {
+        self.position = self.position + (
+            (self.velocity.x as f32 * delta_time) as isize,
+            (self.velocity.y as f32 * delta_time) as isize
+        );
+        self.life -= delta_time;
+    }
+
+    pub fn is_alive(&self) -> bool {
+        self.life > 0.0
+    }
+
+    pub fn alpha(&self) -> u8 {
+        ((self.life / self.max_life) * self.color.a as f32) as u8
+    }
+}
+
+pub struct ParticleSystem {
+    pub particles: Vec<Particle>,
+    pub max_particles: usize,
+}
+
+impl ParticleSystem {
+    pub fn new(max_particles: usize) -> Self {
+        Self {
+            particles: Vec::with_capacity(max_particles),
+            max_particles,
+        }
+    }
+
+    pub fn emit(&mut self, particle: Particle) {
+        if self.particles.len() < self.max_particles {
+            self.particles.push(particle);
+        }
+    }
+
+    pub fn update(&mut self, delta_time: f32) {
+        for particle in &mut self.particles {
+            particle.update(delta_time);
+        }
+        self.particles.retain(|p| p.is_alive());
+    }
+
+    pub fn render(&self, fb: &mut FB) {
+        for particle in &self.particles {
+            let mut color = particle.color;
+            color.a = particle.alpha();
+            
+            if particle.size <= 1 {
+                fb.set_pixel_blend(particle.position, color);
+            } else {
+                fb.draw_circle_filled(particle.position, particle.size, color);
+            }
+        }
+    }
+}
+
+/// Mouse input functions
+#[no_mangle]
+pub extern "C" fn get_mouse_x() -> i32 {
+    // For now, return a default value - in a real implementation this would
+    // read from the mouse hardware/VirtIO device
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn get_mouse_y() -> i32 {
+    // For now, return a default value - in a real implementation this would
+    // read from the mouse hardware/VirtIO device
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn is_mouse_button_down(_button: i32) -> bool {
+    // For now, return false - in a real implementation this would
+    // check the actual mouse button state
+    false
+}

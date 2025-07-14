@@ -424,3 +424,164 @@ pub fn temp() {
         raw::temp();
     }
 }
+
+/// Draw a gradient rectangle
+pub fn draw_gradient(pos: Position, width: i32, height: i32, color1: RGBA, color2: RGBA, horizontal: bool) {
+    if horizontal {
+        for x in 0..width {
+            let progress = x as f32 / width as f32;
+            let color = blend_colors(color1, color2, progress);
+            draw_line(
+                Position::new(pos.x + x, pos.y),
+                Position::new(pos.x + x, pos.y + height - 1),
+                color
+            );
+        }
+    } else {
+        for y in 0..height {
+            let progress = y as f32 / height as f32;
+            let color = blend_colors(color1, color2, progress);
+            draw_line(
+                Position::new(pos.x, pos.y + y),
+                Position::new(pos.x + width - 1, pos.y + y),
+                color
+            );
+        }
+    }
+}
+
+/// Blend two colors
+fn blend_colors(color1: RGBA, color2: RGBA, progress: f32) -> RGBA {
+    let progress = progress.max(0.0).min(1.0);
+    let inv_progress = 1.0 - progress;
+    
+    RGBA::new(
+        (color1.r as f32 * inv_progress + color2.r as f32 * progress) as i32,
+        (color1.g as f32 * inv_progress + color2.g as f32 * progress) as i32,
+        (color1.b as f32 * inv_progress + color2.b as f32 * progress) as i32,
+        (color1.a as f32 * inv_progress + color2.a as f32 * progress) as i32,
+    )
+}
+
+/// Draw a rounded rectangle
+pub fn draw_rounded_rectangle(pos: Position, width: i32, height: i32, radius: i32, color: RGBA) {
+    let radius = radius.min(width / 2).min(height / 2);
+    
+    // Draw main rectangles
+    fill_rectangle(
+        Position::new(pos.x + radius, pos.y),
+        width - 2 * radius,
+        height,
+        color
+    );
+    fill_rectangle(
+        Position::new(pos.x, pos.y + radius),
+        width,
+        height - 2 * radius,
+        color
+    );
+    
+    // Draw corners
+    fill_circle(Position::new(pos.x + radius, pos.y + radius), radius, color);
+    fill_circle(Position::new(pos.x + width - radius, pos.y + radius), radius, color);
+    fill_circle(Position::new(pos.x + radius, pos.y + height - radius), radius, color);
+    fill_circle(Position::new(pos.x + width - radius, pos.y + height - radius), radius, color);
+}
+
+/// Draw text with outline
+pub fn draw_text_outlined(pos: Position, text: &str, color: RGBA, outline_color: RGBA) {
+    // Draw outline by drawing text in 8 directions
+    let offsets = [
+        (-1, -1), (0, -1), (1, -1),
+        (-1,  0),          (1,  0),
+        (-1,  1), (0,  1), (1,  1),
+    ];
+    
+    for (dx, dy) in &offsets {
+        draw_text(Position::new(pos.x + dx, pos.y + dy), text, outline_color);
+    }
+    
+    // Draw main text
+    draw_text(pos, text, color);
+}
+
+/// Draw a simple progress bar
+pub fn draw_progress_bar(pos: Position, width: i32, height: i32, progress: f32, bg_color: RGBA, fill_color: RGBA) {
+    // Background
+    fill_rectangle(pos, width, height, bg_color);
+    
+    // Progress fill
+    let fill_width = (width as f32 * progress.max(0.0).min(1.0)) as i32;
+    if fill_width > 0 {
+        fill_rectangle(pos, fill_width, height, fill_color);
+    }
+    
+    // Border
+    draw_rectangle(pos, width, height, RGBA::new(128, 128, 128, 255));
+}
+
+/// Draw a simple button with text
+pub fn draw_button(pos: Position, width: i32, height: i32, text: &str, bg_color: RGBA, text_color: RGBA, pressed: bool) {
+    let offset = if pressed { 2 } else { 0 };
+    let button_pos = Position::new(pos.x + offset, pos.y + offset);
+    
+    // Button background
+    fill_rectangle(button_pos, width, height, bg_color);
+    draw_rectangle(button_pos, width, height, RGBA::new(64, 64, 64, 255));
+    
+    // Button text (centered)
+    let text_width = text.len() as i32 * 8;
+    let text_height = 12;
+    let text_x = button_pos.x + (width - text_width) / 2;
+    let text_y = button_pos.y + (height - text_height) / 2;
+    
+    draw_text(Position::new(text_x, text_y), text, text_color);
+}
+
+/// Animation easing functions
+pub fn ease_in_out_cubic(t: f32) -> f32 {
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - ((-2.0 * t + 2.0).powi(3)) / 2.0
+    }
+}
+
+pub fn ease_in_out_back(t: f32) -> f32 {
+    let c1 = 1.70158;
+    let c2 = c1 * 1.525;
+    
+    if t < 0.5 {
+        ((2.0 * t).powi(2) * ((c2 + 1.0) * 2.0 * t - c2)) / 2.0
+    } else {
+        ((2.0 * t - 2.0).powi(2) * ((c2 + 1.0) * (t * 2.0 - 2.0) + c2) + 2.0) / 2.0
+    }
+}
+
+/// Draw a shadow effect (simple version)
+pub fn draw_shadow(pos: Position, width: i32, height: i32, blur: i32, color: RGBA) {
+    for offset in 1..=blur {
+        let shadow_alpha = color.a * (blur - offset + 1) / (blur + 1);
+        let shadow_color = RGBA::new(color.r, color.g, color.b, shadow_alpha);
+        
+        fill_rectangle(
+            Position::new(pos.x + offset, pos.y + offset),
+            width,
+            height,
+            shadow_color
+        );
+    }
+}
+
+/// Get input state for advanced input handling
+pub fn get_input_state() -> InputState {
+    unsafe {
+        InputState {
+            mouse_x: raw::get_mouse_x(),
+            mouse_y: raw::get_mouse_y(),
+            mouse_left: raw::is_mouse_button_down(0),
+            mouse_right: raw::is_mouse_button_down(1),
+            mouse_middle: raw::is_mouse_button_down(2),
+        }
+    }
+}

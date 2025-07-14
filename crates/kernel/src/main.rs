@@ -17,7 +17,7 @@ use agave_api::sys::{
     wasm::WasmApp,
     with_mapper_framealloc, ACPI_HANDLER, FRAME_ALLOCATOR, MAPPER, VIRTUAL_MAPPING_OFFSET,
 };
-use alloc::{boxed::Box, slice, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
 use bootloader_boot_config::LevelFilter;
 use core::panic::PanicInfo;
@@ -44,10 +44,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
     let fbinfo = framebuffer.info();
     let fbm = framebuffer.buffer_mut();
-    let fbm2 = unsafe {
-        let p = fbm.as_mut_ptr();
-        slice::from_raw_parts_mut(p, fbinfo.byte_len)
-    };
+    // let fbm2 = unsafe {
+    //     let p = fbm.as_mut_ptr();
+    //     slice::from_raw_parts_mut(p, fbinfo.byte_len)
+    // };
 
     init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
@@ -110,7 +110,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 }
             };
         }
-        // log::info!("new:{} already_mapped:{}", news, olds);
+        log::info!("new:{} already_mapped:{}", news, olds);
     }
 
     with_mapper_framealloc(|mapper, frame_allocator| {
@@ -127,8 +127,8 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let acpi_tables = unsafe { AcpiTables::from_rsdp(ACPI_HANDLER, rsdp_addr as usize).unwrap() };
     // log::info!("acpi_read");
 
-    let _x = HpetInfo::new(&acpi_tables).expect("hpet");
-    // log::info!("{:#?}]", x);
+    let x = HpetInfo::new(&acpi_tables).expect("hpet");
+    log::info!("{:#?}]", x);
 
     let pi = acpi_tables.platform_info().expect("platform info");
     log::info!("ACPI platform info obtained");
@@ -148,18 +148,18 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 log::info!("CPUID info obtained");
                 // log::info!("cpuid");
                 if let Some(tsc) = cpuid.get_tsc_info() {
-                    // log::info!(
-                    //     "{} {}",
-                    //     tsc.nominal_frequency(),
-                    //     tsc.tsc_frequency().unwrap()
-                    // );
+                    log::info!(
+                        "{} {}",
+                        tsc.nominal_frequency(),
+                        tsc.tsc_frequency().unwrap()
+                    );
                     freq = tsc.nominal_frequency();
                 } else {
                 }
             }
             log::info!("Setting APIC timer configuration...");
             lapic.set_div_conf(0b1011);
-            // log::info!("start apic c");
+            log::info!("start apic c");
             lapic.set_lvt_timer((1 << 17) + 48);
             let wanted_freq_hz = 1000;
             lapic.set_init_count(freq / wanted_freq_hz);
@@ -168,10 +168,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
         log::info!("Setting up IO APICs...");
         for io_apic in apic.io_apics.iter() {
-            // log::info!("{:x}", io_apic.address);
+            log::info!("{:x}", io_apic.address);
             let ioa = ioapic::IoApic::init(io_apic);
             let val = ioa.read(ioapic::IOAPICVER);
-            // log::info!("{:x}", val);
+            log::info!("{:x}", val);
             for i in 0..24 {
                 let n = ioa.read_redtlb(i);
                 let mut red = ioapic::RedTbl::new(n);
@@ -299,7 +299,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             log::info!("WASM task started - loading applications...");
             let mut apps: Vec<WasmApp> = Vec::new();
             let apps_raw = [
-                &include_bytes!("../../../apps/test-app/target/wasm32-wasip1/release/test_app.wasm")
+                &include_bytes!("../../../apps/terminal/target/wasm32-wasip1/release/terminal_app.wasm")
                     [..],
                 // &include_bytes!("../../../apps/zig-app/zig-out/lib/zig-app.wasm")[..],
                 // &include_bytes!("../../../disk/bin/hello.wasm")[..],

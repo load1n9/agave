@@ -12,4 +12,11 @@ extern "C" {
     pub fn draw_line(x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn get_time_ms() -> u64;
     pub fn temp();
+    
+    // Keyboard input functions
+    pub fn is_key_pressed(key_code: i32) -> bool;
+    pub fn is_key_down(key_code: i32) -> bool;
+    pub fn is_key_released(key_code: i32) -> bool;
+    pub fn get_key_history_count() -> i32;
+    pub fn get_key_history_event(index: i32) -> i64; // Returns key code in low 32 bits, pressed state in high 32 bits
 }

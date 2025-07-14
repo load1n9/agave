@@ -6,18 +6,21 @@ Agave OS is a simple operating system written in Rust with WASI support. It is d
 ## 🚀 Enhanced Features
 
 ### Core Features
+
 - **Lightweight and fast** - Minimal overhead with efficient memory management
 - **Hardware support** - Supports a wide range of x86_64 hardware platforms
 - **Easy to customize** - Modular architecture for easy extension
 - **Built with Rust** - Memory safety and performance with zero-cost abstractions
 
 ### 🎨 Enhanced Graphics & WASM
+
 - **Rich Graphics API** - Circles, rectangles, lines, triangles with color support
 - **Animation Support** - Time-based animations and smooth transitions
 - **Interactive Applications** - Mouse input and real-time interaction
 - **WASM Runtime** - Execute WebAssembly applications with comprehensive API
 
 ### ⚡ Advanced System Features
+
 - **Priority Task Scheduling** - Multi-level priority queues with fair scheduling
 - **Memory Management** - Advanced allocator with statistics and leak detection
 - **Error Handling** - Comprehensive error types with recovery strategies
@@ -25,6 +28,7 @@ Agave OS is a simple operating system written in Rust with WASI support. It is d
 - **Profiling Tools** - Built-in profiler for performance analysis
 
 ### 🛠️ Development Tools
+
 - **Enhanced Diagnostics** - Detailed panic information with system state
 - **Memory Tracking** - Allocation statistics and pressure monitoring
 - **Performance Events** - Event logging for optimization insights
@@ -65,6 +69,7 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 ```
 
 ### Available Graphics Functions
+
 - `clear_screen(color)` - Clear entire screen
 - `set_pixel(pos, color)` - Set individual pixel
 - `draw_circle(center, radius, color)` - Draw circle outline
@@ -77,6 +82,7 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 - `get_time_ms()` - Get system time in milliseconds
 
 ### Color Constants
+
 - `RGBA::RED`, `RGBA::GREEN`, `RGBA::BLUE`
 - `RGBA::WHITE`, `RGBA::BLACK`, `RGBA::TRANSPARENT`
 
@@ -85,14 +91,15 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 ## 🔧 Building and Running
 
 ### Prerequisites
+
 - Rust nightly toolchain
 - QEMU (for running the OS)
-- PowerShell (for build script)
 
 ### Quick Start
+
 ```powershell
 # Build and run in debug mode
-.\build.ps1 -Run
+deno task build
 
 # Build release version
 .\build.ps1 -Release
@@ -108,6 +115,7 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 ```
 
 ### Manual Building
+
 ```bash
 # Build test application
 cd apps/test-app
@@ -115,7 +123,7 @@ cargo build --target wasm32-wasi --release
 
 # Build OS
 cd ../..
-cargo build --release
+cargo run --release build
 
 # Run with QEMU
 qemu-system-x86_64 -drive format=raw,file=target/release/bios.img -m 512M
@@ -134,12 +142,14 @@ The OS includes comprehensive monitoring capabilities:
 ## 🏗️ Architecture
 
 ### Core Components
+
 - **Kernel** (`crates/kernel`) - Core OS functionality
 - **API** (`crates/api`) - System APIs and drivers
 - **Library** (`crates/lib`) - WASM application library
 - **Applications** (`apps/`) - WASM applications
 
 ### Enhanced Systems
+
 - **Error Handling** (`sys/error.rs`) - Comprehensive error types
 - **Memory Management** (`sys/allocator.rs`) - Advanced allocation tracking
 - **Task Scheduling** (`sys/task/`) - Priority-based async execution
@@ -149,6 +159,7 @@ The OS includes comprehensive monitoring capabilities:
 ## 🐛 Debugging
 
 Enhanced panic handler provides detailed system information:
+
 - System uptime and current state
 - Memory usage and allocation statistics
 - Task execution metrics
@@ -157,6 +168,7 @@ Enhanced panic handler provides detailed system information:
 ## 🤝 Contributing
 
 Contributions are welcome! Areas for improvement:
+
 - Additional graphics primitives
 - Network stack implementation
 - Filesystem enhancements

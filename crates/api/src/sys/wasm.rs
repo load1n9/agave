@@ -325,6 +325,71 @@ impl WasmApp {
 
         linker.define("agave", "get_time_ms", get_time_ms).unwrap();
 
+        // Keyboard input functions
+        let is_key_pressed = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+            let input = crate::sys::globals::INPUT.read();
+            if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                match input.keys[key_code as usize] {
+                    crate::sys::globals::KeyState::OnFromOff => 1,
+                    _ => 0,
+                }
+            } else {
+                0
+            }
+        });
+
+        linker.define("agave", "is_key_pressed", is_key_pressed).unwrap();
+
+        let is_key_down = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+            let input = crate::sys::globals::INPUT.read();
+            if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                match input.keys[key_code as usize] {
+                    crate::sys::globals::KeyState::On | crate::sys::globals::KeyState::OnFromOff | crate::sys::globals::KeyState::OnTransientOff => 1,
+                    _ => 0,
+                }
+            } else {
+                0
+            }
+        });
+
+        linker.define("agave", "is_key_down", is_key_down).unwrap();
+
+        let is_key_released = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+            let input = crate::sys::globals::INPUT.read();
+            if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                match input.keys[key_code as usize] {
+                    crate::sys::globals::KeyState::OffFromOn => 1,
+                    _ => 0,
+                }
+            } else {
+                0
+            }
+        });
+
+        linker.define("agave", "is_key_released", is_key_released).unwrap();
+
+        let get_key_history_count = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
+            let input = crate::sys::globals::INPUT.read();
+            // Return the number of events we have, up to the buffer size
+            core::cmp::min(input.history_last_index, 64) as i32
+        });
+
+        linker.define("agave", "get_key_history_count", get_key_history_count).unwrap();
+
+        let get_key_history_event = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, index: i32| -> i64 {
+            let input = crate::sys::globals::INPUT.read();
+            if index >= 0 && (index as usize) < 64 && (index as usize) < input.history_last_index {
+                let event = input.history_ring[index as usize];
+                // Pack key code in low 32 bits, pressed state in high 32 bits
+                let pressed_bits = if event.trigger { 1i64 << 32 } else { 0 };
+                pressed_bits | (event.key as i64)
+            } else {
+                0
+            }
+        });
+
+        linker.define("agave", "get_key_history_event", get_key_history_event).unwrap();
+
         // Link comprehensive WASI Preview 1 implementation
         wasi::preview1::link_preview1_functions(&mut linker, &mut store).unwrap();
 

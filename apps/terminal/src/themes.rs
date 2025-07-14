@@ -1,0 +1,160 @@
+use agave_lib::RGBA;
+use crate::types::Theme;
+
+/// Theme color scheme structure
+#[derive(Clone, Copy)]
+pub struct ThemeColors {
+    pub bg_primary: RGBA,
+    pub bg_secondary: RGBA,
+    pub bg_accent: RGBA,
+    pub border_color: RGBA,
+    pub text_primary: RGBA,
+    pub text_secondary: RGBA,
+    pub text_muted: RGBA,
+    pub accent_green: RGBA,
+    pub accent_blue: RGBA,
+    pub accent_yellow: RGBA,
+    pub accent_red: RGBA,
+    pub accent_purple: RGBA,
+    pub accent_cyan: RGBA,
+}
+
+/// Get colors for a specific theme
+pub fn get_theme_colors(theme: Theme) -> ThemeColors {
+    match theme {
+        Theme::Default => ThemeColors {
+            bg_primary: RGBA::new(16, 20, 24, 255),
+            bg_secondary: RGBA::new(24, 30, 36, 255),
+            bg_accent: RGBA::new(32, 40, 48, 255),
+            border_color: RGBA::new(64, 80, 96, 255),
+            text_primary: RGBA::new(220, 225, 230, 255),
+            text_secondary: RGBA::new(160, 170, 180, 255),
+            text_muted: RGBA::new(120, 130, 140, 255),
+            accent_green: RGBA::new(72, 187, 120, 255),
+            accent_blue: RGBA::new(96, 165, 250, 255),
+            accent_yellow: RGBA::new(251, 191, 36, 255),
+            accent_red: RGBA::new(248, 113, 113, 255),
+            accent_purple: RGBA::new(168, 85, 247, 255),
+            accent_cyan: RGBA::new(34, 211, 238, 255),
+        },
+        Theme::Dark => ThemeColors {
+            bg_primary: RGBA::new(0, 0, 0, 255),
+            bg_secondary: RGBA::new(8, 8, 8, 255),
+            bg_accent: RGBA::new(16, 16, 16, 255),
+            border_color: RGBA::new(40, 40, 40, 255),
+            text_primary: RGBA::new(255, 255, 255, 255),
+            text_secondary: RGBA::new(180, 180, 180, 255),
+            text_muted: RGBA::new(120, 120, 120, 255),
+            accent_green: RGBA::new(0, 255, 0, 255),
+            accent_blue: RGBA::new(0, 150, 255, 255),
+            accent_yellow: RGBA::new(255, 255, 0, 255),
+            accent_red: RGBA::new(255, 60, 60, 255),
+            accent_purple: RGBA::new(200, 100, 255, 255),
+            accent_cyan: RGBA::new(0, 255, 255, 255),
+        },
+        Theme::Light => ThemeColors {
+            bg_primary: RGBA::new(248, 250, 252, 255),
+            bg_secondary: RGBA::new(241, 245, 249, 255),
+            bg_accent: RGBA::new(226, 232, 240, 255),
+            border_color: RGBA::new(203, 213, 225, 255),
+            text_primary: RGBA::new(15, 23, 42, 255),
+            text_secondary: RGBA::new(51, 65, 85, 255),
+            text_muted: RGBA::new(100, 116, 139, 255),
+            accent_green: RGBA::new(34, 197, 94, 255),
+            accent_blue: RGBA::new(59, 130, 246, 255),
+            accent_yellow: RGBA::new(234, 179, 8, 255),
+            accent_red: RGBA::new(239, 68, 68, 255),
+            accent_purple: RGBA::new(147, 51, 234, 255),
+            accent_cyan: RGBA::new(6, 182, 212, 255),
+        },
+        Theme::Ocean => ThemeColors {
+            bg_primary: RGBA::new(12, 36, 64, 255),
+            bg_secondary: RGBA::new(16, 48, 80, 255),
+            bg_accent: RGBA::new(24, 60, 96, 255),
+            border_color: RGBA::new(56, 96, 144, 255),
+            text_primary: RGBA::new(224, 242, 254, 255),
+            text_secondary: RGBA::new(186, 230, 253, 255),
+            text_muted: RGBA::new(125, 211, 252, 255),
+            accent_green: RGBA::new(52, 211, 153, 255),
+            accent_blue: RGBA::new(59, 130, 246, 255),
+            accent_yellow: RGBA::new(251, 191, 36, 255),
+            accent_red: RGBA::new(239, 68, 68, 255),
+            accent_purple: RGBA::new(139, 92, 246, 255),
+            accent_cyan: RGBA::new(6, 182, 212, 255),
+        },
+        Theme::Forest => ThemeColors {
+            bg_primary: RGBA::new(20, 40, 24, 255),
+            bg_secondary: RGBA::new(28, 52, 32, 255),
+            bg_accent: RGBA::new(36, 64, 40, 255),
+            border_color: RGBA::new(72, 108, 80, 255),
+            text_primary: RGBA::new(240, 253, 244, 255),
+            text_secondary: RGBA::new(187, 247, 208, 255),
+            text_muted: RGBA::new(134, 239, 172, 255),
+            accent_green: RGBA::new(34, 197, 94, 255),
+            accent_blue: RGBA::new(96, 165, 250, 255),
+            accent_yellow: RGBA::new(234, 179, 8, 255),
+            accent_red: RGBA::new(239, 68, 68, 255),
+            accent_purple: RGBA::new(147, 51, 234, 255),
+            accent_cyan: RGBA::new(6, 182, 212, 255),
+        },
+        Theme::Sunset => ThemeColors {
+            bg_primary: RGBA::new(64, 32, 20, 255),
+            bg_secondary: RGBA::new(80, 40, 28, 255),
+            bg_accent: RGBA::new(96, 52, 36, 255),
+            border_color: RGBA::new(144, 96, 72, 255),
+            text_primary: RGBA::new(254, 242, 240, 255),
+            text_secondary: RGBA::new(254, 215, 170, 255),
+            text_muted: RGBA::new(253, 186, 116, 255),
+            accent_green: RGBA::new(34, 197, 94, 255),
+            accent_blue: RGBA::new(96, 165, 250, 255),
+            accent_yellow: RGBA::new(251, 191, 36, 255),
+            accent_red: RGBA::new(239, 68, 68, 255),
+            accent_purple: RGBA::new(147, 51, 234, 255),
+            accent_cyan: RGBA::new(6, 182, 212, 255),
+        },
+        Theme::Neon => ThemeColors {
+            bg_primary: RGBA::new(4, 4, 8, 255),
+            bg_secondary: RGBA::new(8, 8, 16, 255),
+            bg_accent: RGBA::new(16, 16, 32, 255),
+            border_color: RGBA::new(64, 64, 128, 255),
+            text_primary: RGBA::new(0, 255, 255, 255),
+            text_secondary: RGBA::new(255, 0, 255, 255),
+            text_muted: RGBA::new(128, 128, 255, 255),
+            accent_green: RGBA::new(0, 255, 128, 255),
+            accent_blue: RGBA::new(0, 128, 255, 255),
+            accent_yellow: RGBA::new(255, 255, 0, 255),
+            accent_red: RGBA::new(255, 0, 128, 255),
+            accent_purple: RGBA::new(192, 0, 255, 255),
+            accent_cyan: RGBA::new(0, 255, 255, 255),
+        },
+        Theme::Retro => ThemeColors {
+            bg_primary: RGBA::new(33, 37, 41, 255),    // Classic terminal green background
+            bg_secondary: RGBA::new(40, 44, 52, 255),
+            bg_accent: RGBA::new(52, 58, 64, 255),
+            border_color: RGBA::new(108, 117, 125, 255),
+            text_primary: RGBA::new(0, 255, 65, 255),   // Classic terminal green
+            text_secondary: RGBA::new(0, 200, 50, 255), // Dimmer green
+            text_muted: RGBA::new(0, 150, 35, 255),     // Even dimmer green
+            accent_green: RGBA::new(0, 255, 65, 255),   // Same as primary text
+            accent_blue: RGBA::new(0, 200, 255, 255),   // Cyan-ish blue
+            accent_yellow: RGBA::new(255, 255, 0, 255), // Bright yellow
+            accent_red: RGBA::new(255, 65, 65, 255),    // Bright red
+            accent_purple: RGBA::new(255, 0, 255, 255), // Magenta
+            accent_cyan: RGBA::new(0, 255, 255, 255),   // Cyan
+        },
+    }
+}
+
+/// Theme descriptions for help text
+pub fn get_theme_description(theme: Theme) -> &'static str {
+    match theme {
+        Theme::Default => "Modern dark blue-gray theme with balanced contrast",
+        Theme::Dark => "Pure black background with bright accent colors",
+        Theme::Light => "Clean light theme optimized for bright environments", 
+        Theme::Ocean => "Deep blue oceanic theme with aqua accents",
+        Theme::Forest => "Natural green forest theme for reduced eye strain",
+        Theme::Sunset => "Warm orange-red sunset theme for evening use",
+        Theme::Neon => "Electric cyberpunk theme with glowing colors",
+        Theme::Retro => "Classic terminal green-on-black vintage theme",
+    }
+}

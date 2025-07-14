@@ -3,6 +3,7 @@ mod state;
 mod commands;
 mod input;
 mod display;
+mod themes;
 
 use agave_lib::get_time_ms;
 use state::{TERMINAL, LAST_TIME, ANIMATION_FRAME, CURSOR_BLINK};

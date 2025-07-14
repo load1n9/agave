@@ -1,5 +1,6 @@
 use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
-use crate::types::{Screen, TerminalApp};
+use crate::types::{Screen, TerminalApp, Theme};
+use crate::themes::{get_theme_description};
 
 impl TerminalApp {
     pub fn process_command(&mut self) {
@@ -86,6 +87,8 @@ impl TerminalApp {
         } else if self.command_length == 4 && &cmd_lower[0..4] == b"exit" {
             self.add_output_line(b"Goodbye! Thanks for using Agave OS Terminal.");
             self.add_output_line(b"Session terminated.");
+        } else if self.command_length >= 5 && &cmd_lower[0..5] == b"theme" {
+            self.handle_theme_command();
         } else {
             self.add_output_line(b"Command not found. Type 'help' for available commands.");
         }
@@ -174,11 +177,18 @@ impl TerminalApp {
         self.add_output_line(b"  whoami    - Show current user");
         self.add_output_line(b"  date      - Show current date/time");
         self.add_output_line(b"  echo      - Echo text");
+        self.add_output_line(b"  theme     - Change color themes");
         self.add_output_line(b"  exit      - Exit the terminal");
+        self.add_output_line(b"");
+        self.add_output_line(b"Theme commands:");
+        self.add_output_line(b"  theme list    - List all available themes");
+        self.add_output_line(b"  theme <name>  - Switch to specific theme");
+        self.add_output_line(b"  theme next    - Switch to next theme");
+        self.add_output_line(b"  theme prev    - Switch to previous theme");
         self.add_output_line(b"");
         self.add_output_line(b"Quick shortcuts (when command line is empty):");
         self.add_output_line(b"  L-ls  H-help  S-system  P-ps");
-        self.add_output_line(b"  U-uname  C-clear  M-main");
+        self.add_output_line(b"  U-uname  C-clear  M-main  T-theme next");
         self.current_screen = Screen::Help;
     }
 
@@ -241,6 +251,166 @@ impl TerminalApp {
             self.add_output_line(&echo_line);
         } else {
             self.add_output_line(b"");
+        }
+    }
+
+    fn handle_theme_command(&mut self) {
+        // Handle theme command - can be "theme", "theme list", "theme <name>", or "theme next/prev"
+        if self.command_length == 5 {
+            // Just "theme" - show current theme
+            let current_name = self.current_theme.name();
+            let mut response = [0u8; 120];
+            
+            // Build response string manually
+            let prefix = b"Current theme: ";
+            let desc_text = get_theme_description(self.current_theme);
+            
+            let mut pos = 0;
+            // Copy prefix
+            for &byte in prefix {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            // Copy theme name
+            for &byte in current_name.as_bytes() {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            
+            self.add_output_line(&response);
+            
+            // Add description
+            let mut desc_line = [0u8; 120];
+            let desc_bytes = desc_text.as_bytes();
+            let desc_len = desc_bytes.len().min(119);
+            desc_line[..desc_len].copy_from_slice(&desc_bytes[..desc_len]);
+            self.add_output_line(&desc_line);
+            
+            self.add_output_line(b"Use 'theme list' to see all themes");
+            self.add_output_line(b"Use 'theme <name>' to switch themes");
+            self.add_output_line(b"Use 'theme next' or 'theme prev' to cycle");
+            
+        } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"list" {
+            // "theme list" - show all available themes
+            self.add_output_line(b"Available themes:");
+            self.add_output_line(b"");
+            
+            for theme in Theme::all_themes().iter() {
+                let mut line = [0u8; 120];
+                let name = theme.name();
+                let desc = get_theme_description(*theme);
+                
+                let mut pos = 0;
+                // Add indicator for current theme
+                if *theme == self.current_theme {
+                    line[pos] = b'*'; pos += 1;
+                    line[pos] = b' '; pos += 1;
+                } else {
+                    line[pos] = b' '; pos += 1;
+                    line[pos] = b' '; pos += 1;
+                }
+                
+                // Add theme name
+                for &byte in name.as_bytes() {
+                    if pos < 119 { line[pos] = byte; pos += 1; }
+                }
+                
+                // Add spacing
+                while pos < 20 && pos < 119 {
+                    line[pos] = b' '; pos += 1;
+                }
+                
+                // Add description
+                for &byte in desc.as_bytes() {
+                    if pos < 119 { line[pos] = byte; pos += 1; }
+                }
+                
+                self.add_output_line(&line);
+            }
+            
+        } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"next" {
+            // "theme next" - switch to next theme
+            self.current_theme = self.current_theme.next_theme();
+            let new_name = self.current_theme.name();
+            
+            let mut response = [0u8; 120];
+            let prefix = b"Switched to theme: ";
+            let mut pos = 0;
+            
+            for &byte in prefix {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            for &byte in new_name.as_bytes() {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            
+            self.add_output_line(&response);
+            
+        } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"prev" {
+            // "theme prev" - switch to previous theme
+            self.current_theme = self.current_theme.prev_theme();
+            let new_name = self.current_theme.name();
+            
+            let mut response = [0u8; 120];
+            let prefix = b"Switched to theme: ";
+            let mut pos = 0;
+            
+            for &byte in prefix {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            for &byte in new_name.as_bytes() {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            
+            self.add_output_line(&response);
+            
+        } else if self.command_length > 6 {
+            // "theme <name>" - switch to specific theme
+            let theme_name_start = 6;
+            let theme_name_len = self.command_length - theme_name_start;
+            
+            // Extract theme name and convert to lowercase for comparison
+            let mut theme_name = [0u8; 64];
+            for i in 0..theme_name_len.min(63) {
+                let ch = self.command_buffer[theme_name_start + i];
+                theme_name[i] = match ch {
+                    b'A'..=b'Z' => ch + 32, // Convert to lowercase
+                    _ => ch,
+                };
+            }
+            
+            // Try to match theme name
+            let mut found_theme = None;
+            for theme in Theme::all_themes().iter() {
+                let theme_name_bytes = theme.name().to_lowercase();
+                let theme_name_lower = theme_name_bytes.as_bytes();
+                
+                if theme_name_len == theme_name_lower.len() &&
+                   &theme_name[..theme_name_len] == theme_name_lower {
+                    found_theme = Some(*theme);
+                    break;
+                }
+            }
+            
+            if let Some(new_theme) = found_theme {
+                self.current_theme = new_theme;
+                let new_name = new_theme.name();
+                
+                let mut response = [0u8; 120];
+                let prefix = b"Switched to theme: ";
+                let mut pos = 0;
+                
+                for &byte in prefix {
+                    if pos < 119 { response[pos] = byte; pos += 1; }
+                }
+                for &byte in new_name.as_bytes() {
+                    if pos < 119 { response[pos] = byte; pos += 1; }
+                }
+                
+                self.add_output_line(&response);
+            } else {
+                self.add_output_line(b"Unknown theme. Use 'theme list' to see available themes.");
+            }
+        } else {
+            self.add_output_line(b"Usage: theme [list|next|prev|<name>]");
         }
     }
 }

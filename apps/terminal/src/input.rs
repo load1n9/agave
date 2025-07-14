@@ -1,7 +1,7 @@
 use agave_lib::{
     is_key_pressed, is_key_down, key_code_to_char, get_key_history_count, get_key_history_event,
     KEY_ENTER, KEY_BACKSPACE, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_ESC, 
-    KEY_L, KEY_P, KEY_S, KEY_H, KEY_U, KEY_C, KEY_M
+    KEY_L, KEY_P, KEY_S, KEY_H, KEY_U, KEY_C, KEY_M, KEY_T
 };
 
 use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
@@ -247,6 +247,26 @@ fn handle_shortcut_keys() {
             }
             TERMINAL.command_length = main_cmd.len();
             TERMINAL.process_command();
+            return;
+        }
+        
+        if is_key_pressed(KEY_T) && TERMINAL.command_length == 0 {
+            // Quick 'theme next' shortcut
+            TERMINAL.current_theme = TERMINAL.current_theme.next_theme();
+            let theme_name = TERMINAL.current_theme.name();
+            
+            let mut response = [0u8; 120];
+            let prefix = b"Switched to theme: ";
+            let mut pos = 0;
+            
+            for &byte in prefix {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            for &byte in theme_name.as_bytes() {
+                if pos < 119 { response[pos] = byte; pos += 1; }
+            }
+            
+            TERMINAL.add_output_line(&response);
             return;
         }
     }

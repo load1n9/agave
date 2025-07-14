@@ -4,46 +4,37 @@ use agave_lib::{
 
 use crate::types::Screen;
 use crate::state::{TERMINAL, CURSOR_BLINK, ANIMATION_FRAME};
-
-// Enhanced color palette
-const BG_PRIMARY: RGBA = RGBA::new(16, 20, 24, 255);      // Dark blue-gray background
-const BG_SECONDARY: RGBA = RGBA::new(24, 30, 36, 255);    // Slightly lighter background
-const BG_ACCENT: RGBA = RGBA::new(32, 40, 48, 255);       // Card/panel background
-const BORDER_COLOR: RGBA = RGBA::new(64, 80, 96, 255);    // Subtle borders
-const TEXT_PRIMARY: RGBA = RGBA::new(220, 225, 230, 255); // Primary text
-const TEXT_SECONDARY: RGBA = RGBA::new(160, 170, 180, 255); // Secondary text
-const TEXT_MUTED: RGBA = RGBA::new(120, 130, 140, 255);   // Muted text
-const ACCENT_GREEN: RGBA = RGBA::new(72, 187, 120, 255);  // Success/active green
-const ACCENT_BLUE: RGBA = RGBA::new(96, 165, 250, 255);   // Info blue
-const ACCENT_YELLOW: RGBA = RGBA::new(251, 191, 36, 255); // Warning yellow
-const ACCENT_RED: RGBA = RGBA::new(248, 113, 113, 255);   // Error red
-const ACCENT_PURPLE: RGBA = RGBA::new(168, 85, 247, 255); // Highlight purple
-const ACCENT_CYAN: RGBA = RGBA::new(34, 211, 238, 255);   // Bright cyan
+use crate::themes::{get_theme_colors, ThemeColors};
 
 pub fn draw_terminal() {
     let dim = get_dimensions();
     
-    // Clear screen with enhanced background
-    clear_screen(BG_PRIMARY);
-    
-    // Draw subtle gradient background
-    draw_background_gradient(dim);
-    
     unsafe {
+        let colors = get_theme_colors(TERMINAL.current_theme);
+        
+        // Clear screen with theme background
+        clear_screen(colors.bg_primary);
+        
+        // Draw subtle gradient background
+        draw_background_gradient(dim, &colors);
+        
         match TERMINAL.current_screen {
-            Screen::Main => draw_main_screen(dim),
-            Screen::Files => draw_files_screen(dim),
-            Screen::Processes => draw_processes_screen(dim),
-            Screen::System => draw_system_screen(dim),
-            Screen::Help => draw_help_screen(dim),
+            Screen::Main => draw_main_screen(dim, &colors),
+            Screen::Files => draw_files_screen(dim, &colors),
+            Screen::Processes => draw_processes_screen(dim, &colors),
+            Screen::System => draw_system_screen(dim, &colors),
+            Screen::Help => draw_help_screen(dim, &colors),
         }
     }
     
     // Draw enhanced status bar at bottom
-    draw_status_bar(dim);
+    unsafe {
+        let colors = get_theme_colors(TERMINAL.current_theme);
+        draw_status_bar(dim, &colors);
+    }
 }
 
-fn draw_background_gradient(dim: agave_lib::Dimensions) {
+fn draw_background_gradient(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     // Draw subtle vertical gradient for visual depth
     for y in 0..dim.height/4 {
         let alpha = 10 + (y * 15 / (dim.height/4));
@@ -51,18 +42,23 @@ fn draw_background_gradient(dim: agave_lib::Dimensions) {
             Position::new(0, y),
             dim.width,
             1,
-            RGBA::new(32, 48, 64, alpha as i32)
+            RGBA::new(
+                colors.border_color.r / 2,
+                colors.border_color.g / 2,
+                colors.border_color.b / 2,
+                alpha as i32
+            )
         );
     }
 }
 
-fn draw_main_screen(dim: agave_lib::Dimensions) {
+fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
     unsafe {
         // Draw main content card with subtle background
-        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140, colors);
         
         // ASCII Art Header with better spacing
         let header_lines = [
@@ -78,7 +74,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
             draw_text(
                 Position::new(margin + 20, 70 + i as i32 * 22),
                 line,
-                ACCENT_CYAN
+                colors.accent_cyan
             );
         }
         
@@ -86,26 +82,26 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
         draw_text(
             Position::new(margin + 20, 210),
             "Welcome to Agave OS Terminal",
-            TEXT_PRIMARY
+            colors.text_primary
         );
         draw_text(
             Position::new(margin + 20, 235),
             "A WASM-based operating system",
-            TEXT_SECONDARY
+            colors.text_secondary
         );
         
         // Status section with visual separation
-        draw_section_divider(Position::new(margin, 270), content_width);
+        draw_section_divider(Position::new(margin, 270), content_width, colors);
         
         draw_text(
             Position::new(margin + 20, 295),
             "● System Status:",
-            ACCENT_GREEN
+            colors.accent_green
         );
         draw_text(
             Position::new(margin + 160, 295),
             "Online",
-            ACCENT_GREEN
+            colors.accent_green
         );
         
         let uptime_seconds = TERMINAL.uptime / 1000;
@@ -120,31 +116,43 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
         draw_text(
             Position::new(margin + 20, 320),
             uptime_text,
-            TEXT_SECONDARY
+            colors.text_secondary
+        );
+        
+        // Show current theme
+        draw_text(
+            Position::new(margin + 20, 345),
+            "● Theme:",
+            colors.text_secondary
+        );
+        draw_text(
+            Position::new(margin + 100, 345),
+            TERMINAL.current_theme.name(),
+            colors.accent_purple
         );
         
         // Terminal output section with scroll support
-        draw_section_divider(Position::new(margin, 355), content_width);
+        draw_section_divider(Position::new(margin, 375), content_width, colors);
         
-        let output_header_y = 380;
+        let output_header_y = 400;
         
         // Show scroll indicators if needed
         if TERMINAL.scroll_offset > 0 {
             draw_text(
                 Position::new(margin + 20, output_header_y),
                 "Terminal Output: (Scrolled - Use ↑↓ PgUp/PgDn to navigate)",
-                ACCENT_YELLOW
+                colors.accent_yellow
             );
         } else {
             draw_text(
                 Position::new(margin + 20, output_header_y),
                 "Terminal Output:",
-                TEXT_PRIMARY
+                colors.text_primary
             );
         }
         
         // Calculate which lines to display based on scroll offset
-        let output_start_y = 410;
+        let output_start_y = 430;
         let max_display_lines = 15; // Maximum lines to show in terminal output area
         
         let total_lines = TERMINAL.output_line_count;
@@ -185,7 +193,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
                 draw_text(
                     Position::new(margin + 30, output_start_y + line_count as i32 * 18),
                     trimmed_line,
-                    TEXT_PRIMARY
+                    colors.text_primary
                 );
             }
             line_count += 1;
@@ -201,7 +209,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
                 Position::new(scroll_indicator_x, scroll_indicator_y),
                 8,
                 max_display_lines as i32 * 18,
-                BORDER_COLOR
+                colors.border_color
             );
             
             // Calculate scroll thumb position
@@ -218,7 +226,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
                 Position::new(scroll_indicator_x + 1, thumb_y),
                 6,
                 10,
-                ACCENT_CYAN
+                colors.accent_cyan
             );
         }
         
@@ -230,19 +238,19 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
             Position::new(margin + 15, prompt_y - 5),
             content_width - 30,
             30,
-            BG_ACCENT
+            colors.bg_accent
         );
         draw_rectangle(
             Position::new(margin + 15, prompt_y - 5),
             content_width - 30,
             30,
-            BORDER_COLOR
+            colors.border_color
         );
         
         draw_text(
             Position::new(margin + 25, prompt_y + 5),
             "user@agave:~$",
-            ACCENT_BLUE
+            colors.accent_blue
         );
         
         // Current command
@@ -251,7 +259,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
             draw_text(
                 Position::new(margin + 140, prompt_y + 5),
                 cmd_str,
-                TEXT_PRIMARY
+                colors.text_primary
             );
         }
         
@@ -261,7 +269,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
             draw_text(
                 Position::new(cursor_x, prompt_y + 5),
                 "▊",
-                ACCENT_CYAN
+                colors.accent_cyan
             );
         }
         
@@ -269,51 +277,51 @@ fn draw_main_screen(dim: agave_lib::Dimensions) {
     }
 }
 
-fn draw_files_screen(dim: agave_lib::Dimensions) {
+fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
     unsafe {
         // Draw main content card
-        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140, colors);
         
         // Header with icon
         draw_text(
             Position::new(margin + 20, 70),
             "📁 File System Browser",
-            ACCENT_BLUE
+            colors.accent_blue
         );
         
         draw_text(
             Position::new(margin + 20, 100),
             "Current Directory:",
-            TEXT_SECONDARY
+            colors.text_secondary
         );
         draw_text(
             Position::new(margin + 180, 100),
             "/home/user",
-            ACCENT_CYAN
+            colors.accent_cyan
         );
         
         // Table header with better styling
-        draw_section_divider(Position::new(margin, 130), content_width);
+        draw_section_divider(Position::new(margin, 130), content_width, colors);
         
         fill_rectangle(
             Position::new(margin + 10, 145),
             content_width - 20,
             35,
-            BG_ACCENT
+            colors.bg_accent
         );
         
-        draw_text(Position::new(margin + 25, 155), "Name", ACCENT_PURPLE);
-        draw_text(Position::new(margin + 320, 155), "Size", ACCENT_PURPLE);
-        draw_text(Position::new(margin + 420, 155), "Type", ACCENT_PURPLE);
+        draw_text(Position::new(margin + 25, 155), "Name", colors.accent_purple);
+        draw_text(Position::new(margin + 320, 155), "Size", colors.accent_purple);
+        draw_text(Position::new(margin + 420, 155), "Type", colors.accent_purple);
         
         draw_rectangle(
             Position::new(margin + 10, 145),
             content_width - 20,
             35,
-            BORDER_COLOR
+            colors.border_color
         );
         
         // File listing with alternating backgrounds
@@ -327,17 +335,22 @@ fn draw_files_screen(dim: agave_lib::Dimensions) {
                     Position::new(margin + 10, y - 5),
                     content_width - 20,
                     30,
-                    RGBA::new(24, 30, 36, 128)
+                    RGBA::new(
+                        colors.bg_secondary.r,
+                        colors.bg_secondary.g,
+                        colors.bg_secondary.b,
+                        128
+                    )
                 );
             }
             
             let (icon, name_color) = if file.is_directory {
-                ("📂", ACCENT_BLUE)
+                ("📂", colors.accent_blue)
             } else {
-                ("📄", TEXT_PRIMARY)
+                ("📄", colors.text_primary)
             };
             
-            draw_text(Position::new(margin + 25, y + 5), icon, TEXT_PRIMARY);
+            draw_text(Position::new(margin + 25, y + 5), icon, colors.text_primary);
             draw_text(Position::new(margin + 50, y + 5), file.name, name_color);
             
             if !file.is_directory {
@@ -348,70 +361,70 @@ fn draw_files_screen(dim: agave_lib::Dimensions) {
                 } else {
                     "Small"
                 };
-                draw_text(Position::new(margin + 320, y + 5), size_str, TEXT_SECONDARY);
-                draw_text(Position::new(margin + 420, y + 5), "File", TEXT_SECONDARY);
+                draw_text(Position::new(margin + 320, y + 5), size_str, colors.text_secondary);
+                draw_text(Position::new(margin + 420, y + 5), "File", colors.text_secondary);
             } else {
-                draw_text(Position::new(margin + 420, y + 5), "Directory", ACCENT_BLUE);
+                draw_text(Position::new(margin + 420, y + 5), "Directory", colors.accent_blue);
             }
         }
         
         // Instructions
-        draw_section_divider(Position::new(margin, dim.height - 120), content_width);
+        draw_section_divider(Position::new(margin, dim.height - 120), content_width, colors);
         draw_text(
             Position::new(margin + 20, dim.height - 95),
             "⏎ Press Enter to return to main screen",
-            TEXT_MUTED
+            colors.text_muted
         );
     }
 }
 
-fn draw_processes_screen(dim: agave_lib::Dimensions) {
+fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
     unsafe {
         // Draw main content card
-        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140, colors);
         
         // Header with icon
         draw_text(
             Position::new(margin + 20, 70),
             "⚙️ Process Manager",
-            ACCENT_RED
+            colors.accent_red
         );
         
         // Performance indicator
         draw_text(
             Position::new(margin + 20, 100),
             "System Load:",
-            TEXT_SECONDARY
+            colors.text_secondary
         );
         draw_text(
             Position::new(margin + 130, 100),
             "Normal",
-            ACCENT_GREEN
+            colors.accent_green
         );
         
         // Table header
-        draw_section_divider(Position::new(margin, 130), content_width);
+        draw_section_divider(Position::new(margin, 130), content_width, colors);
         
         fill_rectangle(
             Position::new(margin + 10, 145),
             content_width - 20,
             35,
-            BG_ACCENT
+            colors.bg_accent
         );
         
-        draw_text(Position::new(margin + 25, 155), "PID", ACCENT_PURPLE);
-        draw_text(Position::new(margin + 80, 155), "Name", ACCENT_PURPLE);
-        draw_text(Position::new(margin + 250, 155), "Status", ACCENT_PURPLE);
-        draw_text(Position::new(margin + 350, 155), "Memory", ACCENT_PURPLE);
+        draw_text(Position::new(margin + 25, 155), "PID", colors.accent_purple);
+        draw_text(Position::new(margin + 80, 155), "Name", colors.accent_purple);
+        draw_text(Position::new(margin + 250, 155), "Status", colors.accent_purple);
+        draw_text(Position::new(margin + 350, 155), "Memory", colors.accent_purple);
         
         draw_rectangle(
             Position::new(margin + 10, 145),
             content_width - 20,
             35,
-            BORDER_COLOR
+            colors.border_color
         );
         
         // Process listing with enhanced styling
@@ -425,7 +438,12 @@ fn draw_processes_screen(dim: agave_lib::Dimensions) {
                     Position::new(margin + 10, y - 5),
                     content_width - 20,
                     32,
-                    RGBA::new(24, 30, 36, 128)
+                    RGBA::new(
+                        colors.bg_secondary.r,
+                        colors.bg_secondary.g,
+                        colors.bg_secondary.b,
+                        128
+                    )
                 );
             }
             
@@ -441,7 +459,7 @@ fn draw_processes_screen(dim: agave_lib::Dimensions) {
                 8 => "008",
                 _ => "???",
             };
-            draw_text(Position::new(margin + 25, y + 5), pid_str, TEXT_SECONDARY);
+            draw_text(Position::new(margin + 25, y + 5), pid_str, colors.text_secondary);
             
             // Process name with icon
             let proc_icon = match proc.name {
@@ -456,14 +474,14 @@ fn draw_processes_screen(dim: agave_lib::Dimensions) {
                 _ => "⚙️",
             };
             
-            draw_text(Position::new(margin + 80, y + 5), proc_icon, TEXT_PRIMARY);
-            draw_text(Position::new(margin + 105, y + 5), proc.name, ACCENT_CYAN);
+            draw_text(Position::new(margin + 80, y + 5), proc_icon, colors.text_primary);
+            draw_text(Position::new(margin + 105, y + 5), proc.name, colors.accent_cyan);
             
             // Status with colored indicator
             let (status_color, status_icon) = if proc.status == "running" {
-                (ACCENT_GREEN, "●")
+                (colors.accent_green, "●")
             } else {
-                (ACCENT_YELLOW, "⏸")
+                (colors.accent_yellow, "⏸")
             };
             
             draw_text(Position::new(margin + 250, y + 5), status_icon, status_color);
@@ -479,11 +497,11 @@ fn draw_processes_screen(dim: agave_lib::Dimensions) {
             };
             
             let mem_color = if proc.memory > 4096 {
-                ACCENT_RED
+                colors.accent_red
             } else if proc.memory > 1024 {
-                ACCENT_YELLOW
+                colors.accent_yellow
             } else {
-                ACCENT_GREEN
+                colors.accent_green
             };
             
             draw_text(Position::new(margin + 350, y + 5), mem_str, mem_color);
@@ -500,110 +518,110 @@ fn draw_processes_screen(dim: agave_lib::Dimensions) {
                 Position::new(margin + 390, y + 10),
                 60,
                 6,
-                BORDER_COLOR
+                colors.border_color
             );
         }
         
         // Instructions
-        draw_section_divider(Position::new(margin, dim.height - 120), content_width);
+        draw_section_divider(Position::new(margin, dim.height - 120), content_width, colors);
         draw_text(
             Position::new(margin + 20, dim.height - 95),
             "⏎ Press Enter to return to main screen",
-            TEXT_MUTED
+            colors.text_muted
         );
     }
 }
 
-fn draw_system_screen(dim: agave_lib::Dimensions) {
+fn draw_system_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
     // Draw main content card
-    draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+    draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140, colors);
     
     // Header with icon
     draw_text(
         Position::new(margin + 20, 70),
         "🖥️ System Information",
-        ACCENT_YELLOW
+        colors.accent_yellow
     );
         
         // System overview section
-        draw_section_header(Position::new(margin + 20, 110), "Operating System");
+        draw_section_header(Position::new(margin + 20, 110), "Operating System", colors);
         
         let os_info = [
-            ("OS:", "Agave OS v1.0.0", ACCENT_CYAN),
-            ("Architecture:", "x86_64", TEXT_PRIMARY),
-            ("Kernel:", "Custom Rust Kernel", ACCENT_PURPLE),
-            ("Runtime:", "WASM + Native", ACCENT_GREEN),
+            ("OS:", "Agave OS v1.0.0", colors.accent_cyan),
+            ("Architecture:", "x86_64", colors.text_primary),
+            ("Kernel:", "Custom Rust Kernel", colors.accent_purple),
+            ("Runtime:", "WASM + Native", colors.accent_green),
         ];
         
         for (i, (label, value, color)) in os_info.iter().enumerate() {
             let y = 140 + i as i32 * 25;
-            draw_text(Position::new(margin + 40, y), label, TEXT_SECONDARY);
+            draw_text(Position::new(margin + 40, y), label, colors.text_secondary);
             draw_text(Position::new(margin + 200, y), value, *color);
         }
         
         // Hardware section
-        draw_section_header(Position::new(margin + 20, 250), "Hardware Resources");
+        draw_section_header(Position::new(margin + 20, 250), "Hardware Resources", colors);
         
         let hw_info = [
-            ("Memory:", "100 MB Heap", ACCENT_BLUE),
-            ("Graphics:", "Direct Framebuffer", ACCENT_GREEN),
-            ("Input:", "VirtIO Mouse/Keyboard", TEXT_PRIMARY),
-            ("Storage:", "Virtual Disk", TEXT_PRIMARY),
+            ("Memory:", "100 MB Heap", colors.accent_blue),
+            ("Graphics:", "Direct Framebuffer", colors.accent_green),
+            ("Input:", "VirtIO Mouse/Keyboard", colors.text_primary),
+            ("Storage:", "Virtual Disk", colors.text_primary),
         ];
         
         for (i, (label, value, color)) in hw_info.iter().enumerate() {
             let y = 280 + i as i32 * 25;
-            draw_text(Position::new(margin + 40, y), label, TEXT_SECONDARY);
+            draw_text(Position::new(margin + 40, y), label, colors.text_secondary);
             draw_text(Position::new(margin + 200, y), value, *color);
         }
         
         // Status indicators
-        draw_section_header(Position::new(margin + 20, 390), "System Status");
+        draw_section_header(Position::new(margin + 20, 390), "System Status", colors);
         
         let status_items = [
-            ("Uptime:", "Running", ACCENT_GREEN, "✓"),
-            ("Status:", "Operational", ACCENT_GREEN, "✓"),
-            ("Load:", "Normal", ACCENT_YELLOW, "●"),
-            ("Network:", "Not Available", ACCENT_RED, "✗"),
+            ("Uptime:", "Running", colors.accent_green, "✓"),
+            ("Status:", "Operational", colors.accent_green, "✓"),
+            ("Load:", "Normal", colors.accent_yellow, "●"),
+            ("Network:", "Not Available", colors.accent_red, "✗"),
         ];
         
         for (i, (label, value, color, icon)) in status_items.iter().enumerate() {
             let y = 420 + i as i32 * 25;
-            draw_text(Position::new(margin + 40, y), label, TEXT_SECONDARY);
+            draw_text(Position::new(margin + 40, y), label, colors.text_secondary);
             draw_text(Position::new(margin + 150, y), icon, *color);
             draw_text(Position::new(margin + 180, y), value, *color);
         }
         
         // Instructions
-        draw_section_divider(Position::new(margin, dim.height - 120), content_width);
+        draw_section_divider(Position::new(margin, dim.height - 120), content_width, colors);
         draw_text(
             Position::new(margin + 20, dim.height - 95),
             "⏎ Press Enter to return to main screen",
-            TEXT_MUTED
+            colors.text_muted
         );
 }
 
-fn draw_help_screen(dim: agave_lib::Dimensions) {
+fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
     // Draw main content card
-    draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+    draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140, colors);
     
     // Header with icon
     draw_text(
         Position::new(margin + 20, 70),
         "❓ Agave OS Terminal - Help",
-        ACCENT_YELLOW
+        colors.accent_yellow
     );
     
     draw_text(
         Position::new(margin + 20, 100),
         "Command Reference Guide",
-        TEXT_SECONDARY
+        colors.text_secondary
     );
     
     let col1_x = margin + 30;
@@ -611,7 +629,7 @@ fn draw_help_screen(dim: agave_lib::Dimensions) {
     let mut current_y = 140;
     
     // File System Commands
-    draw_section_header(Position::new(col1_x, current_y), "📁 File System");
+    draw_section_header(Position::new(col1_x, current_y), "📁 File System", colors);
     current_y += 30;
     
     let file_commands = [
@@ -619,16 +637,16 @@ fn draw_help_screen(dim: agave_lib::Dimensions) {
     ];
     
     for (cmd, desc) in file_commands.iter() {
-        draw_text(Position::new(col1_x + 20, current_y), cmd, ACCENT_CYAN);
-        draw_text(Position::new(col1_x + 60, current_y), "-", TEXT_MUTED);
-        draw_text(Position::new(col1_x + 80, current_y), desc, TEXT_PRIMARY);
+        draw_text(Position::new(col1_x + 20, current_y), cmd, colors.accent_cyan);
+        draw_text(Position::new(col1_x + 60, current_y), "-", colors.text_muted);
+        draw_text(Position::new(col1_x + 80, current_y), desc, colors.text_primary);
         current_y += 22;
     }
     
     current_y += 10;
     
     // System Commands
-    draw_section_header(Position::new(col1_x, current_y), "⚙️ System Commands");
+    draw_section_header(Position::new(col1_x, current_y), "⚙️ System Commands", colors);
     current_y += 30;
     
     let system_commands = [
@@ -641,15 +659,15 @@ fn draw_help_screen(dim: agave_lib::Dimensions) {
     ];
     
     for (cmd, desc) in system_commands.iter() {
-        draw_text(Position::new(col1_x + 20, current_y), cmd, ACCENT_CYAN);
-        draw_text(Position::new(col1_x + 80, current_y), "-", TEXT_MUTED);
-        draw_text(Position::new(col1_x + 100, current_y), desc, TEXT_PRIMARY);
+        draw_text(Position::new(col1_x + 20, current_y), cmd, colors.accent_cyan);
+        draw_text(Position::new(col1_x + 80, current_y), "-", colors.text_muted);
+        draw_text(Position::new(col1_x + 100, current_y), desc, colors.text_primary);
         current_y += 22;
     }
     
     // Right column - Utility Commands
     current_y = 170;
-    draw_section_header(Position::new(col2_x, current_y), "🔧 Utility Commands");
+    draw_section_header(Position::new(col2_x, current_y), "🔧 Utility Commands", colors);
     current_y += 30;
     
     let utility_commands = [
@@ -657,27 +675,48 @@ fn draw_help_screen(dim: agave_lib::Dimensions) {
         ("clear", "Clear terminal output"),
         ("reset", "Reset terminal state"),
         ("echo", "Echo text to output"),
+        ("theme", "Change color themes"),
         ("main", "Return to main screen"),
         ("exit", "Exit the terminal"),
     ];
     
     for (cmd, desc) in utility_commands.iter() {
-        draw_text(Position::new(col2_x + 20, current_y), cmd, ACCENT_CYAN);
-        draw_text(Position::new(col2_x + 70, current_y), "-", TEXT_MUTED);
-        draw_text(Position::new(col2_x + 90, current_y), desc, TEXT_PRIMARY);
+        draw_text(Position::new(col2_x + 20, current_y), cmd, colors.accent_cyan);
+        draw_text(Position::new(col2_x + 70, current_y), "-", colors.text_muted);
+        draw_text(Position::new(col2_x + 90, current_y), desc, colors.text_primary);
         current_y += 22;
     }
     
     current_y += 20;
     
+    // Theme commands section
+    draw_section_header(Position::new(col2_x, current_y), "🎨 Theme Commands", colors);
+    current_y += 25;
+    
+    let theme_commands = [
+        ("theme", "Show current theme"),
+        ("theme list", "List all themes"),
+        ("theme <name>", "Switch to theme"),
+        ("theme next", "Next theme"),
+        ("theme prev", "Previous theme"),
+    ];
+    
+    for (cmd, desc) in theme_commands.iter() {
+        draw_text(Position::new(col2_x + 20, current_y), cmd, colors.accent_purple);
+        draw_text(Position::new(col2_x + 110, current_y), "-", colors.text_muted);
+        draw_text(Position::new(col2_x + 130, current_y), desc, colors.text_secondary);
+        current_y += 20;
+    }
+    
     // Keyboard shortcuts section
-    draw_section_header(Position::new(col2_x, current_y), "⌨️ Quick Shortcuts");
+    current_y = 420;
+    draw_section_header(Position::new(col1_x, current_y), "⌨️ Quick Shortcuts", colors);
     current_y += 25;
     
     draw_text(
-        Position::new(col2_x + 10, current_y),
+        Position::new(col1_x + 10, current_y),
         "(when command line is empty)",
-        TEXT_MUTED
+        colors.text_muted
     );
     current_y += 25;
     
@@ -689,25 +728,26 @@ fn draw_help_screen(dim: agave_lib::Dimensions) {
         ("U", "uname command"),
         ("C", "clear command"),
         ("M", "main screen"),
+        ("T", "next theme"),
     ];
     
     for (key, action) in shortcuts.iter() {
-        draw_text(Position::new(col2_x + 20, current_y), key, ACCENT_PURPLE);
-        draw_text(Position::new(col2_x + 40, current_y), "-", TEXT_MUTED);
-        draw_text(Position::new(col2_x + 60, current_y), action, TEXT_SECONDARY);
+        draw_text(Position::new(col1_x + 20, current_y), key, colors.accent_purple);
+        draw_text(Position::new(col1_x + 40, current_y), "-", colors.text_muted);
+        draw_text(Position::new(col1_x + 60, current_y), action, colors.text_secondary);
         current_y += 20;
     }
     
     // Instructions
-    draw_section_divider(Position::new(margin, dim.height - 120), content_width);
+    draw_section_divider(Position::new(margin, dim.height - 120), content_width, colors);
     draw_text(
         Position::new(margin + 20, dim.height - 95),
         "⏎ Press Enter to return to main screen",
-        TEXT_MUTED
+        colors.text_muted
     );
 }
 
-fn draw_status_bar(dim: agave_lib::Dimensions) {
+fn draw_status_bar(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let status_y = dim.height - 40;
     let status_height = 40;
     
@@ -716,7 +756,7 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         Position::new(0, status_y),
         dim.width,
         status_height,
-        BG_SECONDARY
+        colors.bg_secondary
     );
     
     // Top border with accent color
@@ -724,7 +764,7 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         Position::new(0, status_y),
         dim.width,
         2,
-        ACCENT_CYAN
+        colors.accent_cyan
     );
     
     // Subtle inner border
@@ -732,17 +772,17 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         Position::new(0, status_y),
         dim.width,
         status_height,
-        BORDER_COLOR
+        colors.border_color
     );
     
     unsafe {
         // Current screen indicator with enhanced styling
         let (screen_text, screen_color) = match TERMINAL.current_screen {
-            Screen::Main => ("● MAIN", ACCENT_GREEN),
-            Screen::Files => ("📁 FILES", ACCENT_BLUE),
-            Screen::Processes => ("⚙️ PROCESSES", ACCENT_RED), 
-            Screen::System => ("🖥️ SYSTEM", ACCENT_YELLOW),
-            Screen::Help => ("❓ HELP", ACCENT_PURPLE),
+            Screen::Main => ("● MAIN", colors.accent_green),
+            Screen::Files => ("📁 FILES", colors.accent_blue),
+            Screen::Processes => ("⚙️ PROCESSES", colors.accent_red), 
+            Screen::System => ("🖥️ SYSTEM", colors.accent_yellow),
+            Screen::Help => ("❓ HELP", colors.accent_purple),
         };
         
         draw_text(
@@ -755,34 +795,54 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         draw_text(
             Position::new(160, status_y + 12),
             "│",
-            BORDER_COLOR
+            colors.border_color
         );
         
         // Application title
         draw_text(
             Position::new(180, status_y + 12),
             "Agave OS Terminal v1.0",
-            TEXT_PRIMARY
+            colors.text_primary
         );
         
         // Separator
         draw_text(
             Position::new(380, status_y + 12),
             "│",
-            BORDER_COLOR
+            colors.border_color
         );
         
         // Command buffer indicator with better styling
         let (cmd_text, cmd_color) = if TERMINAL.command_length > 0 {
-            ("⌨️ TYPING", ACCENT_YELLOW)
+            ("⌨️ TYPING", colors.accent_yellow)
         } else {
-            ("✓ READY", ACCENT_GREEN)
+            ("✓ READY", colors.accent_green)
         };
         
         draw_text(
             Position::new(400, status_y + 12),
             cmd_text,
             cmd_color
+        );
+        
+        // Theme indicator
+        draw_text(
+            Position::new(500, status_y + 12),
+            "│",
+            colors.border_color
+        );
+        
+        // Show current theme name
+        let theme_text = TERMINAL.current_theme.name();
+        draw_text(
+            Position::new(520, status_y + 12),
+            "🎨",
+            colors.accent_purple
+        );
+        draw_text(
+            Position::new(545, status_y + 12),
+            theme_text,
+            colors.accent_purple
         );
         
         // Right side indicators
@@ -801,23 +861,23 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         draw_text(
             Position::new(right_x, status_y + 12),
             uptime_str,
-            TEXT_SECONDARY
+            colors.text_secondary
         );
         
         // Separator
         draw_text(
             Position::new(right_x + 80, status_y + 12),
             "│",
-            BORDER_COLOR
+            colors.border_color
         );
         
         // System heartbeat indicator
         let heartbeat_color = if ANIMATION_FRAME % 120 < 20 {
-            ACCENT_RED
+            colors.accent_red
         } else if ANIMATION_FRAME % 120 < 40 {
-            RGBA::new(248, 113, 113, 180)
+            RGBA::new(colors.accent_red.r, colors.accent_red.g, colors.accent_red.b, 180)
         } else {
-            RGBA::new(248, 113, 113, 80)
+            RGBA::new(colors.accent_red.r, colors.accent_red.g, colors.accent_red.b, 80)
         };
         
         draw_text(
@@ -830,7 +890,7 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
         draw_text(
             Position::new(right_x + 125, status_y + 12),
             "Online",
-            ACCENT_GREEN
+            colors.accent_green
         );
     }
 }
@@ -839,12 +899,12 @@ fn draw_status_bar(dim: agave_lib::Dimensions) {
 // IMPORTANT: These functions maintain the visual consistency of the terminal UI
 // Do not modify spacing, colors, or layout without updating the design system above
 
-fn draw_card(pos: Position, width: i32, height: i32) {
+fn draw_card(pos: Position, width: i32, height: i32, colors: &ThemeColors) {
     // Card background with consistent styling
-    fill_rectangle(pos, width, height, BG_ACCENT);
+    fill_rectangle(pos, width, height, colors.bg_accent);
     
     // Card border for definition
-    draw_rectangle(pos, width, height, BORDER_COLOR);
+    draw_rectangle(pos, width, height, colors.border_color);
     
     // Subtle inner shadow effect for depth
     draw_rectangle(
@@ -855,9 +915,9 @@ fn draw_card(pos: Position, width: i32, height: i32) {
     );
 }
 
-fn draw_section_divider(pos: Position, width: i32) {
+fn draw_section_divider(pos: Position, width: i32, colors: &ThemeColors) {
     // Main divider line with consistent styling
-    fill_rectangle(pos, width, 1, BORDER_COLOR);
+    fill_rectangle(pos, width, 1, colors.border_color);
     
     // Subtle highlight above for depth
     fill_rectangle(
@@ -868,9 +928,9 @@ fn draw_section_divider(pos: Position, width: i32) {
     );
 }
 
-fn draw_section_header(pos: Position, text: &str) {
+fn draw_section_header(pos: Position, text: &str, colors: &ThemeColors) {
     // Section header with professional styling
-    draw_text(pos, text, ACCENT_PURPLE);
+    draw_text(pos, text, colors.accent_purple);
     
     // Underline for emphasis (maintain 8px character width assumption)
     let text_width = text.len() as i32 * 8;
@@ -878,6 +938,6 @@ fn draw_section_header(pos: Position, text: &str) {
         Position::new(pos.x, pos.y + 18),
         text_width,
         2,
-        ACCENT_PURPLE
+        colors.accent_purple
     );
 }

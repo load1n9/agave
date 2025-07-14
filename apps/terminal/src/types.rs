@@ -8,6 +8,59 @@ pub enum Screen {
     Help,
 }
 
+/// Color theme types
+#[derive(Clone, Copy, PartialEq)]
+pub enum Theme {
+    Default,
+    Dark,
+    Light,
+    Ocean,
+    Forest,
+    Sunset,
+    Neon,
+    Retro,
+}
+
+impl Theme {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Theme::Default => "Default",
+            Theme::Dark => "Dark",
+            Theme::Light => "Light",
+            Theme::Ocean => "Ocean",
+            Theme::Forest => "Forest",
+            Theme::Sunset => "Sunset",
+            Theme::Neon => "Neon",
+            Theme::Retro => "Retro",
+        }
+    }
+    
+    pub fn all_themes() -> [Theme; 8] {
+        [
+            Theme::Default,
+            Theme::Dark,
+            Theme::Light,
+            Theme::Ocean,
+            Theme::Forest,
+            Theme::Sunset,
+            Theme::Neon,
+            Theme::Retro,
+        ]
+    }
+    
+    pub fn next_theme(&self) -> Theme {
+        let themes = Self::all_themes();
+        let current_index = themes.iter().position(|&t| t == *self).unwrap_or(0);
+        themes[(current_index + 1) % themes.len()]
+    }
+    
+    pub fn prev_theme(&self) -> Theme {
+        let themes = Self::all_themes();
+        let current_index = themes.iter().position(|&t| t == *self).unwrap_or(0);
+        themes[(current_index + themes.len() - 1) % themes.len()]
+    }
+}
+
 /// Process information
 #[derive(Clone, Copy)]
 pub struct Process {
@@ -28,6 +81,7 @@ pub struct FileEntry {
 /// Terminal application state
 pub struct TerminalApp {
     pub current_screen: Screen,
+    pub current_theme: Theme,
     pub command_buffer: [u8; 512], // Increased from 256 to 512
     pub command_length: usize,
     pub output_lines: [[u8; 120]; 500], // Increased from 80x200 to 120x500 for more history and wider lines
@@ -45,6 +99,7 @@ impl TerminalApp {
     pub const fn new() -> Self {
         Self {
             current_screen: Screen::Main,
+            current_theme: Theme::Default,
             command_buffer: [0; 512],
             command_length: 0,
             output_lines: [[0; 120]; 500], // Increased buffer size

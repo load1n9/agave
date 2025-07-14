@@ -575,13 +575,12 @@ pub fn draw_shadow(pos: Position, width: i32, height: i32, blur: i32, color: RGB
 
 /// Get input state for advanced input handling
 pub fn get_input_state() -> InputState {
-    unsafe {
-        InputState {
-            mouse_x: raw::get_mouse_x(),
-            mouse_y: raw::get_mouse_y(),
-            mouse_left: raw::is_mouse_button_down(0),
-            mouse_right: raw::is_mouse_button_down(1),
-            mouse_middle: raw::is_mouse_button_down(2),
-        }
+    // For now, return default values since mouse support isn't fully implemented
+    InputState {
+        mouse_x: 0,
+        mouse_y: 0,
+        mouse_left: false,
+        mouse_right: false,
+        mouse_middle: false,
     }
 }

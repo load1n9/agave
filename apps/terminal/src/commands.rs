@@ -50,7 +50,7 @@ impl TerminalApp {
         self.add_output_line(&prompt_line);
         
         // Convert command to lowercase for case-insensitive matching
-        let mut cmd_lower = [0u8; 256];
+        let mut cmd_lower = [0u8; 512];
         for i in 0..self.command_length {
             cmd_lower[i] = match self.command_buffer[i] {
                 b'A'..=b'Z' => self.command_buffer[i] + 32, // Convert to lowercase
@@ -205,8 +205,8 @@ impl TerminalApp {
 
     fn handle_clear_command(&mut self) {
         self.output_line_count = 0;
-        for i in 0..24 {
-            for j in 0..80 {
+        for i in 0..500 {
+            for j in 0..120 {
                 self.output_lines[i][j] = 0;
             }
         }
@@ -220,8 +220,8 @@ impl TerminalApp {
     fn handle_reset_command(&mut self) {
         // Reset command - clears everything and resets to initial state
         self.output_line_count = 0;
-        for i in 0..24 {
-            for j in 0..80 {
+        for i in 0..500 {
+            for j in 0..120 {
                 self.output_lines[i][j] = 0;
             }
         }

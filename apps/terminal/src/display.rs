@@ -121,14 +121,19 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         
         // Show current theme
         draw_text(
-            Position::new(margin + 20, 345),
+            Position::new(margin + 280, 345),
             "● Theme:",
             colors.text_secondary
         );
         draw_text(
-            Position::new(margin + 100, 345),
+            Position::new(margin + 340, 345),
             TERMINAL.current_theme.name(),
             colors.accent_purple
+        );
+        draw_text(
+            Position::new(margin + 420, 345),
+            "(Press T to cycle)",
+            colors.text_muted
         );
         
         // Terminal output section with scroll support

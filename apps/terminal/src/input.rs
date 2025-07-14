@@ -28,156 +28,152 @@ pub fn handle_keyboard_input() {
                 let (key_code, pressed) = get_key_history_event(i);
                 
                 if pressed {
-                    // Check for Enter key in history
-                    if key_code == KEY_ENTER {
-                        TERMINAL.process_command();
-                        LAST_PROCESSED_COUNT = history_count;
-                        return;
-                    }
-                    
-                    // Check for Backspace in history
-                    if key_code == KEY_BACKSPACE {
-                        if TERMINAL.command_length > 0 {
-                            TERMINAL.command_length -= 1;
-                            TERMINAL.command_buffer[TERMINAL.command_length] = 0;
-                        }
-                        continue;
-                    }
-                    
-                    // Check for Escape in history
-                    if key_code == KEY_ESC {
-                        TERMINAL.command_length = 0;
-                        for j in 0..256 {
-                            TERMINAL.command_buffer[j] = 0;
-                        }
-                        continue;
-                    }
-                    
-                    // Check for Up arrow - scroll history or command history
-                    if key_code == KEY_UP {
-                        if TERMINAL.command_length == 0 {
-                            // No command typed, scroll up in output history
-                            TERMINAL.scroll_up(3);
-                        } else if COMMAND_HISTORY_INDEX > 0 {
-                            // Command typed, navigate command history
-                            COMMAND_HISTORY_INDEX -= 1;
-                            // Load command from history
-                            TERMINAL.command_length = 0;
-                            for j in 0..256 {
-                                if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
-                                    break;
-                                }
-                                TERMINAL.command_buffer[j] = COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j];
-                                TERMINAL.command_length += 1;
-                            }
-                        }
-                        continue;
-                    }
-                    
-                    // Check for Down arrow - scroll history or command history
-                    if key_code == KEY_DOWN {
-                        if TERMINAL.command_length == 0 {
-                            // No command typed, scroll down in output history
-                            TERMINAL.scroll_down(3);
-                        } else if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
-                            // Command typed, navigate command history
-                            COMMAND_HISTORY_INDEX += 1;
-                            if COMMAND_HISTORY_INDEX >= COMMAND_HISTORY_COUNT {
-                                // Clear command line
-                                TERMINAL.command_length = 0;
-                                for j in 0..256 {
-                                    TERMINAL.command_buffer[j] = 0;
-                                }
-                            } else {
-                                // Load command from history
-                                TERMINAL.command_length = 0;
-                                for j in 0..256 {
-                                    if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
-                                        break;
-                                    }
-                                    TERMINAL.command_buffer[j] = COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j];
-                                    TERMINAL.command_length += 1;
-                                }
-                            }
-                        }
-                        continue;
-                    }
-                    
-                    // Check for Page Up - scroll up faster
-                    if key_code == KEY_PAGEUP {
-                        TERMINAL.scroll_up(10);
-                        continue;
-                    }
-                    
-                    // Check for Page Down - scroll down faster  
-                    if key_code == KEY_PAGEDOWN {
-                        TERMINAL.scroll_down(10);
-                        continue;
-                    }
-                    
-                    // Check for Home - jump to top of history
-                    if key_code == KEY_HOME && TERMINAL.command_length == 0 {
-                        TERMINAL.scroll_to_top();
-                        continue;
-                    }
-                    
-                    // Check for End - jump to bottom of history
-                    if key_code == KEY_END && TERMINAL.command_length == 0 {
-                        TERMINAL.scroll_to_bottom();
+                    // Handle special keys first
+                    if handle_special_key(key_code, shift_pressed) {
                         continue;
                     }
                     
                     // Handle character input
                     if let Some(ch) = key_code_to_char(key_code, shift_pressed) {
-                        // Add character to command buffer with safety checks
-                        if TERMINAL.command_length < 500 { // Leave some buffer space
-                            TERMINAL.command_buffer[TERMINAL.command_length] = ch as u8;
-                            TERMINAL.command_length += 1;
-                        } else {
-                            // Command too long - auto-clear to prevent issues
-                            TERMINAL.add_output_line(b"Command too long - cleared");
-                            TERMINAL.command_length = 0;
-                            for j in 0..256 {
-                                TERMINAL.command_buffer[j] = 0;
-                            }
-                        }
+                        handle_character_input(ch);
                     }
                 }
             }
             LAST_PROCESSED_COUNT = history_count;
         }
         
-        // Handle special keys using is_key_pressed as backup
-        if is_key_pressed(KEY_ENTER) {
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_BACKSPACE) {
-            if TERMINAL.command_length > 0 {
-                TERMINAL.command_length -= 1;
-                TERMINAL.command_buffer[TERMINAL.command_length] = 0;
-            }
-            return;
-        }
-        
-        if is_key_pressed(KEY_ESC) {
-            // Clear command line
-            TERMINAL.command_length = 0;
-            for i in 0..256 {
-                TERMINAL.command_buffer[i] = 0;
-            }
-            return;
-        }
-        
-        // Handle quick shortcuts
+        // Handle quick shortcuts only when no character input is being processed
         handle_shortcut_keys();
+    }
+}
+
+// Separate function to handle special keys
+fn handle_special_key(key_code: i32, shift_pressed: bool) -> bool {
+    unsafe {
+        match key_code {
+            KEY_ENTER => {
+                TERMINAL.process_command();
+                true
+            }
+            KEY_BACKSPACE => {
+                if TERMINAL.command_length > 0 {
+                    TERMINAL.command_length -= 1;
+                    TERMINAL.command_buffer[TERMINAL.command_length] = 0;
+                }
+                true
+            }
+            KEY_ESC => {
+                TERMINAL.command_length = 0;
+                for j in 0..512 {
+                    TERMINAL.command_buffer[j] = 0;
+                }
+                true
+            }
+            KEY_UP => {
+                if TERMINAL.command_length == 0 {
+                    // No command typed, scroll up in output history
+                    TERMINAL.scroll_up(3);
+                } else if COMMAND_HISTORY_INDEX > 0 {
+                    // Command typed, navigate command history
+                    COMMAND_HISTORY_INDEX -= 1;
+                    // Load command from history
+                    TERMINAL.command_length = 0;
+                    for j in 0..512 {
+                        if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
+                            break;
+                        }
+                        TERMINAL.command_buffer[j] = COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j];
+                        TERMINAL.command_length += 1;
+                    }
+                }
+                true
+            }
+            KEY_DOWN => {
+                if TERMINAL.command_length == 0 {
+                    // No command typed, scroll down in output history
+                    TERMINAL.scroll_down(3);
+                } else if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
+                    // Command typed, navigate command history
+                    COMMAND_HISTORY_INDEX += 1;
+                    if COMMAND_HISTORY_INDEX >= COMMAND_HISTORY_COUNT {
+                        // Clear command line
+                        TERMINAL.command_length = 0;
+                        for j in 0..512 {
+                            TERMINAL.command_buffer[j] = 0;
+                        }
+                    } else {
+                        // Load command from history
+                        TERMINAL.command_length = 0;
+                        for j in 0..512 {
+                            if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
+                                break;
+                            }
+                            TERMINAL.command_buffer[j] = COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j];
+                            TERMINAL.command_length += 1;
+                        }
+                    }
+                }
+                true
+            }
+            KEY_PAGEUP => {
+                TERMINAL.scroll_up(10);
+                true
+            }
+            KEY_PAGEDOWN => {
+                TERMINAL.scroll_down(10);
+                true
+            }
+            KEY_HOME => {
+                if TERMINAL.command_length == 0 {
+                    TERMINAL.scroll_to_top();
+                }
+                true
+            }
+            KEY_END => {
+                if TERMINAL.command_length == 0 {
+                    TERMINAL.scroll_to_bottom();
+                }
+                true
+            }
+            _ => false
+        }
+    }
+}
+
+// Separate function to handle character input with better bounds checking
+fn handle_character_input(ch: char) {
+    unsafe {
+        // Validate that the character is printable and safe
+        let ch_byte = ch as u8;
+        if ch_byte < 32 || ch_byte > 126 {
+            return; // Skip non-printable characters
+        }
+        
+        // Check buffer bounds more conservatively
+        if TERMINAL.command_length < 510 { // Leave more space for safety
+            TERMINAL.command_buffer[TERMINAL.command_length] = ch_byte;
+            TERMINAL.command_length += 1;
+            // Ensure null termination
+            TERMINAL.command_buffer[TERMINAL.command_length] = 0;
+        } else {
+            // Command too long - auto-clear to prevent issues
+            TERMINAL.add_output_line(b"Command too long - cleared");
+            TERMINAL.command_length = 0;
+            for j in 0..512 {
+                TERMINAL.command_buffer[j] = 0;
+            }
+        }
     }
 }
 
 fn handle_shortcut_keys() {
     unsafe {
-        if is_key_pressed(KEY_L) && TERMINAL.command_length == 0 {
+        // Only handle shortcuts when command line is empty to avoid conflicts
+        if TERMINAL.command_length > 0 {
+            return;
+        }
+        
+        if is_key_pressed(KEY_L) {
             // Quick 'ls' shortcut
             TERMINAL.command_buffer[0] = b'l';
             TERMINAL.command_buffer[1] = b's';
@@ -186,7 +182,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_P) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_P) {
             // Quick 'ps' shortcut
             TERMINAL.command_buffer[0] = b'p';
             TERMINAL.command_buffer[1] = b's';
@@ -195,7 +191,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_H) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_H) {
             // Quick 'help' shortcut
             let help_cmd = b"help";
             for (i, &byte) in help_cmd.iter().enumerate() {
@@ -206,7 +202,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_S) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_S) {
             // Quick 'system' shortcut
             let sys_cmd = b"system";
             for (i, &byte) in sys_cmd.iter().enumerate() {
@@ -217,7 +213,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_U) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_U) {
             // Quick 'uname' shortcut
             let uname_cmd = b"uname";
             for (i, &byte) in uname_cmd.iter().enumerate() {
@@ -228,7 +224,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_C) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_C) {
             // Quick 'clear' shortcut
             let clear_cmd = b"clear";
             for (i, &byte) in clear_cmd.iter().enumerate() {
@@ -239,7 +235,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_M) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_M) {
             // Quick 'main' shortcut
             let main_cmd = b"main";
             for (i, &byte) in main_cmd.iter().enumerate() {
@@ -250,7 +246,7 @@ fn handle_shortcut_keys() {
             return;
         }
         
-        if is_key_pressed(KEY_T) && TERMINAL.command_length == 0 {
+        if is_key_pressed(KEY_T) {
             // Quick 'theme next' shortcut
             TERMINAL.current_theme = TERMINAL.current_theme.next_theme();
             let theme_name = TERMINAL.current_theme.name();

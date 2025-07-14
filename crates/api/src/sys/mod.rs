@@ -1,4 +1,5 @@
 pub mod allocator;
+pub mod diagnostics; // New: Enhanced system diagnostics
 pub mod drivers;
 pub mod error;
 pub mod framebuffer;
@@ -14,7 +15,10 @@ pub mod monitor;
 pub mod network; // New: Network stack
 pub mod pci;
 pub mod pic;
+pub mod power; // New: Power management
+pub mod process; // New: Enhanced process management
 pub mod random;
+pub mod security; // New: Security framework
 pub mod serial;
 pub mod task;
 pub mod virtio;

@@ -5,7 +5,9 @@
 
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
-    allocator, drivers,
+    allocator, 
+    diagnostics,    // New: Enhanced diagnostics
+    drivers,
     framebuffer::{FB, RGBA},
     fs,        // Add filesystem
     gdt, globals, interrupts, ioapic, local_apic,
@@ -14,6 +16,9 @@ use agave_api::sys::{
     monitor,
     network,   // Add network
     pci,
+    power,     // New: Power management
+    process,   // New: Process management
+    security,  // New: Security framework
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
     wasm::WasmApp,
@@ -273,7 +278,31 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Initializing system monitoring...");
     monitor::init_monitoring();
     log::info!("System monitoring enabled");
-    show_loading_screen("System monitoring enabled...", 40, &mut *fb);
+    show_loading_screen("System monitoring enabled...", 35, &mut *fb);
+
+    // Initialize enhanced diagnostics
+    log::info!("Initializing enhanced diagnostics...");
+    diagnostics::init_diagnostics();
+    log::info!("Enhanced diagnostics enabled");
+    show_loading_screen("Enhanced diagnostics enabled...", 40, &mut *fb);
+
+    // Initialize security framework
+    log::info!("Initializing security framework...");
+    security::init_security();
+    log::info!("Security framework enabled");
+    show_loading_screen("Security framework enabled...", 45, &mut *fb);
+
+    // Initialize process management
+    log::info!("Initializing process management...");
+    process::init_process_management();
+    log::info!("Process management enabled");
+    show_loading_screen("Process management enabled...", 50, &mut *fb);
+
+    // Initialize power management
+    log::info!("Initializing power management...");
+    power::init_power_management();
+    log::info!("Power management enabled");
+    show_loading_screen("Power management enabled...", 55, &mut *fb);
 
     // Initialize filesystem
     log::info!("Initializing filesystem...");
@@ -282,7 +311,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Filesystem initialized successfully");
     }
-    show_loading_screen("Filesystem initialized...", 55, &mut *fb);
+    show_loading_screen("Filesystem initialized...", 65, &mut *fb);
 
     // Initialize network stack
     log::info!("Initializing network stack...");
@@ -291,7 +320,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Network stack initialized successfully");
     }
-    show_loading_screen("Network stack ready...", 70, &mut *fb);
+    show_loading_screen("Network stack ready...", 75, &mut *fb);
 
     // Initialize socket subsystem
     log::info!("Initializing socket subsystem...");
@@ -300,7 +329,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Socket subsystem initialized successfully");
     }
-    show_loading_screen("Socket subsystem ready...", 85, &mut *fb);
+    show_loading_screen("Socket subsystem ready...", 80, &mut *fb);
 
     // Log initial system status
     log::info!("Logging initial system status...");
@@ -378,26 +407,65 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             loop {
                 globals::INPUT.update(|e| e.step());
                 let input = globals::INPUT.read();
+                
+                // Record system activity for power management
+                power::record_system_activity();
+                
                 for app in apps.iter_mut() {
                     app.call_update(input);
                 }
                 
                 frame_counter += 1;
                 
-                // Periodic monitoring (every ~1000 frames, roughly once per second)
+                // Update power management every 10 frames (~100Hz)
+                if frame_counter % 10 == 0 {
+                    if let Err(e) = power::update_power_management() {
+                        log::error!("Power management update failed: {:?}", e);
+                    }
+                }
+                
+                // Enhanced monitoring and diagnostics (every ~1000 frames, roughly once per second)
                 if frame_counter % 1000 == 0 {
                     let current_time = agave_api::sys::interrupts::TIME_MS
                         .load(core::sync::atomic::Ordering::Relaxed);
                     
-                    // Run monitoring check every 10 seconds
+                    // Run periodic diagnostics every 10 seconds
                     if current_time - last_monitor_check > 10000 {
+                        let health_report = diagnostics::perform_health_check();
+                        
+                        // Log critical issues immediately
+                        if health_report.status == diagnostics::SystemHealthStatus::Critical {
+                            log::error!("CRITICAL SYSTEM HEALTH ISSUE DETECTED!");
+                            log::error!("{}", health_report.summary());
+                        }
+                        
+                        // Run legacy monitoring
                         monitor::periodic_monitor_check();
+                        
+                        // Clean up terminated processes
+                        process::cleanup_terminated_processes();
+                        
                         last_monitor_check = current_time;
                     }
                     
-                    // Log system status every 30 seconds
+                    // Log comprehensive system status every 30 seconds
                     if frame_counter % 30000 == 0 {
                         monitor::log_system_status();
+                        
+                        // Log power status
+                        let (cpu_freq, _, _) = power::get_cpu_frequency_info();
+                        let (cpu_temp, thermal_throttling) = power::get_thermal_info();
+                        let power_state = power::get_power_state();
+                        
+                        log::info!("Enhanced Status - Power: {:?}, CPU: {} MHz, Temp: {:.1}°C, Throttling: {}",
+                                   power_state, cpu_freq, cpu_temp, thermal_throttling);
+                        
+                        // Log security status
+                        let security_stats = security::get_security_statistics();
+                        if security_stats.total_events > 0 {
+                            log::info!("Security Status - {} events, {} blocked processes",
+                                       security_stats.total_events, security_stats.blocked_processes);
+                        }
                     }
                 }
                 

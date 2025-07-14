@@ -32,6 +32,14 @@ pub enum AgaveError {
     TaskError(TaskError),
     /// Hardware error
     HardwareError(HwError),
+    /// Security violation
+    SecurityViolation,
+    /// Invalid system state
+    InvalidState,
+    /// Resource exhausted
+    ResourceExhausted,
+    /// Feature not implemented
+    NotImplemented,
     /// Unknown error
     Unknown,
 }
@@ -100,6 +108,10 @@ impl fmt::Display for AgaveError {
             AgaveError::WasmError(e) => write!(f, "WASM error: {:?}", e),
             AgaveError::TaskError(e) => write!(f, "Task error: {:?}", e),
             AgaveError::HardwareError(e) => write!(f, "Hardware error: {:?}", e),
+            AgaveError::SecurityViolation => write!(f, "Security violation"),
+            AgaveError::InvalidState => write!(f, "Invalid system state"),
+            AgaveError::ResourceExhausted => write!(f, "Resource exhausted"),
+            AgaveError::NotImplemented => write!(f, "Feature not implemented"),
             AgaveError::Unknown => write!(f, "Unknown error"),
         }
     }

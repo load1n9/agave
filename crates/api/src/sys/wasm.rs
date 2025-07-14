@@ -28,33 +28,6 @@ impl WasmApp {
         let mut linker = <Linker<*mut FB>>::new(&engine);
 
         log::info!("WASM: Setting up function bindings...");
-
-        let temp = Func::wrap(&mut store, |caller: Caller<'_, *mut FB>| {
-            log::trace!("WASM: temp function called");
-            let fb = unsafe { caller.data().as_mut().unwrap() };
-            let mut text_display = TextDisplay::new(
-                400,
-                400,
-                RGBA {
-                    r: 255,
-                    g: 0,
-                    b: 255,
-                    a: 255,
-                },
-                RGBA {
-                    r: 0,
-                    g: 0,
-                    b: 0,
-                    a: 255,
-                },
-            )
-            .unwrap();
-            text_display.set_text("Agave");
-            text_display.display(Coordinate { x: 0, y: 0 }, fb).unwrap();
-        });
-
-        linker.define("agave", "temp", temp).unwrap();
-
         let draw_circle = Func::wrap(
             &mut store,
             |caller: Caller<'_, *mut FB>,
@@ -65,7 +38,6 @@ impl WasmApp {
              g: i32,
              b: i32,
              a: i32| {
-                log::trace!("WASM: draw_circle called at ({}, {}) radius {} color ({},{},{},{})", x, y, radius, r, g, b, a);
                 let fb = unsafe { caller.data().as_mut().unwrap() };
                 fb.draw_circle(
                     Coordinate {
@@ -103,7 +75,9 @@ impl WasmApp {
                             let px = x + dx;
                             let py = y + dy;
                             if px >= 0 && py >= 0 && px < fb.w as i32 && py < fb.h as i32 {
-                                if let Some(pixel) = fb.pixels.get_mut((py * fb.w as i32 + px) as usize) {
+                                if let Some(pixel) =
+                                    fb.pixels.get_mut((py * fb.w as i32 + px) as usize)
+                                {
                                     pixel.r = r as u8;
                                     pixel.g = g as u8;
                                     pixel.b = b as u8;
@@ -118,13 +92,16 @@ impl WasmApp {
 
         linker.define("agave", "fill_circle", fill_circle).unwrap();
 
-        // Add draw_triangle function  
+        // Add draw_triangle function
         let draw_triangle = Func::wrap(
             &mut store,
             |caller: Caller<'_, *mut FB>,
-             x1: i32, y1: i32,
-             x2: i32, y2: i32,
-             x3: i32, y3: i32,
+             x1: i32,
+             y1: i32,
+             x2: i32,
+             y2: i32,
+             x3: i32,
+             y3: i32,
              r: i32,
              g: i32,
              b: i32,
@@ -136,27 +113,47 @@ impl WasmApp {
                     b: b as u8,
                     a: a as u8,
                 };
-                
+
                 // Draw triangle edges
                 fb.draw_line(
-                    Coordinate { x: x1 as isize, y: y1 as isize },
-                    Coordinate { x: x2 as isize, y: y2 as isize },
+                    Coordinate {
+                        x: x1 as isize,
+                        y: y1 as isize,
+                    },
+                    Coordinate {
+                        x: x2 as isize,
+                        y: y2 as isize,
+                    },
                     color,
                 );
                 fb.draw_line(
-                    Coordinate { x: x2 as isize, y: y2 as isize },
-                    Coordinate { x: x3 as isize, y: y3 as isize },
+                    Coordinate {
+                        x: x2 as isize,
+                        y: y2 as isize,
+                    },
+                    Coordinate {
+                        x: x3 as isize,
+                        y: y3 as isize,
+                    },
                     color,
                 );
                 fb.draw_line(
-                    Coordinate { x: x3 as isize, y: y3 as isize },
-                    Coordinate { x: x1 as isize, y: y1 as isize },
+                    Coordinate {
+                        x: x3 as isize,
+                        y: y3 as isize,
+                    },
+                    Coordinate {
+                        x: x1 as isize,
+                        y: y1 as isize,
+                    },
                     color,
                 );
             },
         );
 
-        linker.define("agave", "draw_triangle", draw_triangle).unwrap();
+        linker
+            .define("agave", "draw_triangle", draw_triangle)
+            .unwrap();
 
         let fill_rectangle = Func::wrap(
             &mut store,
@@ -326,47 +323,62 @@ impl WasmApp {
         linker.define("agave", "get_time_ms", get_time_ms).unwrap();
 
         // Keyboard input functions
-        let is_key_pressed = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
-            let input = crate::sys::globals::INPUT.read();
-            if key_code >= 0 && (key_code as usize) < input.keys.len() {
-                match input.keys[key_code as usize] {
-                    crate::sys::globals::KeyState::OnFromOff => 1,
-                    _ => 0,
+        let is_key_pressed = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+                let input = crate::sys::globals::INPUT.read();
+                if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                    match input.keys[key_code as usize] {
+                        crate::sys::globals::KeyState::OnFromOff => 1,
+                        _ => 0,
+                    }
+                } else {
+                    0
                 }
-            } else {
-                0
-            }
-        });
+            },
+        );
 
-        linker.define("agave", "is_key_pressed", is_key_pressed).unwrap();
+        linker
+            .define("agave", "is_key_pressed", is_key_pressed)
+            .unwrap();
 
-        let is_key_down = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
-            let input = crate::sys::globals::INPUT.read();
-            if key_code >= 0 && (key_code as usize) < input.keys.len() {
-                match input.keys[key_code as usize] {
-                    crate::sys::globals::KeyState::On | crate::sys::globals::KeyState::OnFromOff | crate::sys::globals::KeyState::OnTransientOff => 1,
-                    _ => 0,
+        let is_key_down = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+                let input = crate::sys::globals::INPUT.read();
+                if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                    match input.keys[key_code as usize] {
+                        crate::sys::globals::KeyState::On
+                        | crate::sys::globals::KeyState::OnFromOff
+                        | crate::sys::globals::KeyState::OnTransientOff => 1,
+                        _ => 0,
+                    }
+                } else {
+                    0
                 }
-            } else {
-                0
-            }
-        });
+            },
+        );
 
         linker.define("agave", "is_key_down", is_key_down).unwrap();
 
-        let is_key_released = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
-            let input = crate::sys::globals::INPUT.read();
-            if key_code >= 0 && (key_code as usize) < input.keys.len() {
-                match input.keys[key_code as usize] {
-                    crate::sys::globals::KeyState::OffFromOn => 1,
-                    _ => 0,
+        let is_key_released = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, key_code: i32| -> i32 {
+                let input = crate::sys::globals::INPUT.read();
+                if key_code >= 0 && (key_code as usize) < input.keys.len() {
+                    match input.keys[key_code as usize] {
+                        crate::sys::globals::KeyState::OffFromOn => 1,
+                        _ => 0,
+                    }
+                } else {
+                    0
                 }
-            } else {
-                0
-            }
-        });
+            },
+        );
 
-        linker.define("agave", "is_key_released", is_key_released).unwrap();
+        linker
+            .define("agave", "is_key_released", is_key_released)
+            .unwrap();
 
         let get_key_history_count = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
             let input = crate::sys::globals::INPUT.read();
@@ -374,21 +386,31 @@ impl WasmApp {
             core::cmp::min(input.history_last_index, 64) as i32
         });
 
-        linker.define("agave", "get_key_history_count", get_key_history_count).unwrap();
+        linker
+            .define("agave", "get_key_history_count", get_key_history_count)
+            .unwrap();
 
-        let get_key_history_event = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>, index: i32| -> i64 {
-            let input = crate::sys::globals::INPUT.read();
-            if index >= 0 && (index as usize) < 64 && (index as usize) < input.history_last_index {
-                let event = input.history_ring[index as usize];
-                // Pack key code in low 32 bits, pressed state in high 32 bits
-                let pressed_bits = if event.trigger { 1i64 << 32 } else { 0 };
-                pressed_bits | (event.key as i64)
-            } else {
-                0
-            }
-        });
+        let get_key_history_event = Func::wrap(
+            &mut store,
+            |_caller: Caller<'_, *mut FB>, index: i32| -> i64 {
+                let input = crate::sys::globals::INPUT.read();
+                if index >= 0
+                    && (index as usize) < 64
+                    && (index as usize) < input.history_last_index
+                {
+                    let event = input.history_ring[index as usize];
+                    // Pack key code in low 32 bits, pressed state in high 32 bits
+                    let pressed_bits = if event.trigger { 1i64 << 32 } else { 0 };
+                    pressed_bits | (event.key as i64)
+                } else {
+                    0
+                }
+            },
+        );
 
-        linker.define("agave", "get_key_history_event", get_key_history_event).unwrap();
+        linker
+            .define("agave", "get_key_history_event", get_key_history_event)
+            .unwrap();
 
         // Link comprehensive WASI Preview 1 implementation
         wasi::preview1::link_preview1_functions(&mut linker, &mut store).unwrap();
@@ -402,16 +424,13 @@ impl WasmApp {
     }
 
     pub fn call(&mut self) {
-        log::info!("WASM: Calling _start function");
         let start = self
             .instance
             .get_typed_func::<(), ()>(&self.store, "_start");
 
         match start {
             Ok(start) => {
-                log::info!("WASM: Found _start function, executing...");
                 start.call(&mut self.store, ()).unwrap();
-                log::info!("WASM: _start function completed");
             }
             Err(e) => {
                 log::warn!("WASM: No _start function found: {:?}", e);
@@ -420,7 +439,6 @@ impl WasmApp {
     }
 
     pub fn call_update(&mut self, input: Input) {
-        log::trace!("WASM: Calling update function with mouse: ({}, {})", input.mouse_x, input.mouse_y);
         let update = self
             .instance
             .get_typed_func::<(i32, i32), ()>(&self.store, "update");

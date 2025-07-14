@@ -198,7 +198,7 @@ pub fn init_heap(
     }
 
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
     }
 
     log::info!("Heap initialized: start=0x{:x}, size={} MB", 

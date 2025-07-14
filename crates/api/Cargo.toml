@@ -52,4 +52,4 @@ bootloader-x86_64-common = { workspace = true }
 iced-x86 = { workspace = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64-cpu = "9.3.1"
+aarch64-cpu = "10.0.0"

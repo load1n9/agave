@@ -418,13 +418,6 @@ pub fn get_time_ms() -> u64 {
     unsafe { raw::get_time_ms() }
 }
 
-/// temp function to test stuff
-pub fn temp() {
-    unsafe {
-        raw::temp();
-    }
-}
-
 /// Draw a gradient rectangle
 pub fn draw_gradient(pos: Position, width: i32, height: i32, color1: RGBA, color2: RGBA, horizontal: bool) {
     if horizontal {

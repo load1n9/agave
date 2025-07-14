@@ -1,5 +1,5 @@
 #[link(wasm_import_module = "agave")]
-extern "C" {
+unsafe extern "C" {
     pub fn set_pixel(x: i32, y: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn set_pixels_from_to(x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn get_width() -> i32;
@@ -11,7 +11,6 @@ extern "C" {
     pub fn draw_rectangle(x: i32, y: i32, width: i32, height: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn draw_line(x0: i32, y0: i32, x1: i32, y1: i32, r: i32, g: i32, b: i32, a: i32);
     pub fn get_time_ms() -> u64;
-    pub fn temp();
     
     // Keyboard input functions
     pub fn is_key_pressed(key_code: i32) -> bool;

@@ -518,16 +518,15 @@ fn draw_system_screen(dim: agave_lib::Dimensions) {
     let margin = 60;
     let content_width = dim.width - (margin * 2);
     
-    unsafe {
-        // Draw main content card
-        draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
-        
-        // Header with icon
-        draw_text(
-            Position::new(margin + 20, 70),
-            "🖥️ System Information",
-            ACCENT_YELLOW
-        );
+    // Draw main content card
+    draw_card(Position::new(margin - 20, 40), content_width + 40, dim.height - 140);
+    
+    // Header with icon
+    draw_text(
+        Position::new(margin + 20, 70),
+        "🖥️ System Information",
+        ACCENT_YELLOW
+    );
         
         // System overview section
         draw_section_header(Position::new(margin + 20, 110), "Operating System");
@@ -585,7 +584,6 @@ fn draw_system_screen(dim: agave_lib::Dimensions) {
             "⏎ Press Enter to return to main screen",
             TEXT_MUTED
         );
-    }
 }
 
 fn draw_help_screen(dim: agave_lib::Dimensions) {

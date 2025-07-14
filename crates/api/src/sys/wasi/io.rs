@@ -499,7 +499,7 @@ pub fn drop_pollable(id: Pollable) {
 }
 
 // Additional I/O functions for Preview 2 compatibility
-pub fn read(stream: InputStream, len: u64) -> WasiResult<(Vec<u8>, u8)> {
+pub fn read(_stream: InputStream, len: u64) -> WasiResult<(Vec<u8>, u8)> {
     let mut buffer = alloc::vec![0u8; len as usize];
     let bytes_read = crate::sys::fs::read_file(&alloc::format!("/dev/stdin"))
         .map(|data| data.len().min(len as usize))
@@ -512,7 +512,7 @@ pub fn blocking_read(stream: InputStream, len: u64) -> WasiResult<(Vec<u8>, u8)>
     read(stream, len)
 }
 
-pub fn skip(stream: InputStream, len: u64) -> WasiResult<(u64, u8)> {
+pub fn skip(_stream: InputStream, len: u64) -> WasiResult<(u64, u8)> {
     Ok((len, 0)) // Simulate skipping len bytes
 }
 
@@ -520,12 +520,12 @@ pub fn blocking_skip(stream: InputStream, len: u64) -> WasiResult<(u64, u8)> {
     skip(stream, len)
 }
 
-pub fn subscribe_to_input_stream(stream: InputStream) -> Pollable {
+pub fn subscribe_to_input_stream(_stream: InputStream) -> Pollable {
     let mut pollables = POLLABLES.lock();
     pollables.create_pollable(true) // Always ready for demo
 }
 
-pub fn check_write(stream: OutputStream) -> WasiResult<u64> {
+pub fn check_write(_stream: OutputStream) -> WasiResult<u64> {
     Ok(1024) // Always allow 1KB writes
 }
 
@@ -550,7 +550,7 @@ pub fn blocking_flush(stream: OutputStream) -> WasiResult<()> {
     flush(stream)
 }
 
-pub fn subscribe_to_output_stream(stream: OutputStream) -> Pollable {
+pub fn subscribe_to_output_stream(_stream: OutputStream) -> Pollable {
     let mut pollables = POLLABLES.lock();
     pollables.create_pollable(true) // Always ready for demo
 }

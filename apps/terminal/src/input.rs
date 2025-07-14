@@ -1,10 +1,9 @@
 use agave_lib::{
     is_key_pressed, is_key_down, key_code_to_char, get_key_history_count, get_key_history_event,
     KEY_ENTER, KEY_BACKSPACE, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_ESC, 
-    KEY_A, KEY_L, KEY_P, KEY_S, KEY_H, KEY_U, KEY_C, KEY_M
+    KEY_L, KEY_P, KEY_S, KEY_H, KEY_U, KEY_C, KEY_M
 };
 
-use crate::types::TerminalApp;
 use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
 
 // Add arrow keys and page keys for navigation
@@ -131,7 +130,7 @@ pub fn handle_keyboard_input() {
                     // Handle character input
                     if let Some(ch) = key_code_to_char(key_code, shift_pressed) {
                         // Add character to command buffer with safety checks
-                        if TERMINAL.command_length < 250 { // Leave some buffer space
+                        if TERMINAL.command_length < 500 { // Leave some buffer space
                             TERMINAL.command_buffer[TERMINAL.command_length] = ch as u8;
                             TERMINAL.command_length += 1;
                         } else {

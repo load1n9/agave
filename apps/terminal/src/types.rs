@@ -28,9 +28,9 @@ pub struct FileEntry {
 /// Terminal application state
 pub struct TerminalApp {
     pub current_screen: Screen,
-    pub command_buffer: [u8; 256],
+    pub command_buffer: [u8; 512], // Increased from 256 to 512
     pub command_length: usize,
-    pub output_lines: [[u8; 80]; 200], // Increased buffer for scroll history
+    pub output_lines: [[u8; 120]; 500], // Increased from 80x200 to 120x500 for more history and wider lines
     pub output_line_count: usize,
     pub scroll_offset: usize, // Current scroll position (0 = bottom/latest)
     pub uptime: u64,
@@ -45,9 +45,9 @@ impl TerminalApp {
     pub const fn new() -> Self {
         Self {
             current_screen: Screen::Main,
-            command_buffer: [0; 256],
+            command_buffer: [0; 512],
             command_length: 0,
-            output_lines: [[0; 80]; 200], // Increased buffer size
+            output_lines: [[0; 120]; 500], // Increased buffer size
             output_line_count: 0,
             scroll_offset: 0, // Initialize scroll at bottom
             uptime: 0,
@@ -89,24 +89,24 @@ impl TerminalApp {
         // When adding new content, reset scroll to bottom to show latest
         self.scroll_offset = 0;
         
-        if self.output_line_count < 200 {
+        if self.output_line_count < 500 {
             // Still have space in buffer
-            let mut line = [0u8; 80];
-            let len = text.len().min(79);
+            let mut line = [0u8; 120];
+            let len = text.len().min(119);
             line[..len].copy_from_slice(&text[..len]);
             self.output_lines[self.output_line_count] = line;
             self.output_line_count += 1;
         } else {
             // Buffer is full, scroll up (shift all lines up by 1)
-            for i in 0..199 {
+            for i in 0..499 {
                 self.output_lines[i] = self.output_lines[i + 1];
             }
             // Add new line at the end
-            let mut line = [0u8; 80];
-            let len = text.len().min(79);
+            let mut line = [0u8; 120];
+            let len = text.len().min(119);
             line[..len].copy_from_slice(&text[..len]);
-            self.output_lines[199] = line;
-            // Keep count at 200 (buffer is full)
+            self.output_lines[499] = line;
+            // Keep count at 500 (buffer is full)
         }
     }
     

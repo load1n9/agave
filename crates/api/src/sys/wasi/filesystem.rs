@@ -116,7 +116,7 @@ pub fn fd_prestat_get(fd: Fd) -> WasiResult<Prestat> {
     }
 }
 
-pub fn fd_prestat_dir_name(fd: Fd, path_ptr: u32, path_len: Size) -> WasiResult<()> {
+pub fn fd_prestat_dir_name(fd: Fd, _path_ptr: u32, path_len: Size) -> WasiResult<()> {
     let fs = FILESYSTEM.lock();
 
     if let Some(path) = fs.preopened_dirs.get(&fd) {
@@ -133,7 +133,7 @@ pub fn fd_prestat_dir_name(fd: Fd, path_ptr: u32, path_len: Size) -> WasiResult<
 
 pub fn path_open(
     fd: Fd,
-    dirflags: LookupFlags,
+    _dirflags: LookupFlags,
     path: &str,
     oflags: OFlags,
     fs_rights_base: Rights,
@@ -343,7 +343,7 @@ pub fn fd_allocate(fd: Fd, offset: FileSize, len: FileSize) -> WasiResult<()> {
     }
 }
 
-pub fn fd_advise(fd: Fd, offset: FileSize, len: FileSize, advice: Advice) -> WasiResult<()> {
+pub fn fd_advise(fd: Fd, _offset: FileSize, _len: FileSize, _advice: Advice) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
 
     if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -449,7 +449,7 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
     }
 }
 
-pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
+pub fn path_create_directory(fd: Fd, _path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
 
     // Check directory permissions
@@ -470,7 +470,7 @@ pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
     Ok(())
 }
 
-pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
+pub fn path_unlink_file(fd: Fd, _path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
 
     // Check directory permissions
@@ -489,7 +489,7 @@ pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
     Ok(())
 }
 
-pub fn path_remove_directory(fd: Fd, path: &str) -> WasiResult<()> {
+pub fn path_remove_directory(fd: Fd, _path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
 
     // Check directory permissions
@@ -510,7 +510,7 @@ pub fn path_remove_directory(fd: Fd, path: &str) -> WasiResult<()> {
     Ok(())
 }
 
-pub fn fd_readdir(fd: Fd, buf: &mut [u8], cookie: DirCookie) -> WasiResult<Size> {
+pub fn fd_readdir(fd: Fd, _buf: &mut [u8], _cookie: DirCookie) -> WasiResult<Size> {
     let fs_state = FILESYSTEM.lock();
 
     if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -571,7 +571,7 @@ pub fn read_via_stream(fd: Fd, offset: FileSize) -> WasiResult<super::io::InputS
     }
 }
 
-pub fn write_via_stream(fd: Fd, offset: FileSize) -> WasiResult<super::io::OutputStream> {
+pub fn write_via_stream(fd: Fd, _offset: FileSize) -> WasiResult<super::io::OutputStream> {
     let fs_state = FILESYSTEM.lock();
 
     if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -633,12 +633,12 @@ pub fn sync_data(fd: Fd) -> WasiResult<()> {
     Ok(())
 }
 
-pub fn get_flags(fd: Fd) -> WasiResult<u32> {
+pub fn get_flags(_fd: Fd) -> WasiResult<u32> {
     // Return some default flags
     Ok(0)
 }
 
-pub fn get_type(fd: Fd) -> WasiResult<u8> {
+pub fn get_type(_fd: Fd) -> WasiResult<u8> {
     // Return regular file type
     Ok(4) // FILETYPE_REGULAR_FILE
 }
@@ -664,7 +664,7 @@ pub fn set_times(
     Ok(())
 }
 
-pub fn read(fd: Fd, length: FileSize, offset: FileSize) -> WasiResult<(Vec<u8>, bool)> {
+pub fn read(_fd: Fd, length: FileSize, _offset: FileSize) -> WasiResult<(Vec<u8>, bool)> {
     // For demo, return empty data
     let data = alloc::vec![0u8; length.min(1024) as usize];
     Ok((data, true)) // true = end of file
@@ -717,7 +717,7 @@ pub fn stat_open_directory(fd: Fd, path_flags: u16, path: &str) -> WasiResult<Fd
 
 pub fn link(
     fd: Fd,
-    old_path_flags: u16,
+    _old_path_flags: u16,
     old_path: &str,
     new_fd: Fd,
     new_path: &str,

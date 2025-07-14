@@ -1,4 +1,4 @@
-use super::fs::FileIO;
+// use super::fs::FileIO; // TODO: Update for new filesystem
 use crate::sys;
 use core::sync::atomic::Ordering;
 use rand::{RngCore, SeedableRng};
@@ -15,6 +15,7 @@ impl Random {
     }
 }
 
+/* TODO: Update for new filesystem
 impl FileIO for Random {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ()> {
         let n = buf.len();
@@ -27,6 +28,7 @@ impl FileIO for Random {
         unimplemented!();
     }
 }
+*/
 
 pub fn get_u64() -> u64 {
     let mut seed = [0u8; 32];

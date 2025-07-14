@@ -14,6 +14,7 @@ use x86_64::{
 const MAX_NUM_QUEUE: usize = 256;
 const DEVICE_ID_INPUT: isize = 18;
 const DEVICE_ID_GPU: isize = 16;
+const DEVICE_ID_NETWORK: isize = 1;
 const VIRTIO_PCI_CAP_COMMON_CFG: u8 = 1;
 const VIRTIO_PCI_CAP_NOTIFY_CFG: u8 = 2;
 const VIRTIO_PCI_CAP_ISR_CFG: u8 = 3;
@@ -81,12 +82,14 @@ impl QueueFreeDescs {
 pub enum DeviceType {
     Input,
     Gpu,
+    Network,
 }
 
 fn device_id_to_type(id: isize) -> Option<DeviceType> {
     match id {
         DEVICE_ID_INPUT => Some(DeviceType::Input),
         DEVICE_ID_GPU => Some(DeviceType::Gpu),
+        DEVICE_ID_NETWORK => Some(DeviceType::Network),
         _ => None,
     }
 }
@@ -465,6 +468,10 @@ impl Virtio {
                     // log::info!("{:?}", rconf);
                     // rconf.events_clear = 1;
                     // conf_ptr.write_volatile(rconf);
+                }
+                DeviceType::Network => {
+                    log::info!("VirtIO network device configuration");
+                    // Network device configuration will be handled by the driver
                 }
             }
 

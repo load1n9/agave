@@ -128,8 +128,8 @@ pub struct Socket {
     listen_queue: Vec<Fd>, // For listening sockets
     recv_buffer: Vec<u8>,
     send_buffer: Vec<u8>,
-    recv_timeout: Option<Timestamp>,
-    send_timeout: Option<Timestamp>,
+    _recv_timeout: Option<Timestamp>,
+    _send_timeout: Option<Timestamp>,
     keep_alive: bool,
     no_delay: bool,
     reuse_address: bool,
@@ -146,8 +146,8 @@ impl Socket {
             listen_queue: Vec::new(),
             recv_buffer: Vec::new(),
             send_buffer: Vec::new(),
-            recv_timeout: None,
-            send_timeout: None,
+            _recv_timeout: None,
+            _send_timeout: None,
             keep_alive: false,
             no_delay: false,
             reuse_address: false,
@@ -501,7 +501,7 @@ pub fn create_udp_socket(address_family: u8) -> WasiResult<Fd> {
     socket(address_family, 2) // SOCK_DGRAM
 }
 
-pub fn subscribe_to_socket(fd: Fd, interest: u8) -> WasiResult<super::io::Pollable> {
+pub fn subscribe_to_socket(fd: Fd, _interest: u8) -> WasiResult<super::io::Pollable> {
     let sockets = SOCKETS.lock();
     if sockets.sockets.contains_key(&fd) {
         // Create a pollable for socket readiness

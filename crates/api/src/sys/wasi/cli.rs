@@ -338,9 +338,9 @@ pub fn get_resource_limit(resource: u32) -> WasiResult<(u64, u64)> {
     // Return simulated resource limits (soft, hard)
     match resource {
         0 => Ok((1024 * 1024, 2 * 1024 * 1024)), // CPU time in seconds
-        1 => Ok((100 * 1024 * 1024, 200 * 1024 * 1024)), // File size in bytes
-        2 => Ok((8 * 1024 * 1024, 16 * 1024 * 1024)), // Data size in bytes
-        3 => Ok((8 * 1024 * 1024, 16 * 1024 * 1024)), // Stack size in bytes
+        1 => Ok((500 * 1024 * 1024, 1024 * 1024 * 1024)), // File size in bytes - increased to 500MB/1GB
+        2 => Ok((32 * 1024 * 1024, 64 * 1024 * 1024)), // Data size in bytes - increased to 32MB/64MB
+        3 => Ok((32 * 1024 * 1024, 64 * 1024 * 1024)), // Stack size in bytes - increased to 32MB/64MB
         4 => Ok((1024 * 1024 * 1024, 2 * 1024 * 1024 * 1024)), // Core file size in bytes
         7 => Ok((1024, 2048)),                   // Number of file descriptors
         _ => Err(WasiError::inval()),

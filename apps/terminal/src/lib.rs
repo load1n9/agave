@@ -10,7 +10,7 @@ use input::handle_keyboard_input;
 use display::draw_terminal;
 
 #[no_mangle]
-pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
+pub extern "C" fn update(_mouse_x: i32, _mouse_y: i32) {
     unsafe {
         let current_time = get_time_ms();
         TERMINAL.uptime = current_time;

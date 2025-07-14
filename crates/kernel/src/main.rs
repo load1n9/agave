@@ -6,11 +6,13 @@
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
     allocator, drivers,
-    framebuffer::FB,
+    framebuffer::{FB, RGBA},
+    fs,        // Add filesystem
     gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
     memory::{self, BootInfoFrameAllocator},
     monitor,
+    network,   // Add network
     pci,
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
@@ -58,6 +60,9 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("KERNEL: Initializing IDT");
     interrupts::init_idt();
     log::info!("KERNEL: Basic initialization complete");
+    
+    // TODO: Add loading screen once framebuffer is accessible
+    // show_loading_screen("Initializing Memory Management...", 10, &mut fb);
 
     let virtual_full_mapping_offset = VirtAddr::new(
         boot_info
@@ -258,12 +263,44 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let mut fb = Box::new(FB::new(&fbinfo));
     let fb_clone: *mut FB = &mut *fb;
     log::info!("Framebuffer created at {:?}", fb_clone);
+    
+    // Show loading screen now that framebuffer is available
+    show_loading_screen("Basic initialization complete...", 25, &mut *fb);
+    
     // log::info!("fbclone {:?}", fb_clone);
 
     // Initialize monitoring system
     log::info!("Initializing system monitoring...");
     monitor::init_monitoring();
     log::info!("System monitoring enabled");
+    show_loading_screen("System monitoring enabled...", 40, &mut *fb);
+
+    // Initialize filesystem
+    log::info!("Initializing filesystem...");
+    if let Err(e) = fs::init_filesystem() {
+        log::error!("Failed to initialize filesystem: {:?}", e);
+    } else {
+        log::info!("Filesystem initialized successfully");
+    }
+    show_loading_screen("Filesystem initialized...", 55, &mut *fb);
+
+    // Initialize network stack
+    log::info!("Initializing network stack...");
+    if let Err(e) = network::init_network() {
+        log::error!("Failed to initialize network: {:?}", e);
+    } else {
+        log::info!("Network stack initialized successfully");
+    }
+    show_loading_screen("Network stack ready...", 70, &mut *fb);
+
+    // Initialize socket subsystem
+    log::info!("Initializing socket subsystem...");
+    if let Err(e) = network::sockets::init_sockets() {
+        log::error!("Failed to initialize sockets: {:?}", e);
+    } else {
+        log::info!("Socket subsystem initialized successfully");
+    }
+    show_loading_screen("Socket subsystem ready...", 85, &mut *fb);
 
     // Log initial system status
     log::info!("Logging initial system status...");
@@ -274,6 +311,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         let mut executor = task::executor::Executor::new();
         let spawner = executor.spawner();
         log::info!("Task executor created");
+        show_loading_screen("Task executor ready...", 95, &mut *fb);
 
         log::info!("Setting up VirtIO device drivers...");
         for virtio in virtio_devices.into_iter() {
@@ -289,6 +327,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                         spawner.clone(),
                         fb_clone,
                     ));
+                }
+                DeviceType::Network => {
+                    log::info!("Spawning VirtIO network driver task");
+                    spawner.run(drivers::virtio_net::drive(virtio));
                 }
             }
         }
@@ -322,6 +364,16 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             let mut frame_counter = 0u64;
             let mut last_monitor_check = 0u64;
             
+            // Show completion screen - access framebuffer through the raw pointer
+            unsafe {
+                let fb_ref = &mut *fb_clone;
+                show_loading_screen("Agave OS Ready!", 100, fb_ref);
+                // Give the user a moment to see the completion
+                for _ in 0..1000000 { 
+                    core::hint::spin_loop(); 
+                }
+            }
+            
             log::info!("Starting main application loop...");
             loop {
                 globals::INPUT.update(|e| e.step());
@@ -354,6 +406,49 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         });
         log::info!("WASM task spawned, starting executor...");
         executor.run();
+    }
+}
+
+/// Display a loading screen with progress indicators
+fn show_loading_screen(_stage: &str, progress: u8, fb: &mut FB) {
+    // Get screen dimensions
+    let width = fb.w as i32;
+    let height = fb.h as i32;
+    
+    // Fill background with dark blue
+    let bg_color = RGBA { r: 0x1a, g: 0x1a, b: 0x2e, a: 0xFF };
+    for y in 0..height {
+        for x in 0..width {
+            fb.set(x as usize, y as usize, bg_color);
+        }
+    }
+    
+    // Draw progress bar background
+    let bar_width = 400;
+    let bar_height = 20;
+    let bar_x = (width - bar_width) / 2;
+    let bar_y = height / 2 + 50;
+    
+    let bar_bg_color = RGBA { r: 0x0f, g: 0x0f, b: 0x23, a: 0xFF };
+    for y in bar_y..(bar_y + bar_height) {
+        for x in bar_x..(bar_x + bar_width) {
+            if x >= 0 && x < width && y >= 0 && y < height {
+                fb.set(x as usize, y as usize, bar_bg_color);
+            }
+        }
+    }
+    
+    // Draw progress bar fill
+    let fill_width = (bar_width as u8 * progress / 100) as i32;
+    if fill_width > 0 {
+        let fill_color = RGBA { r: 0x00, g: 0xd4, b: 0xaa, a: 0xFF };
+        for y in bar_y..(bar_y + bar_height) {
+            for x in bar_x..(bar_x + fill_width) {
+                if x >= 0 && x < width && y >= 0 && y < height {
+                    fb.set(x as usize, y as usize, fill_color);
+                }
+            }
+        }
     }
 }
 

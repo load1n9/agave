@@ -9,7 +9,7 @@ use wasmi::{Caller, Func, Linker, Store};
 
 pub fn link_preview1_functions<T>(
     linker: &mut Linker<T>,
-    store: &mut Store<T>,
+    _store: &mut Store<T>,
 ) -> Result<(), wasmi::Error>
 where
     T: 'static,

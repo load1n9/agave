@@ -20,6 +20,8 @@ pub enum AgaveError {
     TimedOut,
     /// Device or resource busy
     Busy,
+    /// Resource not ready
+    NotReady,
     /// I/O error occurred
     IoError,
     /// Filesystem error
@@ -45,6 +47,9 @@ pub enum FsError {
     ReadOnlyFilesystem,
     DiskFull,
     CorruptedData,
+    IsDirectory,
+    NotDirectory,
+    InvalidFileDescriptor,
 }
 
 /// WASM runtime errors
@@ -89,6 +94,7 @@ impl fmt::Display for AgaveError {
             AgaveError::InvalidInput => write!(f, "Invalid input provided"),
             AgaveError::TimedOut => write!(f, "Operation timed out"),
             AgaveError::Busy => write!(f, "Resource busy"),
+            AgaveError::NotReady => write!(f, "Resource not ready"),
             AgaveError::IoError => write!(f, "I/O error"),
             AgaveError::FileSystemError(e) => write!(f, "Filesystem error: {:?}", e),
             AgaveError::WasmError(e) => write!(f, "WASM error: {:?}", e),

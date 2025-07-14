@@ -11,6 +11,7 @@ pub mod local_apic;
 pub mod logger;
 pub mod memory;
 pub mod monitor;
+pub mod network; // New: Network stack
 pub mod pci;
 pub mod pic;
 pub mod random;

@@ -67,13 +67,13 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
 
         // ASCII Art Header with better spacing
         let header_lines = [
-"     ___       _______      ___   ____    ____  _______ ",
-"    /   \\     /  _____|    /   \\  \\   \\  /   / |   ____|",
-"   /  ^  \\   |  |  __     /  ^  \\  \\   \\/   /  |  |__   ",
-"  /  /_\\  \\  |  | |_ |   /  /_\\  \\  \\      /   |   __|  ",
-" /  _____  \\ |  |__| |  /  _____  \\  \\    /    |  |____ ",
-"/__/     \\__\\ \\______| /__/     \\__\\  \\__/     |_______|",
-"                                                        ",
+            "     ___       _______      ___   ____    ____  _______ ",
+            "    /   \\     /  _____|    /   \\  \\   \\  /   / |   ____|",
+            "   /  ^  \\   |  |  __     /  ^  \\  \\   \\/   /  |  |__   ",
+            "  /  /_\\  \\  |  | |_ |   /  /_\\  \\  \\      /   |   __|  ",
+            " /  _____  \\ |  |__| |  /  _____  \\  \\    /    |  |____ ",
+            "/__/     \\__\\ \\______| /__/     \\__\\  \\__/     |_______|",
+            "                                                        ",
         ];
 
         for (i, line) in header_lines.iter().enumerate() {
@@ -191,9 +191,16 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             let trimmed_line = line_str.trim_end_matches('\0');
 
             if !trimmed_line.is_empty() {
+                // Handle longer lines by truncating if needed for display
+                let display_line = if trimmed_line.len() > 80 {
+                    &trimmed_line[..80]
+                } else {
+                    trimmed_line
+                };
+
                 draw_text(
                     Position::new(margin + 30, output_start_y + line_count as i32 * 18),
-                    trimmed_line,
+                    display_line,
                     colors.text_primary,
                 );
             }
@@ -341,8 +348,11 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.border_color,
         );
 
-        // File listing with alternating backgrounds
-        for i in 0..TERMINAL.file_count {
+        // File listing with alternating backgrounds and scrolling support
+        let max_visible_files = 15; // Limit visible files to fit on screen
+        let files_to_show = TERMINAL.file_count.min(max_visible_files);
+
+        for i in 0..files_to_show {
             let file = &TERMINAL.file_system[i];
             let y = 190 + i as i32 * 30;
 
@@ -395,6 +405,21 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                     colors.accent_blue,
                 );
             }
+        }
+
+        // Show file count and scroll indicator if needed
+        if TERMINAL.file_count > max_visible_files {
+            let count_y = 190 + max_visible_files as i32 * 30 + 20;
+            let count_text = if TERMINAL.file_count == 80 {
+                "... and more files (80 total entries)"
+            } else {
+                "... and more files"
+            };
+            draw_text(
+                Position::new(margin + 25, count_y),
+                count_text,
+                colors.text_muted,
+            );
         }
 
         // Instructions
@@ -477,8 +502,11 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.border_color,
         );
 
-        // Process listing with enhanced styling
-        for i in 0..TERMINAL.process_count {
+        // Process listing with enhanced styling and scrolling support
+        let max_visible_processes = 12; // Limit visible processes to fit on screen
+        let processes_to_show = TERMINAL.process_count.min(max_visible_processes);
+
+        for i in 0..processes_to_show {
             let proc = &TERMINAL.processes[i];
             let y = 190 + i as i32 * 32;
 
@@ -497,17 +525,49 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 );
             }
 
-            // PID with leading zeros
-            let pid_str = match proc.pid {
-                1 => "001",
-                2 => "002",
-                3 => "003",
-                4 => "004",
-                5 => "005",
-                6 => "006",
-                7 => "007",
-                8 => "008",
-                _ => "???",
+            // PID formatting for larger numbers
+            let pid_str = if proc.pid < 10 {
+                match proc.pid {
+                    1 => "001",
+                    2 => "002",
+                    3 => "003",
+                    4 => "004",
+                    5 => "005",
+                    6 => "006",
+                    7 => "007",
+                    8 => "008",
+                    9 => "009",
+                    _ => "0??",
+                }
+            } else if proc.pid < 100 {
+                match proc.pid {
+                    10 => "010",
+                    11 => "011",
+                    12 => "012",
+                    13 => "013",
+                    14 => "014",
+                    15 => "015",
+                    16 => "016",
+                    17 => "017",
+                    18 => "018",
+                    19 => "019",
+                    20 => "020",
+                    21 => "021",
+                    22 => "022",
+                    23 => "023",
+                    24 => "024",
+                    25 => "025",
+                    26 => "026",
+                    27 => "027",
+                    28 => "028",
+                    29 => "029",
+                    30 => "030",
+                    31 => "031",
+                    32 => "032",
+                    _ => "???",
+                }
+            } else {
+                "???"
             };
             draw_text(
                 Position::new(margin + 25, y + 5),
@@ -524,7 +584,31 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 "framebuffer" => "🖥️",
                 "memory-mgr" => "💾",
                 "task-executor" => "⚡",
-                "terminal-app" => "💻",
+                "terminal-app" => "�",
+                "filesystem" => "📁",
+                "network-stack" => "🌐",
+                "audio-driver" => "🔊",
+                "graphics-accel" => "🎮",
+                "security-mgr" => "🔒",
+                "power-mgr" => "🔋",
+                "interrupt-hdl" => "⚡",
+                "scheduler" => "�",
+                "device-mgr" => "🔌",
+                "io-subsystem" => "📤",
+                "cache-mgr" => "💿",
+                "crypto-engine" => "�",
+                "vm-manager" => "🖥️",
+                "backup-daemon" => "💾",
+                "log-collector" => "📄",
+                "perf-monitor" => "�",
+                "user-session" => "👤",
+                "service-mgr" => "⚙️",
+                "event-loop" => "🔄",
+                "debug-agent" => "🐛",
+                "thermal-ctrl" => "🌡️",
+                "watchdog" => "🐕",
+                "profiler" => "�",
+                "health-check" => "🏥",
                 _ => "⚙️",
             };
 
@@ -542,8 +626,10 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             // Status with colored indicator
             let (status_color, status_icon) = if proc.status == "running" {
                 (colors.accent_green, "●")
-            } else {
+            } else if proc.status == "idle" {
                 (colors.accent_yellow, "⏸")
+            } else {
+                (colors.accent_red, "✗")
             };
 
             draw_text(
@@ -558,7 +644,9 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             );
 
             // Memory usage with bar visualization
-            let mem_str = if proc.memory > 4096 {
+            let mem_str = if proc.memory > 8192 {
+                "VHigh"
+            } else if proc.memory > 4096 {
                 "High"
             } else if proc.memory > 1024 {
                 "Med"
@@ -566,10 +654,12 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 "Low"
             };
 
-            let mem_color = if proc.memory > 4096 {
+            let mem_color = if proc.memory > 8192 {
                 colors.accent_red
-            } else if proc.memory > 1024 {
+            } else if proc.memory > 4096 {
                 colors.accent_yellow
+            } else if proc.memory > 1024 {
+                colors.accent_blue
             } else {
                 colors.accent_green
             };
@@ -577,13 +667,23 @@ fn draw_processes_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             draw_text(Position::new(margin + 350, y + 5), mem_str, mem_color);
 
             // Memory usage bar
-            let bar_width = (proc.memory / 100).min(60) as i32;
+            let bar_width = (proc.memory / 200).min(60) as i32; // Adjusted for higher memory values
             fill_rectangle(Position::new(margin + 390, y + 10), bar_width, 6, mem_color);
             draw_rectangle(
                 Position::new(margin + 390, y + 10),
                 60,
                 6,
                 colors.border_color,
+            );
+        }
+
+        // Show process count and scroll indicator if needed
+        if TERMINAL.process_count > max_visible_processes {
+            let count_y = 190 + max_visible_processes as i32 * 32 + 20;
+            draw_text(
+                Position::new(margin + 25, count_y),
+                "... and more processes (32 total)",
+                colors.text_muted,
             );
         }
 
@@ -644,7 +744,7 @@ fn draw_system_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     );
 
     let hw_info = [
-        ("Memory:", "100 MB Heap", colors.accent_blue),
+        ("Memory:", "512 MB Total", colors.accent_blue),
         ("Graphics:", "Direct Framebuffer", colors.accent_green),
         ("Input:", "VirtIO Mouse/Keyboard", colors.text_primary),
         ("Storage:", "Virtual Disk", colors.text_primary),

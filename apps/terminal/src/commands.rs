@@ -17,40 +17,40 @@ impl TerminalApp {
 
         // Add command to history
         unsafe {
-            if COMMAND_HISTORY_COUNT < 20 {
+            if COMMAND_HISTORY_COUNT < 100 {
                 for i in 0..self.command_length {
                     COMMAND_HISTORY[COMMAND_HISTORY_COUNT][i] = self.command_buffer[i];
                 }
-                for i in self.command_length..512 {
+                for i in self.command_length..2048 {
                     COMMAND_HISTORY[COMMAND_HISTORY_COUNT][i] = 0;
                 }
                 COMMAND_HISTORY_COUNT += 1;
             } else {
                 // Shift history up and add new command at the end
-                for i in 0..19 {
+                for i in 0..99 {
                     COMMAND_HISTORY[i] = COMMAND_HISTORY[i + 1];
                 }
                 for i in 0..self.command_length {
-                    COMMAND_HISTORY[19][i] = self.command_buffer[i];
+                    COMMAND_HISTORY[99][i] = self.command_buffer[i];
                 }
-                for i in self.command_length..512 {
-                    COMMAND_HISTORY[19][i] = 0;
+                for i in self.command_length..2048 {
+                    COMMAND_HISTORY[99][i] = 0;
                 }
             }
             COMMAND_HISTORY_INDEX = COMMAND_HISTORY_COUNT;
         }
 
         // Show command in output (echo)
-        let mut prompt_line = [0u8; 120];
+        let mut prompt_line = [0u8; 200];
         prompt_line[0] = b'$';
         prompt_line[1] = b' ';
-        for i in 0..self.command_length.min(116) {
+        for i in 0..self.command_length.min(196) {
             prompt_line[i + 2] = self.command_buffer[i];
         }
         self.add_output_line(&prompt_line);
 
         // Convert command to lowercase for case-insensitive matching
-        let mut cmd_lower = [0u8; 512];
+        let mut cmd_lower = [0u8; 2048];
         for i in 0..self.command_length {
             cmd_lower[i] = match self.command_buffer[i] {
                 b'A'..=b'Z' => self.command_buffer[i] + 32, // Convert to lowercase
@@ -103,7 +103,7 @@ impl TerminalApp {
 
         // Clear command buffer
         self.command_length = 0;
-        for i in 0..512 {
+        for i in 0..2048 {
             self.command_buffer[i] = 0;
         }
     }
@@ -235,6 +235,8 @@ impl TerminalApp {
         self.add_output_line(b"  + Power management & thermal control");
         self.add_output_line(b"  + Enhanced networking (TCP/UDP/HTTP)");
         self.add_output_line(b"  + Virtual filesystem");
+        self.add_output_line(b"  + Extended command history (100 commands)"); // New feature
+        self.add_output_line(b"  + Large output buffer (2000 lines x 200 chars)"); // New feature
         self.add_output_line(b"");
         self.add_output_line(b"Commands: 'health', 'power', 'security', 'features'");
         self.current_screen = Screen::System;
@@ -242,8 +244,8 @@ impl TerminalApp {
 
     fn handle_clear_command(&mut self) {
         self.output_line_count = 0;
-        for i in 0..500 {
-            for j in 0..120 {
+        for i in 0..2000 {
+            for j in 0..200 {
                 self.output_lines[i][j] = 0;
             }
         }
@@ -257,8 +259,8 @@ impl TerminalApp {
     fn handle_reset_command(&mut self) {
         // Reset command - clears everything and resets to initial state
         self.output_line_count = 0;
-        for i in 0..500 {
-            for j in 0..120 {
+        for i in 0..2000 {
+            for j in 0..200 {
                 self.output_lines[i][j] = 0;
             }
         }
@@ -267,8 +269,8 @@ impl TerminalApp {
             // Clear command history
             COMMAND_HISTORY_COUNT = 0;
             COMMAND_HISTORY_INDEX = 0;
-            for i in 0..20 {
-                for j in 0..512 {
+            for i in 0..100 {
+                for j in 0..2048 {
                     COMMAND_HISTORY[i][j] = 0;
                 }
             }
@@ -279,9 +281,9 @@ impl TerminalApp {
     fn handle_echo_command(&mut self) {
         // Echo command - output everything after "echo "
         if self.command_length > 5 {
-            let mut echo_line = [0u8; 80];
+            let mut echo_line = [0u8; 160]; // Increased buffer size for longer echo output
             let start = 5; // Skip "echo "
-            let len = (self.command_length - start).min(79);
+            let len = (self.command_length - start).min(159);
             for i in 0..len {
                 echo_line[i] = self.command_buffer[start + i];
             }
@@ -296,7 +298,7 @@ impl TerminalApp {
         if self.command_length == 5 {
             // Just "theme" - show current theme
             let current_name = self.current_theme.name();
-            let mut response = [0u8; 120];
+            let mut response = [0u8; 200];
 
             // Build response string manually
             let prefix = b"Current theme: ";
@@ -305,14 +307,14 @@ impl TerminalApp {
             let mut pos = 0;
             // Copy prefix
             for &byte in prefix {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
             }
             // Copy theme name
             for &byte in current_name.as_bytes() {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
@@ -321,9 +323,9 @@ impl TerminalApp {
             self.add_output_line(&response);
 
             // Add description
-            let mut desc_line = [0u8; 120];
+            let mut desc_line = [0u8; 200];
             let desc_bytes = desc_text.as_bytes();
-            let desc_len = desc_bytes.len().min(119);
+            let desc_len = desc_bytes.len().min(199);
             desc_line[..desc_len].copy_from_slice(&desc_bytes[..desc_len]);
             self.add_output_line(&desc_line);
 
@@ -336,7 +338,7 @@ impl TerminalApp {
             self.add_output_line(b"");
 
             for theme in Theme::all_themes().iter() {
-                let mut line = [0u8; 120];
+                let mut line = [0u8; 200];
                 let name = theme.name();
                 let desc = get_theme_description(*theme);
 
@@ -356,21 +358,21 @@ impl TerminalApp {
 
                 // Add theme name
                 for &byte in name.as_bytes() {
-                    if pos < 119 {
+                    if pos < 199 {
                         line[pos] = byte;
                         pos += 1;
                     }
                 }
 
                 // Add spacing
-                while pos < 20 && pos < 119 {
+                while pos < 20 && pos < 199 {
                     line[pos] = b' ';
                     pos += 1;
                 }
 
                 // Add description
                 for &byte in desc.as_bytes() {
-                    if pos < 119 {
+                    if pos < 199 {
                         line[pos] = byte;
                         pos += 1;
                     }
@@ -383,18 +385,18 @@ impl TerminalApp {
             self.current_theme = self.current_theme.next_theme();
             let new_name = self.current_theme.name();
 
-            let mut response = [0u8; 120];
+            let mut response = [0u8; 200];
             let prefix = b"Switched to theme: ";
             let mut pos = 0;
 
             for &byte in prefix {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
             }
             for &byte in new_name.as_bytes() {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
@@ -406,18 +408,18 @@ impl TerminalApp {
             self.current_theme = self.current_theme.prev_theme();
             let new_name = self.current_theme.name();
 
-            let mut response = [0u8; 120];
+            let mut response = [0u8; 200];
             let prefix = b"Switched to theme: ";
             let mut pos = 0;
 
             for &byte in prefix {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
             }
             for &byte in new_name.as_bytes() {
-                if pos < 119 {
+                if pos < 199 {
                     response[pos] = byte;
                     pos += 1;
                 }
@@ -457,18 +459,18 @@ impl TerminalApp {
                 self.current_theme = new_theme;
                 let new_name = new_theme.name();
 
-                let mut response = [0u8; 120];
+                let mut response = [0u8; 200];
                 let prefix = b"Switched to theme: ";
                 let mut pos = 0;
 
                 for &byte in prefix {
-                    if pos < 119 {
+                    if pos < 199 {
                         response[pos] = byte;
                         pos += 1;
                     }
                 }
                 for &byte in new_name.as_bytes() {
-                    if pos < 119 {
+                    if pos < 199 {
                         response[pos] = byte;
                         pos += 1;
                     }
@@ -486,15 +488,17 @@ impl TerminalApp {
     fn handle_health_command(&mut self) {
         self.add_output_line(b"=== System Health Status ===");
         self.add_output_line(b"Overall Status: Healthy");
-        self.add_output_line(b"Memory Usage: Normal (45.2%)");
+        self.add_output_line(b"Memory Usage: Normal (35.8%)");
         self.add_output_line(b"CPU Temperature: 42.1C");
         self.add_output_line(b"Power State: Active");
         self.add_output_line(b"Security: No threats detected");
-        self.add_output_line(b"Process Count: 4 active");
+        self.add_output_line(b"Process Count: 32 active");
         self.add_output_line(b"Uptime: 15.3 minutes");
         self.add_output_line(b"Diagnostics: All systems operational");
         self.add_output_line(b"Network: Connected");
         self.add_output_line(b"Storage: Available");
+        self.add_output_line(b"Command Buffer: 2048 bytes available");
+        self.add_output_line(b"Output History: 2000 lines capacity");
     }
 
     fn handle_power_command(&mut self) {

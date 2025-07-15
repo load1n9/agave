@@ -61,7 +61,7 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
             }
             KEY_ESC => {
                 TERMINAL.command_length = 0;
-                for j in 0..512 {
+                for j in 0..2048 {
                     TERMINAL.command_buffer[j] = 0;
                 }
                 true
@@ -76,7 +76,7 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
                     COMMAND_HISTORY_INDEX -= 1;
                     // Load command from history
                     TERMINAL.command_length = 0;
-                    for j in 0..512 {
+                    for j in 0..2048 {
                         if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
                             break;
                         }
@@ -97,13 +97,13 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
                     if COMMAND_HISTORY_INDEX >= COMMAND_HISTORY_COUNT {
                         // Clear command line
                         TERMINAL.command_length = 0;
-                        for j in 0..512 {
+                        for j in 0..2048 {
                             TERMINAL.command_buffer[j] = 0;
                         }
                     } else {
                         // Load command from history
                         TERMINAL.command_length = 0;
-                        for j in 0..512 {
+                        for j in 0..2048 {
                             if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
                                 break;
                             }
@@ -153,8 +153,8 @@ fn handle_character_input(ch: char) {
         }
 
         // Check buffer bounds more conservatively
-        if TERMINAL.command_length < 510 {
-            // Leave more space for safety
+        if TERMINAL.command_length < 2046 {
+            // Updated for new command buffer size - leave more space for safety
             TERMINAL.command_buffer[TERMINAL.command_length] = ch_byte;
             TERMINAL.command_length += 1;
             // Ensure null termination
@@ -164,7 +164,7 @@ fn handle_character_input(ch: char) {
             #[allow(static_mut_refs)]
             TERMINAL.add_output_line(b"Command too long - cleared");
             TERMINAL.command_length = 0;
-            for j in 0..512 {
+            for j in 0..2048 {
                 TERMINAL.command_buffer[j] = 0;
             }
         }

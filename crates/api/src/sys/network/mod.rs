@@ -1,18 +1,22 @@
 /// Network stack implementation for Agave OS
 /// Provides TCP/UDP networking, HTTP client/server, and network utilities
-
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{vec::Vec, string::{String, ToString}, collections::BTreeMap, vec};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 use spin::Mutex;
 
-pub mod tcp;
-pub mod udp; 
-pub mod http;
 pub mod dns;
 pub mod ethernet;
+pub mod http;
 pub mod protocols;
 pub mod sockets;
+pub mod tcp;
+pub mod udp;
 
 /// Network configuration
 #[derive(Debug, Clone)]
@@ -30,10 +34,7 @@ impl Default for NetworkConfig {
             ip_address: Ipv4Addr::new(10, 0, 2, 15), // QEMU default
             subnet_mask: Ipv4Addr::new(255, 255, 255, 0),
             gateway: Ipv4Addr::new(10, 0, 2, 2),
-            dns_servers: vec![
-                Ipv4Addr::new(8, 8, 8, 8),
-                Ipv4Addr::new(1, 1, 1, 1),
-            ],
+            dns_servers: vec![Ipv4Addr::new(8, 8, 8, 8), Ipv4Addr::new(1, 1, 1, 1)],
             hostname: String::from("agave-os"),
         }
     }
@@ -111,7 +112,11 @@ impl NetworkManager {
         if let Some(interface) = self.interfaces.get_mut(name) {
             interface.config = config;
             interface.state = InterfaceState::Down;
-            log::info!("Configured interface {}: IP {}", name, interface.config.ip_address);
+            log::info!(
+                "Configured interface {}: IP {}",
+                name,
+                interface.config.ip_address
+            );
             Ok(())
         } else {
             Err(AgaveError::NotFound)
@@ -126,12 +131,12 @@ impl NetworkManager {
         } else {
             return Err(AgaveError::NotFound);
         };
-        
+
         // Now update the interface state
         if let Some(interface) = self.interfaces.get_mut(name) {
             interface.state = InterfaceState::Up;
             log::info!("Interface {} is now up", name);
-            
+
             // Add default route
             self.add_route(Route {
                 destination: Ipv4Addr::new(0, 0, 0, 0),
@@ -140,7 +145,7 @@ impl NetworkManager {
                 interface: name.to_string(),
                 metric: 100,
             })?;
-            
+
             Ok(())
         } else {
             Err(AgaveError::NotFound)
@@ -149,8 +154,12 @@ impl NetworkManager {
 
     /// Add route to routing table
     pub fn add_route(&mut self, route: Route) -> AgaveResult<()> {
-        log::info!("Adding route: {} -> {} via {}", 
-                   route.destination, route.interface, route.gateway);
+        log::info!(
+            "Adding route: {} -> {} via {}",
+            route.destination,
+            route.interface,
+            route.gateway
+        );
         self.routing_table.push(route);
         self.routing_table.sort_by_key(|r| r.metric);
         Ok(())
@@ -158,7 +167,8 @@ impl NetworkManager {
 
     /// Find route for destination
     pub fn find_route(&self, dest: Ipv4Addr) -> Option<&Route> {
-        self.routing_table.iter()
+        self.routing_table
+            .iter()
             .find(|route| self.matches_route(dest, route))
     }
 
@@ -166,18 +176,21 @@ impl NetworkManager {
         let dest_bits = u32::from(dest);
         let route_bits = u32::from(route.destination);
         let mask_bits = u32::from(route.netmask);
-        
+
         (dest_bits & mask_bits) == (route_bits & mask_bits)
     }
 
     /// Get interface statistics
     pub fn get_stats(&self, interface: &str) -> Option<NetworkStats> {
-        self.interfaces.get(interface).map(|iface| iface.stats.clone())
+        self.interfaces
+            .get(interface)
+            .map(|iface| iface.stats.clone())
     }
 
     /// List all interfaces
     pub fn list_interfaces(&self) -> Vec<(String, InterfaceState)> {
-        self.interfaces.iter()
+        self.interfaces
+            .iter()
             .map(|(name, iface)| (name.clone(), iface.state.clone()))
             .collect()
     }
@@ -186,7 +199,7 @@ impl NetworkManager {
 /// Public API functions
 pub fn init_network() -> AgaveResult<()> {
     log::info!("Initializing network stack...");
-    
+
     // Create default interface (will be configured by VirtIO driver)
     let default_interface = NetworkInterface {
         name: "eth0".to_string(),
@@ -198,7 +211,7 @@ pub fn init_network() -> AgaveResult<()> {
 
     let mut manager = NETWORK_MANAGER.lock();
     manager.add_interface(default_interface)?;
-    
+
     log::info!("Network stack initialized");
     Ok(())
 }
@@ -233,7 +246,7 @@ pub fn receive_packet(interface: &str, packet: &[u8]) -> AgaveResult<()> {
         iface.stats.packets_received += 1;
         iface.stats.bytes_received += packet.len() as u64;
         log::trace!("Received {} byte packet on {}", packet.len(), interface);
-        
+
         // TODO: Process packet through protocol stack
         protocols::process_packet(packet)?;
         Ok(())
@@ -245,7 +258,9 @@ pub fn receive_packet(interface: &str, packet: &[u8]) -> AgaveResult<()> {
 /// Get network statistics
 pub fn get_network_stats() -> BTreeMap<String, NetworkStats> {
     let manager = NETWORK_MANAGER.lock();
-    manager.interfaces.iter()
+    manager
+        .interfaces
+        .iter()
         .map(|(name, iface)| (name.clone(), iface.stats.clone()))
         .collect()
 }
@@ -253,14 +268,18 @@ pub fn get_network_stats() -> BTreeMap<String, NetworkStats> {
 /// Check if network is available
 pub fn is_network_available() -> bool {
     let manager = NETWORK_MANAGER.lock();
-    manager.interfaces.values()
+    manager
+        .interfaces
+        .values()
         .any(|iface| matches!(iface.state, InterfaceState::Up | InterfaceState::Connected))
 }
 
 /// Get local IP address
 pub fn get_local_ip() -> Option<Ipv4Addr> {
     let manager = NETWORK_MANAGER.lock();
-    manager.interfaces.values()
+    manager
+        .interfaces
+        .values()
         .find(|iface| matches!(iface.state, InterfaceState::Up | InterfaceState::Connected))
         .map(|iface| iface.config.ip_address)
 }
@@ -271,7 +290,10 @@ pub async fn resolve_hostname(hostname: &str) -> AgaveResult<Ipv4Addr> {
         "localhost" => Ok(Ipv4Addr::new(127, 0, 0, 1)),
         "gateway" => {
             let manager = NETWORK_MANAGER.lock();
-            Ok(manager.interfaces.values().next()
+            Ok(manager
+                .interfaces
+                .values()
+                .next()
                 .map(|iface| iface.config.gateway)
                 .unwrap_or(Ipv4Addr::new(10, 0, 2, 2)))
         }

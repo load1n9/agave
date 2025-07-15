@@ -1,10 +1,14 @@
 /// VirtIO Network device driver for Agave OS (simplified version)
 use crate::sys::{
     error::{AgaveError, AgaveResult},
-    network::{NetworkInterface, InterfaceState, NetworkConfig, NetworkStats},
+    network::{InterfaceState, NetworkConfig, NetworkInterface, NetworkStats},
     virtio::Virtio,
 };
-use alloc::{vec::Vec, string::{String, ToString}, vec};
+use alloc::{
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 /// VirtIO Network device feature bits
 #[allow(dead_code)]
@@ -127,9 +131,15 @@ impl VirtioNet {
             self.read_mac_address()?;
         }
 
-        log::info!("VirtIO Net MAC address: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-                   self.mac_address[0], self.mac_address[1], self.mac_address[2],
-                   self.mac_address[3], self.mac_address[4], self.mac_address[5]);
+        log::info!(
+            "VirtIO Net MAC address: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.mac_address[0],
+            self.mac_address[1],
+            self.mac_address[2],
+            self.mac_address[3],
+            self.mac_address[4],
+            self.mac_address[5]
+        );
 
         // Set up receive buffers
         self.setup_receive_buffers()?;
@@ -143,8 +153,10 @@ impl VirtioNet {
             stats: NetworkStats::default(),
         };
 
-        crate::sys::network::NETWORK_MANAGER.lock().add_interface(interface)?;
-        
+        crate::sys::network::NETWORK_MANAGER
+            .lock()
+            .add_interface(interface)?;
+
         log::info!("VirtIO network device initialized successfully");
         Ok(())
     }
@@ -153,12 +165,12 @@ impl VirtioNet {
     fn negotiate_features(&mut self) -> AgaveResult<()> {
         // For now, use a simple feature set that's commonly supported
         self.features = VIRTIO_NET_F_MAC | VIRTIO_NET_F_STATUS;
-        
+
         // In a real implementation, we would:
         // 1. Read device features from VirtIO config
         // 2. Select supported features
         // 3. Write driver features back to device
-        
+
         log::debug!("Using features: 0x{:016x}", self.features);
         Ok(())
     }
@@ -174,7 +186,7 @@ impl VirtioNet {
     /// Set up receive buffers
     fn setup_receive_buffers(&mut self) -> AgaveResult<()> {
         const RX_BUFFER_SIZE: usize = 1518; // Maximum Ethernet frame size
-        
+
         for _ in 0..256 {
             let buffer = vec![0u8; RX_BUFFER_SIZE];
             self.rx_queue.add_buffer(buffer)?;
@@ -191,10 +203,10 @@ impl VirtioNet {
         }
 
         log::trace!("Sending {} byte packet", packet.len());
-        
+
         // Select TX queue
         self.base.queue_select(VIRTIO_NET_TX_QUEUE);
-        
+
         // Get descriptor for packet transmission
         if let Some(desc_id) = self.base.get_free_desc_id() {
             // Create VirtIO network header
@@ -213,11 +225,14 @@ impl VirtioNet {
             // 2. Set up the descriptor chain (header + packet)
             // 3. Add to available ring
             // 4. Notify the device
-            
+
             // For now, simulate the transmission
-            log::debug!("Queued packet for transmission using descriptor {}", desc_id);
+            log::debug!(
+                "Queued packet for transmission using descriptor {}",
+                desc_id
+            );
             self.base.set_free_desc_id(desc_id);
-            
+
             self.tx_queue.bytes_processed += packet.len() as u64;
             self.tx_queue.packets_processed += 1;
 
@@ -284,7 +299,10 @@ impl VirtioNet {
                     }
                 }
             } else {
-                log::warn!("Received packet is too small to parse: {} bytes", packet_data.len());
+                log::warn!(
+                    "Received packet is too small to parse: {} bytes",
+                    packet_data.len()
+                );
             }
 
             packets_processed += 1;
@@ -315,15 +333,15 @@ impl VirtioNet {
     /// Start the device
     pub fn start(&mut self) -> AgaveResult<()> {
         log::info!("Starting VirtIO network device");
-        
+
         // Set device status
         self.status = VIRTIO_NET_S_LINK_UP;
-        
+
         // In a real implementation, we would:
         // 1. Set VirtIO device status to DRIVER_OK
         // 2. Enable interrupts
         // 3. Start processing queues
-        
+
         log::info!("VirtIO network device started successfully");
         Ok(())
     }
@@ -331,15 +349,15 @@ impl VirtioNet {
     /// Stop the device
     pub fn stop(&mut self) -> AgaveResult<()> {
         log::info!("Stopping VirtIO network device");
-        
+
         // Clear device status
         self.status = 0;
-        
+
         // In a real implementation, we would:
         // 1. Disable interrupts
         // 2. Stop processing queues
         // 3. Reset VirtIO device
-        
+
         log::info!("VirtIO network device stopped successfully");
         Ok(())
     }
@@ -363,13 +381,13 @@ impl VirtioNet {
     pub fn add_rx_buffer(&mut self, buffer: Vec<u8>) -> AgaveResult<()> {
         // Select RX queue
         self.base.queue_select(VIRTIO_NET_RX_QUEUE);
-        
+
         // In a real implementation, we would:
         // 1. Get a free descriptor
         // 2. Map the buffer to the descriptor
         // 3. Add to available ring
         // 4. Notify the device
-        
+
         // For now, just add to our internal queue
         self.rx_queue.add_buffer(buffer)
     }
@@ -378,38 +396,42 @@ impl VirtioNet {
     pub fn refill_rx_buffers(&mut self) -> AgaveResult<()> {
         const RX_BUFFER_SIZE: usize = 1518;
         const MIN_RX_BUFFERS: usize = 64;
-        
+
         while self.rx_queue.size() < MIN_RX_BUFFERS {
             let buffer = vec![0u8; RX_BUFFER_SIZE];
             self.add_rx_buffer(buffer)?;
         }
-        
+
         Ok(())
     }
 
     /// Handle VirtIO network device interrupt
     pub fn handle_interrupt(&mut self) -> AgaveResult<()> {
         log::trace!("VirtIO network interrupt received");
-        
+
         // In a real implementation, we would:
         // 1. Read interrupt status from device
         // 2. Handle configuration changes
         // 3. Process completed TX/RX operations
         // 4. Acknowledge interrupt
-        
+
         // For now, just process any pending packets
         self.process_received_packets()?;
-        
+
         Ok(())
     }
 
     /// Set device configuration (like promiscuous mode, etc.)
     pub fn set_config(&mut self, promiscuous: bool, multicast: bool) -> AgaveResult<()> {
-        log::info!("Setting device configuration: promiscuous={}, multicast={}", promiscuous, multicast);
-        
+        log::info!(
+            "Setting device configuration: promiscuous={}, multicast={}",
+            promiscuous,
+            multicast
+        );
+
         // In a real implementation, we would write to the VirtIO config space
         // For now, just log the configuration changes
-        
+
         Ok(())
     }
 }

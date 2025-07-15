@@ -1,24 +1,14 @@
 #![no_std]
 #![no_main]
 
-
-
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
-    allocator, 
-    diagnostics,
-    drivers,
+    allocator, diagnostics, drivers,
     framebuffer::{FB, RGBA},
-    fs,
-    gdt, globals, interrupts, ioapic, local_apic,
+    fs, gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
     memory::{self, BootInfoFrameAllocator},
-    monitor,
-    network,
-    pci,
-    power,
-    process,
-    security,
+    monitor, network, pci, power, process, security,
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
     wasm::WasmApp,
@@ -31,7 +21,7 @@ use core::panic::PanicInfo;
 use spin::Mutex;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
-    structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
+    structures::paging::{Mapper, Page, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
     PhysAddr, VirtAddr,
 };
 extern crate agave_api;
@@ -51,10 +41,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
     let fbinfo = framebuffer.info();
     let fbm = framebuffer.buffer_mut();
-    // let fbm2 = unsafe {
-    //     let p = fbm.as_mut_ptr();
-    //     slice::from_raw_parts_mut(p, fbinfo.byte_len)
-    // };
 
     init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
@@ -64,7 +50,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("KERNEL: Initializing IDT");
     interrupts::init_idt();
     log::info!("KERNEL: Basic initialization complete");
-    
+
     let virtual_full_mapping_offset = VirtAddr::new(
         boot_info
             .physical_memory_offset
@@ -89,8 +75,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
         let end_frame: PhysFrame<VirtualMappingPageSize> = PhysFrame::containing_address(max_phys);
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        use x86_64::structures::paging::PageSize;
         let mut news = 0;
         let mut olds = 0;
         for frame in PhysFrame::range_inclusive(start_frame, end_frame) {
@@ -228,19 +212,32 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 pci.config_read_u16(pci::PCIConfigRegisters::PCIDeviceID as u8) as isize - 0x1040;
             const VIRTIO_VENDOR_ID: u16 = 0x1af4;
             if vendor == VIRTIO_VENDOR_ID {
-                log::info!("Found VirtIO device at PCI index {} (device_id: {})", pci_index, device_id);
+                log::info!(
+                    "Found VirtIO device at PCI index {} (device_id: {})",
+                    pci_index,
+                    device_id
+                );
                 let virtio = with_mapper_framealloc(|mapper, frame_allocator| {
                     Virtio::init(pci, mapper, frame_allocator)
                 });
                 if let Some(virtio) = virtio {
-                    log::info!("VirtIO device {:?} initialized successfully", virtio.device_type);
+                    log::info!(
+                        "VirtIO device {:?} initialized successfully",
+                        virtio.device_type
+                    );
                     virtio_devices.push(virtio);
                 } else {
-                    log::warn!("Failed to initialize VirtIO device with device_id {}", device_id);
+                    log::warn!(
+                        "Failed to initialize VirtIO device with device_id {}",
+                        device_id
+                    );
                 }
             }
         }
-        log::info!("VirtIO device scan complete, found {} devices", virtio_devices.len());
+        log::info!(
+            "VirtIO device scan complete, found {} devices",
+            virtio_devices.len()
+        );
     }
 
     log::info!("Setting up framebuffer...");
@@ -249,10 +246,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let mut fb = Box::new(FB::new(&fbinfo));
     let fb_clone: *mut FB = &mut *fb;
     log::info!("Framebuffer created at {:?}", fb_clone);
-    
+
     // Show loading screen now that framebuffer is available
     show_loading_screen("Basic initialization complete...", 25, &mut *fb);
-    
+
     // log::info!("fbclone {:?}", fb_clone);
 
     // Initialize monitoring system
@@ -359,7 +356,10 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                     spawner.run(drivers::virtio_scsi::drive(virtio));
                 }
                 DeviceType::Unknown(id) => {
-                    log::warn!("Unknown VirtIO device type {} detected - no driver available", id);
+                    log::warn!(
+                        "Unknown VirtIO device type {} detected - no driver available",
+                        id
+                    );
                 }
             }
         }
@@ -393,86 +393,73 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
             let mut frame_counter = 0u64;
             let mut last_monitor_check = 0u64;
-            
-            // Show completion screen - access framebuffer through the raw pointer
+
             unsafe {
                 let fb_ref = &mut *fb_clone;
                 show_loading_screen("Agave OS Ready!", 100, fb_ref);
-                // Give the user a moment to see the completion
-                for _ in 0..1000000 { 
-                    core::hint::spin_loop(); 
+                for _ in 0..1000000 {
+                    core::hint::spin_loop();
                 }
             }
-            
+
             log::info!("Starting main application loop...");
             loop {
                 globals::INPUT.update(|e| e.step());
                 let input = globals::INPUT.read();
-                
+
                 // Record system activity for power management
                 power::record_system_activity();
-                
                 for app in apps.iter_mut() {
                     app.call_update(input);
                 }
-                
+
                 frame_counter += 1;
-                
+
                 // Update power management every 10 frames (~100Hz)
                 if frame_counter % 10 == 0 {
                     if let Err(e) = power::update_power_management() {
                         log::error!("Power management update failed: {:?}", e);
                     }
                 }
-                
                 // Enhanced monitoring and diagnostics (every ~1000 frames, roughly once per second)
                 if frame_counter % 1000 == 0 {
                     let current_time = agave_api::sys::interrupts::TIME_MS
                         .load(core::sync::atomic::Ordering::Relaxed);
-                    
                     // Run periodic diagnostics every 10 seconds
                     if current_time - last_monitor_check > 10000 {
                         let health_report = diagnostics::perform_health_check();
-                        
                         // Log critical issues immediately
                         if health_report.status == diagnostics::SystemHealthStatus::Critical {
                             log::error!("CRITICAL SYSTEM HEALTH ISSUE DETECTED!");
                             log::error!("{}", health_report.summary());
                         }
-                        
                         // Run legacy monitoring
                         monitor::periodic_monitor_check();
-                        
                         // Clean up terminated processes
                         process::cleanup_terminated_processes();
-                        
                         last_monitor_check = current_time;
                     }
-                    
                     // Log comprehensive system status every 30 seconds
                     if frame_counter % 30000 == 0 {
                         monitor::log_system_status();
-                        
+
                         // Log power status
                         let (cpu_freq, _, _) = power::get_cpu_frequency_info();
                         let (cpu_temp, thermal_throttling) = power::get_thermal_info();
                         let power_state = power::get_power_state();
-                        
+
                         log::info!("Enhanced Status - Power: {:?}, CPU: {} MHz, Temp: {:.1}°C, Throttling: {}",
                                    power_state, cpu_freq, cpu_temp, thermal_throttling);
-                        
                         // Log security status
                         let security_stats = security::get_security_statistics();
                         if security_stats.total_events > 0 {
                             log::info!("Security Status - {} events, {} blocked processes",
                                        security_stats.total_events, security_stats.blocked_processes);
                         }
-                        
                         // Log VirtIO device status
                         log::info!("VirtIO Status - Devices active and operational");
                     }
                 }
-                
                 yield_once().await;
             }
         });
@@ -486,22 +473,32 @@ fn show_loading_screen(_stage: &str, progress: u8, fb: &mut FB) {
     // Get screen dimensions
     let width = fb.w as i32;
     let height = fb.h as i32;
-    
+
     // Fill background with dark blue
-    let bg_color = RGBA { r: 0x1a, g: 0x1a, b: 0x2e, a: 0xFF };
+    let bg_color = RGBA {
+        r: 0x1a,
+        g: 0x1a,
+        b: 0x2e,
+        a: 0xFF,
+    };
     for y in 0..height {
         for x in 0..width {
             fb.set(x as usize, y as usize, bg_color);
         }
     }
-    
+
     // Draw progress bar background
     let bar_width = 400;
     let bar_height = 20;
     let bar_x = (width - bar_width) / 2;
     let bar_y = height / 2 + 50;
-    
-    let bar_bg_color = RGBA { r: 0x0f, g: 0x0f, b: 0x23, a: 0xFF };
+
+    let bar_bg_color = RGBA {
+        r: 0x0f,
+        g: 0x0f,
+        b: 0x23,
+        a: 0xFF,
+    };
     for y in bar_y..(bar_y + bar_height) {
         for x in bar_x..(bar_x + bar_width) {
             if x >= 0 && x < width && y >= 0 && y < height {
@@ -509,11 +506,16 @@ fn show_loading_screen(_stage: &str, progress: u8, fb: &mut FB) {
             }
         }
     }
-    
+
     // Draw progress bar fill
     let fill_width = (bar_width as u8 * progress / 100) as i32;
     if fill_width > 0 {
-        let fill_color = RGBA { r: 0x00, g: 0xd4, b: 0xaa, a: 0xFF };
+        let fill_color = RGBA {
+            r: 0x00,
+            g: 0xd4,
+            b: 0xaa,
+            a: 0xFF,
+        };
         for y in bar_y..(bar_y + bar_height) {
             for x in bar_x..(bar_x + fill_width) {
                 if x >= 0 && x < width && y >= 0 && y < height {
@@ -529,35 +531,40 @@ fn panic(info: &PanicInfo) -> ! {
     // Disable interrupts to prevent further issues
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     x86_64::instructions::interrupts::disable();
-    
+
     log::error!("=== KERNEL PANIC ===");
     log::error!("Panic info: {:?}", info);
-    
+
     // Log system state at panic
-    log::error!("System uptime: {}ms", 
-        agave_api::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed));
-    
+    log::error!(
+        "System uptime: {}ms",
+        agave_api::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed)
+    );
+
     // Log memory state
     let memory_stats = agave_api::sys::allocator::memory_stats();
-    log::error!("Memory usage: {}/{} bytes ({:.1}%)", 
-        memory_stats.allocated, 
+    log::error!(
+        "Memory usage: {}/{} bytes ({:.1}%)",
+        memory_stats.allocated,
         memory_stats.heap_size,
-        memory_stats.utilization_percent());
-    
+        memory_stats.utilization_percent()
+    );
+
     // Log task metrics
     {
         let task_metrics = agave_api::sys::task::executor::TASK_METRICS.lock();
-        log::error!("Tasks: {} spawned, {} completed, {} context switches",
+        log::error!(
+            "Tasks: {} spawned, {} completed, {} context switches",
             task_metrics.total_tasks_spawned,
             task_metrics.tasks_completed,
-            task_metrics.context_switches);
+            task_metrics.context_switches
+        );
     }
-    
+
     log::error!("System halted due to panic");
-    
+
     loop {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         x86_64::instructions::hlt();
     }
 }
-

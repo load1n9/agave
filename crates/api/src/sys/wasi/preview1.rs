@@ -134,7 +134,7 @@ where
                         *nwritten_ptr = nwritten;
                     }
                     ERRNO_SUCCESS as i32
-                },
+                }
                 Err(e) => e.errno as i32,
             }
         },
@@ -157,7 +157,7 @@ where
                         *nread_ptr = nread;
                     }
                     ERRNO_SUCCESS as i32
-                },
+                }
                 Err(e) => e.errno as i32,
             }
         },
@@ -186,7 +186,7 @@ where
                         *stat_ptr = fdstat;
                     }
                     ERRNO_SUCCESS as i32
-                },
+                }
                 Err(e) => e.errno as i32,
             }
         },
@@ -205,7 +205,7 @@ where
                         *prestat_ptr = prestat;
                     }
                     ERRNO_SUCCESS as i32
-                },
+                }
                 Err(e) => e.errno as i32,
             }
         },

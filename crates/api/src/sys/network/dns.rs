@@ -1,16 +1,21 @@
 /// DNS client implementation for Agave OS
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{string::{String, ToString}, vec::Vec, collections::BTreeMap, vec};
+use alloc::{
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 use core::net::Ipv4Addr;
 
 /// DNS record types
 #[derive(Debug, Clone, PartialEq)]
 pub enum DnsRecordType {
-    A = 1,      // IPv4 address
-    AAAA = 28,  // IPv6 address  
-    CNAME = 5,  // Canonical name
-    MX = 15,    // Mail exchange
-    TXT = 16,   // Text record
+    A = 1,     // IPv4 address
+    AAAA = 28, // IPv6 address
+    CNAME = 5, // Canonical name
+    MX = 15,   // Mail exchange
+    TXT = 16,  // Text record
 }
 
 /// DNS record
@@ -43,7 +48,8 @@ impl DnsCache {
     }
 
     pub fn insert(&mut self, record: DnsRecord) {
-        self.records.entry(record.name.clone())
+        self.records
+            .entry(record.name.clone())
             .or_insert_with(Vec::new)
             .push(record);
     }
@@ -78,16 +84,16 @@ impl DnsResolver {
         let localhost_record = DnsRecord {
             name: "localhost".to_string(),
             record_type: DnsRecordType::A,
-            ttl: 86400, // 24 hours
+            ttl: 86400,               // 24 hours
             data: vec![127, 0, 0, 1], // 127.0.0.1
         };
         self.cache.insert(localhost_record);
 
         // Add some demo entries
         let demo_entries = [
-            ("example.com", [93, 184, 216, 34]),      // Example IP
-            ("google.com", [8, 8, 8, 8]),             // Google DNS
-            ("cloudflare.com", [1, 1, 1, 1]),         // Cloudflare DNS
+            ("example.com", [93, 184, 216, 34]), // Example IP
+            ("google.com", [8, 8, 8, 8]),        // Google DNS
+            ("cloudflare.com", [1, 1, 1, 1]),    // Cloudflare DNS
         ];
 
         for (hostname, ip_bytes) in demo_entries.iter() {
@@ -107,7 +113,7 @@ impl DnsResolver {
             if record.data.len() == 4 {
                 return Ok(Ipv4Addr::new(
                     record.data[0],
-                    record.data[1], 
+                    record.data[1],
                     record.data[2],
                     record.data[3],
                 ));
@@ -137,10 +143,14 @@ impl DnsResolver {
         Err(AgaveError::NotFound)
     }
 
-    async fn query_dns_server(&self, _dns_server: Ipv4Addr, hostname: &str) -> AgaveResult<Ipv4Addr> {
+    async fn query_dns_server(
+        &self,
+        _dns_server: Ipv4Addr,
+        hostname: &str,
+    ) -> AgaveResult<Ipv4Addr> {
         // TODO: Implement actual DNS protocol (UDP port 53)
         log::trace!("Would query DNS server for: {}", hostname);
-        
+
         // For now, return an error since we don't have network implementation yet
         Err(AgaveError::NotFound)
     }
@@ -166,7 +176,10 @@ static mut DNS_RESOLVER: Option<DnsResolver> = None;
 
 /// Initialize DNS resolver
 pub fn init_dns(dns_servers: Vec<Ipv4Addr>) -> AgaveResult<()> {
-    log::info!("DNS resolver initialized with {} servers", dns_servers.len());
+    log::info!(
+        "DNS resolver initialized with {} servers",
+        dns_servers.len()
+    );
     unsafe {
         DNS_RESOLVER = Some(DnsResolver::new(dns_servers));
     }

@@ -44,32 +44,38 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
     unsafe {
         // Perform proper VirtIO GPU feature negotiation
         log::info!("Starting VirtIO GPU driver with feature negotiation");
-        
+
         // VirtIO GPU specific features
         const VIRTIO_GPU_F_VIRGL: u64 = 0;
         const VIRTIO_GPU_F_EDID: u64 = 1;
         const VIRTIO_GPU_F_RESOURCE_UUID: u64 = 2;
         const VIRTIO_GPU_F_RESOURCE_BLOB: u64 = 3;
         const VIRTIO_GPU_F_CONTEXT_INIT: u64 = 4;
-        
+
         // VirtIO Device Status constants
         const VIRTIO_STATUS_DRIVER: u8 = 2;
         const VIRTIO_STATUS_DRIVER_OK: u8 = 4;
-        
+
         // Negotiate features - request basic GPU features
         let desired_features = (1 << VIRTIO_GPU_F_VIRGL) | // Enable 3D/virgl support
-                              (1 << VIRTIO_GPU_F_EDID);    // Enable EDID support
-        
+                              (1 << VIRTIO_GPU_F_EDID); // Enable EDID support
+
         let negotiated_features = virtio.negotiate_features(desired_features);
-        log::info!("VirtIO GPU negotiated features: 0x{:016x}", negotiated_features);
-        
+        log::info!(
+            "VirtIO GPU negotiated features: 0x{:016x}",
+            negotiated_features
+        );
+
         // Check if virgl (3D) is available
         let virgl_enabled = (negotiated_features & (1 << VIRTIO_GPU_F_VIRGL)) != 0;
-        log::info!("VirtIO GPU 3D/virgl support: {}", if virgl_enabled { "enabled" } else { "disabled" });
-        
+        log::info!(
+            "VirtIO GPU 3D/virgl support: {}",
+            if virgl_enabled { "enabled" } else { "disabled" }
+        );
+
         // Initialize driver status
         virtio.set_device_status(VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_DRIVER_OK);
-        
+
         let q = 0;
         virtio.queue_select(q);
         let _queue = read_volatile(virtio.common.cap);
@@ -332,7 +338,12 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 }
             }
 
-            fn cmd_create_surface(buffer: &mut Vec<u32>, handle: u32, res_handle: u32, format: VirglFormats) {
+            fn cmd_create_surface(
+                buffer: &mut Vec<u32>,
+                handle: u32,
+                res_handle: u32,
+                format: VirglFormats,
+            ) {
                 let len = 5;
                 buffer.push(
                     (len << 16)
@@ -424,7 +435,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             cmd_clear(&mut buffer, PIPE_CLEAR_COLOR, [1.0, 0.0, 0.0, 1.0], 1.0, 0);
 
             let len = buffer.len() as u32;
-            
+
             // Validate buffer length
             if len == 0 {
                 log::error!("Empty command buffer - skipping 3D submit");
@@ -432,7 +443,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 log::error!("Command buffer too large: {} > 512 - truncating", len);
             } else {
                 log::debug!("Submitting 3D command buffer with {} words", len);
-                
+
                 // pad to 512
                 while buffer.len() < 512 {
                     buffer.push(0);
@@ -452,9 +463,12 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 )
                 .await;
                 let response = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-                
+
                 if !matches!(response.type_, VirtioGpuCtrlType::VirtioGpuRespOkNoData) {
-                    log::error!("3D command submission failed with response: {:?}", response.type_);
+                    log::error!(
+                        "3D command submission failed with response: {:?}",
+                        response.type_
+                    );
                 } else {
                     log::info!("3D command submission successful");
                 }

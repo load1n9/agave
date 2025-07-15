@@ -150,7 +150,7 @@ impl From<&str> for AgaveError {
     }
 }
 
-impl<S> From<x86_64::structures::paging::mapper::MapToError<S>> for AgaveError 
+impl<S> From<x86_64::structures::paging::mapper::MapToError<S>> for AgaveError
 where
     S: x86_64::structures::paging::page::PageSize,
 {
@@ -228,12 +228,20 @@ where
 pub fn log_error(context: &ErrorContext) {
     match context.error {
         AgaveError::OutOfMemory | AgaveError::HardwareError(_) => {
-            log::error!("Critical error at {}: {} - {:?}", 
-                context.location, context.error, context.message);
+            log::error!(
+                "Critical error at {}: {} - {:?}",
+                context.location,
+                context.error,
+                context.message
+            );
         }
         _ => {
-            log::warn!("Error at {}: {} - {:?}", 
-                context.location, context.error, context.message);
+            log::warn!(
+                "Error at {}: {} - {:?}",
+                context.location,
+                context.error,
+                context.message
+            );
         }
     }
 }

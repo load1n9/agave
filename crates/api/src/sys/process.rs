@@ -1,23 +1,23 @@
 /// Enhanced process management for Agave OS
 /// Provides process isolation, scheduling, and inter-process communication
 use crate::sys::{
+    diagnostics::{add_diagnostic, DiagnosticCategory, DiagnosticLevel},
     error::{AgaveError, AgaveResult},
     memory,
     task::{Task, TaskId},
-    diagnostics::{add_diagnostic, DiagnosticLevel, DiagnosticCategory},
 };
 use alloc::{
-    vec::Vec,
-    string::{String, ToString},
-    collections::{BTreeMap, VecDeque},
     boxed::Box,
+    collections::{BTreeMap, VecDeque},
     format,
+    string::{String, ToString},
+    vec::Vec,
 };
 use core::{
-    sync::atomic::{AtomicU64, AtomicU32, Ordering},
     future::Future,
-    task::{Context, Poll},
     pin::Pin,
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+    task::{Context, Poll},
 };
 use spin::Mutex;
 
@@ -30,7 +30,7 @@ impl ProcessId {
         static NEXT_PID: AtomicU64 = AtomicU64::new(1);
         ProcessId(NEXT_PID.fetch_add(1, Ordering::Relaxed))
     }
-    
+
     pub fn as_u64(&self) -> u64 {
         self.0
     }
@@ -50,11 +50,11 @@ pub enum ProcessState {
 /// Process priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
-    Critical = 0,  // System critical processes
-    High = 1,      // High priority system processes
-    Normal = 2,    // Normal user processes
-    Low = 3,       // Background processes
-    Idle = 4,      // Idle/cleanup processes
+    Critical = 0, // System critical processes
+    High = 1,     // High priority system processes
+    Normal = 2,   // Normal user processes
+    Low = 3,      // Background processes
+    Idle = 4,     // Idle/cleanup processes
 }
 
 impl Default for Priority {
@@ -111,7 +111,7 @@ impl IpcChannel {
             max_messages,
         }
     }
-    
+
     fn send(&mut self, message: IpcMessage) -> AgaveResult<()> {
         if self.messages.len() >= self.max_messages {
             return Err(AgaveError::ResourceExhausted);
@@ -119,15 +119,15 @@ impl IpcChannel {
         self.messages.push_back(message);
         Ok(())
     }
-    
+
     fn receive(&mut self) -> Option<IpcMessage> {
         self.messages.pop_front()
     }
-    
+
     fn peek(&self) -> Option<&IpcMessage> {
         self.messages.front()
     }
-    
+
     fn len(&self) -> usize {
         self.messages.len()
     }
@@ -156,8 +156,8 @@ pub struct ResourceLimits {
 impl Default for ResourceLimits {
     fn default() -> Self {
         Self {
-            max_memory: 16 * 1024 * 1024,  // 16MB
-            max_cpu_time_ms: 60 * 1000,    // 1 minute
+            max_memory: 16 * 1024 * 1024, // 16MB
+            max_cpu_time_ms: 60 * 1000,   // 1 minute
             max_children: 10,
             max_open_files: 100,
             max_ipc_messages: 1000,
@@ -193,8 +193,11 @@ impl ProcessScheduler {
         Self {
             processes: BTreeMap::new(),
             ready_queues: [
-                VecDeque::new(), VecDeque::new(), VecDeque::new(), 
-                VecDeque::new(), VecDeque::new()
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
+                VecDeque::new(),
             ],
             current_process: None,
             next_schedule_time: 0,
@@ -203,15 +206,21 @@ impl ProcessScheduler {
             active_processes: AtomicU32::new(0),
         }
     }
-    
+
     /// Spawn a new process
-    pub fn spawn_process<F>(&mut self, name: String, priority: Priority, future: F, parent_pid: Option<ProcessId>) -> AgaveResult<ProcessId>
+    pub fn spawn_process<F>(
+        &mut self,
+        name: String,
+        priority: Priority,
+        future: F,
+        parent_pid: Option<ProcessId>,
+    ) -> AgaveResult<ProcessId>
     where
         F: Future<Output = i32> + Send + 'static,
     {
         let pid = ProcessId::new();
         let now = crate::sys::interrupts::TIME_MS.load(Ordering::Relaxed);
-        
+
         // Check parent process limits
         if let Some(parent_id) = parent_pid {
             if let Some(parent) = self.processes.get_mut(&parent_id) {
@@ -221,7 +230,7 @@ impl ProcessScheduler {
                 parent.context.children.push(pid);
             }
         }
-        
+
         let context = ProcessContext {
             pid,
             parent_pid,
@@ -234,7 +243,7 @@ impl ProcessScheduler {
             exit_code: None,
             children: Vec::new(),
         };
-        
+
         let pcb = ProcessControlBlock {
             context,
             task: Some(Box::pin(future)),
@@ -243,28 +252,31 @@ impl ProcessScheduler {
             resource_limits: ResourceLimits::default(),
             statistics: ProcessStatistics::default(),
         };
-        
+
         self.processes.insert(pid, pcb);
         self.ready_queues[priority as usize].push_back(pid);
-        
+
         self.total_processes.fetch_add(1, Ordering::Relaxed);
         self.active_processes.fetch_add(1, Ordering::Relaxed);
-        
+
         add_diagnostic(
             DiagnosticLevel::Info,
             DiagnosticCategory::Tasks,
             format!("Process spawned: {} (PID: {})", name, pid.as_u64()),
-            Some(format!("Priority: {:?}, Parent: {:?}", priority, parent_pid))
+            Some(format!(
+                "Priority: {:?}, Parent: {:?}",
+                priority, parent_pid
+            )),
         );
-        
+
         log::info!("Spawned process '{}' with PID {}", name, pid.as_u64());
         Ok(pid)
     }
-    
+
     /// Schedule and run processes
     pub fn schedule(&mut self) -> Option<ProcessId> {
         let now = crate::sys::interrupts::TIME_MS.load(Ordering::Relaxed);
-        
+
         // Check if we need to preempt current process
         if let Some(current_pid) = self.current_process {
             if now >= self.next_schedule_time {
@@ -278,7 +290,7 @@ impl ProcessScheduler {
                 self.current_process = None;
             }
         }
-        
+
         // If no current process, select next one
         if self.current_process.is_none() {
             // Find highest priority non-empty queue
@@ -290,25 +302,29 @@ impl ProcessScheduler {
                             process.statistics.context_switches += 1;
                             self.current_process = Some(pid);
                             self.next_schedule_time = now + self.schedule_quantum_ms;
-                            
-                            log::trace!("Scheduled process {} (priority {})", pid.as_u64(), priority);
+
+                            log::trace!(
+                                "Scheduled process {} (priority {})",
+                                pid.as_u64(),
+                                priority
+                            );
                             return Some(pid);
                         }
                     }
                 }
             }
         }
-        
+
         self.current_process
     }
-    
+
     /// Run the current scheduled process
     pub fn run_current_process(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         if let Some(current_pid) = self.current_process {
             if let Some(pcb) = self.processes.get_mut(&current_pid) {
                 if let Some(task) = &mut pcb.task {
                     let start_time = crate::sys::interrupts::TIME_MS.load(Ordering::Relaxed);
-                    
+
                     match task.as_mut().poll(cx) {
                         Poll::Ready(exit_code) => {
                             let end_time = crate::sys::interrupts::TIME_MS.load(Ordering::Relaxed);
@@ -316,18 +332,26 @@ impl ProcessScheduler {
                             pcb.context.state = ProcessState::Terminated;
                             pcb.context.exit_code = Some(exit_code);
                             pcb.task = None;
-                            
+
                             self.active_processes.fetch_sub(1, Ordering::Relaxed);
                             self.current_process = None;
-                            
+
                             add_diagnostic(
                                 DiagnosticLevel::Info,
                                 DiagnosticCategory::Tasks,
-                                format!("Process terminated: {} (exit code: {})", current_pid.as_u64(), exit_code),
-                                Some(format!("CPU time: {}ms", pcb.context.cpu_time_ms))
+                                format!(
+                                    "Process terminated: {} (exit code: {})",
+                                    current_pid.as_u64(),
+                                    exit_code
+                                ),
+                                Some(format!("CPU time: {}ms", pcb.context.cpu_time_ms)),
                             );
-                            
-                            log::info!("Process {} terminated with exit code {}", current_pid.as_u64(), exit_code);
+
+                            log::info!(
+                                "Process {} terminated with exit code {}",
+                                current_pid.as_u64(),
+                                exit_code
+                            );
                             Poll::Ready(())
                         }
                         Poll::Pending => {
@@ -346,13 +370,19 @@ impl ProcessScheduler {
             Poll::Ready(())
         }
     }
-    
+
     /// Send IPC message between processes
-    pub fn send_message(&mut self, from: ProcessId, to: ProcessId, message_type: IpcMessageType, data: Vec<u8>) -> AgaveResult<()> {
+    pub fn send_message(
+        &mut self,
+        from: ProcessId,
+        to: ProcessId,
+        message_type: IpcMessageType,
+        data: Vec<u8>,
+    ) -> AgaveResult<()> {
         if !self.processes.contains_key(&from) || !self.processes.contains_key(&to) {
             return Err(AgaveError::NotFound);
         }
-        
+
         let message = IpcMessage {
             from,
             to,
@@ -360,19 +390,19 @@ impl ProcessScheduler {
             data,
             timestamp: crate::sys::interrupts::TIME_MS.load(Ordering::Relaxed),
         };
-        
+
         if let Some(target_process) = self.processes.get_mut(&to) {
             target_process.ipc_inbox.send(message)?;
             target_process.statistics.messages_received += 1;
         }
-        
+
         if let Some(sender_process) = self.processes.get_mut(&from) {
             sender_process.statistics.messages_sent += 1;
         }
-        
+
         Ok(())
     }
-    
+
     /// Receive IPC message for a process
     pub fn receive_message(&mut self, pid: ProcessId) -> Option<IpcMessage> {
         if let Some(process) = self.processes.get_mut(&pid) {
@@ -381,7 +411,7 @@ impl ProcessScheduler {
             None
         }
     }
-    
+
     /// Kill a process
     pub fn kill_process(&mut self, pid: ProcessId, signal: i32) -> AgaveResult<()> {
         if let Some(process) = self.processes.get_mut(&pid) {
@@ -389,25 +419,25 @@ impl ProcessScheduler {
                 process.context.state = ProcessState::Terminated;
                 process.context.exit_code = Some(signal);
                 process.task = None;
-                
+
                 self.active_processes.fetch_sub(1, Ordering::Relaxed);
-                
+
                 // Remove from ready queues
                 for queue in &mut self.ready_queues {
                     queue.retain(|&p| p != pid);
                 }
-                
+
                 if self.current_process == Some(pid) {
                     self.current_process = None;
                 }
-                
+
                 add_diagnostic(
                     DiagnosticLevel::Info,
                     DiagnosticCategory::Tasks,
                     format!("Process killed: {} (signal: {})", pid.as_u64(), signal),
-                    None
+                    None,
                 );
-                
+
                 log::info!("Killed process {} with signal {}", pid.as_u64(), signal);
                 Ok(())
             } else {
@@ -417,34 +447,34 @@ impl ProcessScheduler {
             Err(AgaveError::NotFound)
         }
     }
-    
+
     /// Get process information
     pub fn get_process_info(&self, pid: ProcessId) -> Option<&ProcessContext> {
         self.processes.get(&pid).map(|pcb| &pcb.context)
     }
-    
+
     /// List all processes
     pub fn list_processes(&self) -> Vec<&ProcessContext> {
         self.processes.values().map(|pcb| &pcb.context).collect()
     }
-    
+
     /// Get system statistics
     pub fn get_statistics(&self) -> ProcessSystemStats {
         let total = self.total_processes.load(Ordering::Relaxed);
         let active = self.active_processes.load(Ordering::Relaxed);
-        
+
         let mut by_state = BTreeMap::new();
         let mut by_priority = BTreeMap::new();
         let mut total_memory = 0;
         let mut total_cpu_time = 0;
-        
+
         for pcb in self.processes.values() {
             *by_state.entry(pcb.context.state.clone()).or_insert(0) += 1;
             *by_priority.entry(pcb.context.priority).or_insert(0) += 1;
             total_memory += pcb.context.memory_usage;
             total_cpu_time += pcb.context.cpu_time_ms;
         }
-        
+
         ProcessSystemStats {
             total_processes: total,
             active_processes: active,
@@ -454,15 +484,16 @@ impl ProcessScheduler {
             total_cpu_time_ms: total_cpu_time,
         }
     }
-    
+
     /// Cleanup terminated processes
     pub fn cleanup_terminated(&mut self) {
-        let terminated_pids: Vec<ProcessId> = self.processes
+        let terminated_pids: Vec<ProcessId> = self
+            .processes
             .iter()
             .filter(|(_, pcb)| pcb.context.state == ProcessState::Terminated)
             .map(|(&pid, _)| pid)
             .collect();
-        
+
         for pid in terminated_pids {
             self.processes.remove(&pid);
             log::trace!("Cleaned up terminated process {}", pid.as_u64());
@@ -485,8 +516,11 @@ pub struct ProcessSystemStats {
 static PROCESS_MANAGER: Mutex<ProcessScheduler> = Mutex::new(ProcessScheduler {
     processes: BTreeMap::new(),
     ready_queues: [
-        VecDeque::new(), VecDeque::new(), VecDeque::new(),
-        VecDeque::new(), VecDeque::new()
+        VecDeque::new(),
+        VecDeque::new(),
+        VecDeque::new(),
+        VecDeque::new(),
+        VecDeque::new(),
     ],
     current_process: None,
     next_schedule_time: 0,
@@ -496,7 +530,12 @@ static PROCESS_MANAGER: Mutex<ProcessScheduler> = Mutex::new(ProcessScheduler {
 });
 
 /// Public API functions
-pub fn spawn_process<F>(name: String, priority: Priority, future: F, parent_pid: Option<ProcessId>) -> AgaveResult<ProcessId>
+pub fn spawn_process<F>(
+    name: String,
+    priority: Priority,
+    future: F,
+    parent_pid: Option<ProcessId>,
+) -> AgaveResult<ProcessId>
 where
     F: Future<Output = i32> + Send + 'static,
 {
@@ -514,7 +553,12 @@ pub fn run_current_process(cx: &mut Context<'_>) -> Poll<()> {
     manager.run_current_process(cx)
 }
 
-pub fn send_ipc_message(from: ProcessId, to: ProcessId, message_type: IpcMessageType, data: Vec<u8>) -> AgaveResult<()> {
+pub fn send_ipc_message(
+    from: ProcessId,
+    to: ProcessId,
+    message_type: IpcMessageType,
+    data: Vec<u8>,
+) -> AgaveResult<()> {
     let mut manager = PROCESS_MANAGER.lock();
     manager.send_message(from, to, message_type, data)
 }
@@ -556,6 +600,6 @@ pub fn init_process_management() {
         DiagnosticLevel::Info,
         DiagnosticCategory::System,
         "Process management initialized".to_string(),
-        Some("Multi-priority scheduling and IPC enabled".to_string())
+        Some("Multi-priority scheduling and IPC enabled".to_string()),
     );
 }

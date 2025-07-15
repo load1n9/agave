@@ -1,12 +1,11 @@
 /// VirtIO Console Device Driver for Agave OS
 /// Provides multi-port console/serial communication through VirtIO
-
 use crate::sys::{
     error::{AgaveError, AgaveResult},
     task::executor::yield_once,
     virtio::{Desc, Virtio},
 };
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec, string::String, format};
+use alloc::{collections::VecDeque, format, string::String, sync::Arc, vec::Vec};
 use core::{
     ptr::{read_volatile, write_volatile},
     sync::atomic::{AtomicBool, AtomicU16, Ordering},
@@ -21,8 +20,8 @@ const VIRTIO_CONSOLE_F_MULTIPORT: u64 = 1 << 1;
 const VIRTIO_CONSOLE_F_EMERG_WRITE: u64 = 1 << 2;
 
 /// Console queue indices
-const CONSOLE_RX_QUEUE: u16 = 0;  // receiveq port0
-const CONSOLE_TX_QUEUE: u16 = 1;  // transmitq port0
+const CONSOLE_RX_QUEUE: u16 = 0; // receiveq port0
+const CONSOLE_TX_QUEUE: u16 = 1; // transmitq port0
 const CONSOLE_C_RX_QUEUE: u16 = 2; // control receiveq
 const CONSOLE_C_TX_QUEUE: u16 = 3; // control transmitq
 
@@ -39,10 +38,10 @@ const VIRTIO_CONSOLE_PORT_NAME: u16 = 6;
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioConsoleConfig {
-    cols: u16,      // Number of columns
-    rows: u16,      // Number of rows  
+    cols: u16,         // Number of columns
+    rows: u16,         // Number of rows
     max_nr_ports: u32, // Maximum number of ports
-    emerg_wr: u32,  // Emergency write register
+    emerg_wr: u32,     // Emergency write register
 }
 
 /// Console control message
@@ -100,12 +99,12 @@ impl ConsolePort {
         for &byte in data {
             self.tx_queue.push_back(byte);
         }
-        
+
         // Wake up any waiting transmission task
         if let Some(ref waker) = self.tx_waker {
             waker.wake();
         }
-        
+
         Ok(data.len())
     }
 
@@ -136,7 +135,7 @@ pub struct VirtioConsole {
 }
 
 lazy_static! {
-    static ref CONSOLE_WAKERS: Mutex<[Option<AtomicWaker>; 256]> = 
+    static ref CONSOLE_WAKERS: Mutex<[Option<AtomicWaker>; 256]> =
         Mutex::new([(); 256].map(|_| None));
 }
 
@@ -146,10 +145,9 @@ impl VirtioConsole {
         log::info!("Initializing VirtIO console device");
 
         // Feature negotiation
-        let desired_features = VIRTIO_CONSOLE_F_SIZE 
-            | VIRTIO_CONSOLE_F_MULTIPORT 
-            | VIRTIO_CONSOLE_F_EMERG_WRITE;
-        
+        let desired_features =
+            VIRTIO_CONSOLE_F_SIZE | VIRTIO_CONSOLE_F_MULTIPORT | VIRTIO_CONSOLE_F_EMERG_WRITE;
+
         let negotiated = virtio.negotiate_features(desired_features);
         log::info!("VirtIO Console negotiated features: 0x{:016x}", negotiated);
 
@@ -158,16 +156,33 @@ impl VirtioConsole {
 
         // Read device configuration
         let config = Self::read_config(&mut virtio)?;
-        let cols = unsafe { core::ptr::read_unaligned((&config as *const VirtioConsoleConfig as *const u8).add(0) as *const u16) };
-        let rows = unsafe { core::ptr::read_unaligned((&config as *const VirtioConsoleConfig as *const u8).add(2) as *const u16) };
-        let max_ports = unsafe { core::ptr::read_unaligned((&config as *const VirtioConsoleConfig as *const u8).add(4) as *const u32) };
-        log::info!("Console config: {}x{} chars, max {} ports", cols, rows, max_ports);
+        let cols = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioConsoleConfig as *const u8).add(0) as *const u16
+            )
+        };
+        let rows = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioConsoleConfig as *const u8).add(2) as *const u16
+            )
+        };
+        let max_ports = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioConsoleConfig as *const u8).add(4) as *const u32
+            )
+        };
+        log::info!(
+            "Console config: {}x{} chars, max {} ports",
+            cols,
+            rows,
+            max_ports
+        );
 
         // Initialize ports
         let mut ports = Vec::new();
-        let port_count = if multiport { 
+        let port_count = if multiport {
             config.max_nr_ports.min(16) // Limit to reasonable number
-        } else { 
+        } else {
             1 // Single port mode
         };
 
@@ -194,7 +209,10 @@ impl VirtioConsole {
             console.initialize_multiport()?;
         }
 
-        log::info!("VirtIO console device initialized with {} ports", console.ports.len());
+        log::info!(
+            "VirtIO console device initialized with {} ports",
+            console.ports.len()
+        );
         Ok(console)
     }
 
@@ -216,7 +234,7 @@ impl VirtioConsole {
     /// Set up receive buffers for all ports
     fn setup_receive_buffers(&mut self) -> AgaveResult<()> {
         const BUFFER_SIZE: usize = 1024;
-        
+
         // Set up buffers for port 0 (main console)
         self.virtio.queue_select(CONSOLE_RX_QUEUE);
         for _ in 0..16 {
@@ -243,7 +261,7 @@ impl VirtioConsole {
     fn initialize_multiport(&mut self) -> AgaveResult<()> {
         // Collect port IDs first to avoid borrowing conflict
         let port_ids: Vec<u32> = self.ports.iter().map(|port| port.id).collect();
-        
+
         // Send READY message for each port
         for port_id in port_ids {
             let control_msg = VirtioConsoleControl {
@@ -253,7 +271,7 @@ impl VirtioConsole {
             };
             self.send_control_message(&control_msg)?;
         }
-        
+
         log::debug!("Multiport console initialized");
         Ok(())
     }
@@ -265,11 +283,11 @@ impl VirtioConsole {
         }
 
         self.virtio.queue_select(CONSOLE_C_TX_QUEUE);
-        
+
         if let Some((desc_id, desc_next_id)) = self.virtio.get_free_twice_desc_id() {
             self.virtio.add_request(desc_id, desc_next_id, *msg);
             self.virtio.kick(CONSOLE_C_TX_QUEUE);
-            
+
             // TODO: Wait for completion
             self.virtio.set_free_desc_id(desc_id);
             self.virtio.set_free_desc_id(desc_next_id);
@@ -315,18 +333,18 @@ impl VirtioConsole {
         if let Some((desc_id, desc_next_id)) = self.virtio.get_free_twice_desc_id() {
             // Create a copy of the data for transmission
             let data_copy = data.to_vec();
-            
+
             // Set up descriptors
             unsafe {
                 let descs = self.virtio.common.cap.queue_desc as *mut Desc;
                 let mut desc = descs.offset(desc_id as isize).read_volatile();
-                
+
                 // Map data to descriptor
                 desc.addr = data_copy.as_ptr() as u64;
                 desc.len = data_copy.len() as u32;
                 desc.flags = 1; // VIRTQ_DESC_F_NEXT
                 desc.next = desc_next_id;
-                
+
                 descs.offset(desc_id as isize).write_volatile(desc);
             }
 
@@ -359,27 +377,27 @@ impl VirtioConsole {
     pub fn process_received_data(&mut self) -> AgaveResult<()> {
         // Process data on main console port
         self.virtio.queue_select(CONSOLE_RX_QUEUE);
-        
+
         while let Some(used_elem) = unsafe { self.virtio.next_used() } {
             let desc = self.virtio.read_desc(used_elem.id as u16);
-            
+
             // Read received data
             unsafe {
                 let data_ptr = desc.addr as *const u8;
                 let data_len = used_elem.len as usize;
-                
+
                 if data_len > 0 {
                     let mut received_data = Vec::with_capacity(data_len);
                     for i in 0..data_len {
                         received_data.push(read_volatile(data_ptr.offset(i as isize)));
                     }
-                    
+
                     // Add to port 0's receive queue
                     if let Some(port) = self.ports.get_mut(0) {
                         for byte in received_data {
                             port.rx_queue.push_back(byte);
                         }
-                        
+
                         // Wake up any waiting readers
                         if let Some(ref waker) = port.rx_waker {
                             waker.wake();
@@ -387,7 +405,7 @@ impl VirtioConsole {
                     }
                 }
             }
-            
+
             // Return descriptor to available ring
             self.virtio.set_writable_available(used_elem.id as u16);
         }
@@ -403,15 +421,15 @@ impl VirtioConsole {
     /// Process control messages for multiport
     fn process_control_messages(&mut self) -> AgaveResult<()> {
         self.virtio.queue_select(CONSOLE_C_RX_QUEUE);
-        
+
         while let Some(used_elem) = unsafe { self.virtio.next_used() } {
             let desc = self.virtio.read_desc(used_elem.id as u16);
-            
+
             unsafe {
                 let control_msg = read_volatile(desc.addr as *const VirtioConsoleControl);
                 self.handle_control_message(&control_msg)?;
             }
-            
+
             // Return descriptor
             self.virtio.set_writable_available(used_elem.id as u16);
         }
@@ -421,12 +439,25 @@ impl VirtioConsole {
 
     /// Handle incoming control message
     fn handle_control_message(&mut self, msg: &VirtioConsoleControl) -> AgaveResult<()> {
-        let msg_id = unsafe { core::ptr::read_unaligned(msg as *const VirtioConsoleControl as *const u16) };
-        let msg_event = unsafe { core::ptr::read_unaligned((msg as *const VirtioConsoleControl as *const u8).add(2) as *const u16) };
-        let msg_value = unsafe { core::ptr::read_unaligned((msg as *const VirtioConsoleControl as *const u8).add(4) as *const u16) };
-        
-        log::debug!("Console control message: port {}, event {}, value {}", 
-                   msg_id, msg_event, msg_value);
+        let msg_id =
+            unsafe { core::ptr::read_unaligned(msg as *const VirtioConsoleControl as *const u16) };
+        let msg_event = unsafe {
+            core::ptr::read_unaligned(
+                (msg as *const VirtioConsoleControl as *const u8).add(2) as *const u16
+            )
+        };
+        let msg_value = unsafe {
+            core::ptr::read_unaligned(
+                (msg as *const VirtioConsoleControl as *const u8).add(4) as *const u16
+            )
+        };
+
+        log::debug!(
+            "Console control message: port {}, event {}, value {}",
+            msg_id,
+            msg_event,
+            msg_value
+        );
 
         match msg_event {
             VIRTIO_CONSOLE_PORT_ADD => {
@@ -500,7 +531,8 @@ impl VirtioConsole {
 
     /// Check if a port is open
     pub fn is_port_open(&self, port_id: u32) -> bool {
-        self.ports.get(port_id as usize)
+        self.ports
+            .get(port_id as usize)
             .map(|port| port.is_open || port.id == 0) // Port 0 is always considered open
             .unwrap_or(false)
     }
@@ -616,7 +648,10 @@ pub fn read_from_port(port_id: u32, buffer: &mut [u8]) -> AgaveResult<usize> {
 }
 
 pub fn get_console_dimensions() -> Option<(u16, u16)> {
-    VIRTIO_CONSOLE.lock().as_ref().map(|console| console.dimensions())
+    VIRTIO_CONSOLE
+        .lock()
+        .as_ref()
+        .map(|console| console.dimensions())
 }
 
 pub fn is_console_ready() -> bool {

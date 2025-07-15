@@ -342,7 +342,7 @@ pub fn get_resource_limit(resource: u32) -> WasiResult<(u64, u64)> {
         2 => Ok((32 * 1024 * 1024, 64 * 1024 * 1024)), // Data size in bytes - increased to 32MB/64MB
         3 => Ok((32 * 1024 * 1024, 64 * 1024 * 1024)), // Stack size in bytes - increased to 32MB/64MB
         4 => Ok((1024 * 1024 * 1024, 2 * 1024 * 1024 * 1024)), // Core file size in bytes
-        7 => Ok((1024, 2048)),                   // Number of file descriptors
+        7 => Ok((1024, 2048)),                         // Number of file descriptors
         _ => Err(WasiError::inval()),
     }
 }

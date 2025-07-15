@@ -1,6 +1,6 @@
 /// UDP implementation for Agave OS
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{vec::Vec, collections::BTreeMap};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::net::SocketAddr;
 
 /// UDP socket
@@ -64,7 +64,7 @@ impl UdpManager {
 
         let socket = UdpSocket::new(local_addr);
         self.sockets.insert(socket_id, socket);
-        
+
         Ok(socket_id)
     }
 

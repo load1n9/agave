@@ -16,10 +16,10 @@ lazy_static! {
 /// Task priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TaskPriority {
-    Critical = 0,  // System critical tasks
-    High = 1,      // Interactive/user tasks
-    Normal = 2,    // Background tasks
-    Low = 3,       // Cleanup/maintenance tasks
+    Critical = 0, // System critical tasks
+    High = 1,     // Interactive/user tasks
+    Normal = 2,   // Background tasks
+    Low = 3,      // Cleanup/maintenance tasks
 }
 
 impl Default for TaskPriority {
@@ -86,14 +86,15 @@ impl PriorityTask {
     pub fn poll(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         self.execution_count += 1;
         let result = self.task.poll(cx);
-        
+
         if let Poll::Ready(()) = result {
             let execution_time = crate::sys::interrupts::TIME_MS
-                .load(core::sync::atomic::Ordering::Relaxed) - self.spawn_time;
+                .load(core::sync::atomic::Ordering::Relaxed)
+                - self.spawn_time;
             let mut metrics = TASK_METRICS.lock();
             metrics.task_completed(execution_time * 1000); // Convert to microseconds
         }
-        
+
         result
     }
 }
@@ -111,7 +112,7 @@ impl PriorityQueue {
                 VecDeque::new(), // High
                 VecDeque::new(), // Normal
                 VecDeque::new(), // Low
-            ]
+            ],
         }
     }
 
@@ -188,7 +189,11 @@ impl Spawner {
         let _ = self.0.push(Task::new(future));
     }
 
-    pub fn run_with_priority(&self, future: impl Future<Output = ()> + 'static, _priority: TaskPriority) {
+    pub fn run_with_priority(
+        &self,
+        future: impl Future<Output = ()> + 'static,
+        _priority: TaskPriority,
+    ) {
         // For compatibility, convert to regular task (priority scheduling not implemented in spawner yet)
         let _ = self.0.push(Task::new(future));
     }
@@ -223,14 +228,18 @@ impl Executor {
         Spawner(self.spawn_queue.clone())
     }
 
-    pub fn spawn_with_priority(&mut self, future: impl Future<Output = ()> + 'static, priority: TaskPriority) {
+    pub fn spawn_with_priority(
+        &mut self,
+        future: impl Future<Output = ()> + 'static,
+        priority: TaskPriority,
+    ) {
         let priority_task = PriorityTask::new(future, priority);
         let task_id = priority_task.task.id;
-        
+
         if self.tasks.insert(task_id, priority_task).is_some() {
             log::warn!("Task with ID {:?} already exists, replacing", task_id);
         }
-        
+
         if let Err(_) = self.task_queue.push(task_id) {
             log::error!("Task queue full, dropping task {:?}", task_id);
         }
@@ -256,11 +265,11 @@ impl Executor {
             spawn_time: crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed),
             execution_count: 0,
         };
-        
+
         if self.tasks.insert(task_id, priority_task).is_some() {
             log::warn!("Task with ID {:?} already exists, replacing", task_id);
         }
-        
+
         if let Err(_) = self.task_queue.push(task_id) {
             log::error!("Task queue full, dropping task {:?}", task_id);
         }
@@ -288,7 +297,7 @@ impl Executor {
                 .entry(task_id)
                 .or_insert_with(|| TaskWaker::new(task_id, task_queue.clone()));
             let mut context = Context::from_waker(waker);
-            
+
             match task.poll(&mut context) {
                 Poll::Ready(()) => {
                     // task done -> remove it and its cached waker

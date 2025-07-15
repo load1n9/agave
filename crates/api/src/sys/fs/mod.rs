@@ -2,11 +2,11 @@
 /// Supports virtual filesystem with multiple backends
 use crate::sys::error::{AgaveError, AgaveResult, FsError};
 use alloc::{
-    vec::Vec,
-    string::{String, ToString},
-    collections::BTreeMap,
     boxed::Box,
+    collections::BTreeMap,
     format,
+    string::{String, ToString},
+    vec::Vec,
 };
 use core::fmt;
 use spin::Mutex;
@@ -14,10 +14,10 @@ use spin::Mutex;
 /// File system types
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileSystemType {
-    Virtual,    // In-memory filesystem
-    TarFs,      // Read-only tar archive
-    RamDisk,    // RAM-based disk
-    Network,    // Network filesystem (future)
+    Virtual, // In-memory filesystem
+    TarFs,   // Read-only tar archive
+    RamDisk, // RAM-based disk
+    Network, // Network filesystem (future)
 }
 
 /// File types
@@ -64,15 +64,33 @@ impl Default for FilePermissions {
 impl FilePermissions {
     pub fn octal(&self) -> u16 {
         let mut mode = 0;
-        if self.owner_read { mode |= 0o400; }
-        if self.owner_write { mode |= 0o200; }
-        if self.owner_execute { mode |= 0o100; }
-        if self.group_read { mode |= 0o040; }
-        if self.group_write { mode |= 0o020; }
-        if self.group_execute { mode |= 0o010; }
-        if self.other_read { mode |= 0o004; }
-        if self.other_write { mode |= 0o002; }
-        if self.other_execute { mode |= 0o001; }
+        if self.owner_read {
+            mode |= 0o400;
+        }
+        if self.owner_write {
+            mode |= 0o200;
+        }
+        if self.owner_execute {
+            mode |= 0o100;
+        }
+        if self.group_read {
+            mode |= 0o040;
+        }
+        if self.group_write {
+            mode |= 0o020;
+        }
+        if self.group_execute {
+            mode |= 0o010;
+        }
+        if self.other_read {
+            mode |= 0o004;
+        }
+        if self.other_write {
+            mode |= 0o002;
+        }
+        if self.other_execute {
+            mode |= 0o001;
+        }
         mode
     }
 }
@@ -146,7 +164,7 @@ impl VfsNode {
         let mut metadata = FileMetadata::default();
         metadata.file_type = FileType::Regular;
         metadata.size = content.len() as u64;
-        
+
         VfsNode::File { metadata, content }
     }
 
@@ -156,7 +174,7 @@ impl VfsNode {
         metadata.permissions.owner_execute = true;
         metadata.permissions.group_execute = true;
         metadata.permissions.other_execute = true;
-        
+
         VfsNode::Directory {
             metadata,
             children: BTreeMap::new(),
@@ -167,7 +185,7 @@ impl VfsNode {
         let mut metadata = FileMetadata::default();
         metadata.file_type = FileType::Symlink;
         metadata.size = target.len() as u64;
-        
+
         VfsNode::Symlink { metadata, target }
     }
 
@@ -206,14 +224,24 @@ impl VirtualFileSystem {
         // Create standard directories
         vfs.create_standard_directories();
         vfs.populate_demo_files();
-        
+
         vfs
     }
 
     fn create_standard_directories(&mut self) {
         let directories = [
-            "/bin", "/etc", "/home", "/home/user", "/usr", "/usr/bin", 
-            "/var", "/var/log", "/tmp", "/dev", "/proc", "/sys"
+            "/bin",
+            "/etc",
+            "/home",
+            "/home/user",
+            "/usr",
+            "/usr/bin",
+            "/var",
+            "/var/log",
+            "/tmp",
+            "/dev",
+            "/proc",
+            "/sys",
         ];
 
         for dir in &directories {
@@ -228,7 +256,10 @@ impl VirtualFileSystem {
         let files: &[(&str, &[u8])] = &[
             ("/etc/hostname", b"agave-os\n"),
             ("/etc/version", b"Agave OS v1.0.0\n"),
-            ("/home/user/.bashrc", b"# Agave OS bash configuration\necho 'Welcome to Agave OS!'\n"),
+            (
+                "/home/user/.bashrc",
+                b"# Agave OS bash configuration\necho 'Welcome to Agave OS!'\n",
+            ),
             ("/var/log/system.log", b"System log initialized\n"),
             ("/tmp/readme.txt", b"This is a temporary file\n"),
             ("/proc/version", b"Agave OS 1.0.0 (x86_64)\n"),
@@ -244,8 +275,14 @@ impl VirtualFileSystem {
 
         // Create some demo binary files
         let binaries = [
-            "/bin/ls", "/bin/cat", "/bin/echo", "/bin/grep", "/bin/ps",
-            "/usr/bin/top", "/usr/bin/nano", "/usr/bin/vim"
+            "/bin/ls",
+            "/bin/cat",
+            "/bin/echo",
+            "/bin/grep",
+            "/bin/ps",
+            "/usr/bin/top",
+            "/usr/bin/nano",
+            "/usr/bin/vim",
         ];
 
         for binary in &binaries {
@@ -290,7 +327,8 @@ impl VirtualFileSystem {
 
     /// Close a file descriptor
     pub fn close(&mut self, fd: u64) -> AgaveResult<()> {
-        self.open_files.remove(&fd)
+        self.open_files
+            .remove(&fd)
             .ok_or(AgaveError::FileSystemError(FsError::InvalidFileDescriptor))?;
         Ok(())
     }
@@ -299,18 +337,20 @@ impl VirtualFileSystem {
     pub fn read(&mut self, fd: u64, buffer: &mut [u8]) -> AgaveResult<usize> {
         // First get the path from the handle
         let path = {
-            let handle = self.open_files.get(&fd)
+            let handle = self
+                .open_files
+                .get(&fd)
                 .ok_or(AgaveError::FileSystemError(FsError::InvalidFileDescriptor))?;
-            
+
             if !handle.readable {
                 return Err(AgaveError::PermissionDenied);
             }
-            
+
             handle.path.clone()
         };
 
         let node = self.get_node(&path)?;
-        
+
         match node {
             VfsNode::File { content, .. } => {
                 let start = {
@@ -318,18 +358,18 @@ impl VirtualFileSystem {
                     handle.position as usize
                 };
                 let end = (start + buffer.len()).min(content.len());
-                
+
                 if start >= content.len() {
                     return Ok(0); // EOF
                 }
 
                 let bytes_read = end - start;
                 buffer[..bytes_read].copy_from_slice(&content[start..end]);
-                
+
                 // Update position after the read
                 let handle = self.open_files.get_mut(&fd).unwrap();
                 handle.position += bytes_read as u64;
-                
+
                 Ok(bytes_read)
             }
             _ => Err(AgaveError::FileSystemError(FsError::IsDirectory)),
@@ -340,7 +380,9 @@ impl VirtualFileSystem {
     pub fn write(&mut self, fd: u64, data: &[u8]) -> AgaveResult<usize> {
         // First get path and position without holding a mutable reference
         let (path, position) = {
-            let handle = self.open_files.get(&fd)
+            let handle = self
+                .open_files
+                .get(&fd)
                 .ok_or(AgaveError::FileSystemError(FsError::InvalidFileDescriptor))?;
 
             if !handle.writable {
@@ -353,11 +395,13 @@ impl VirtualFileSystem {
         // Modify the file content
         let result = {
             let node = self.get_node_mut(&path)?;
-            
+
             match node {
-                VfsNode::File { content, metadata, .. } => {
+                VfsNode::File {
+                    content, metadata, ..
+                } => {
                     let end_pos = position as usize + data.len();
-                    
+
                     // Extend content if necessary
                     if end_pos > content.len() {
                         content.resize(end_pos, 0);
@@ -365,11 +409,11 @@ impl VirtualFileSystem {
 
                     // Write data
                     content[position as usize..end_pos].copy_from_slice(data);
-                    
+
                     // Update metadata
                     metadata.size = content.len() as u64;
-                    metadata.modified_time = crate::sys::interrupts::TIME_MS
-                        .load(core::sync::atomic::Ordering::Relaxed);
+                    metadata.modified_time =
+                        crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed);
 
                     Ok((data.len(), metadata.clone()))
                 }
@@ -392,18 +436,18 @@ impl VirtualFileSystem {
     /// List directory contents
     pub fn read_dir(&self, path: &str) -> AgaveResult<Vec<DirEntry>> {
         let node = self.get_node(path)?;
-        
+
         match node {
             VfsNode::Directory { children, .. } => {
                 let mut entries = Vec::new();
-                
+
                 // Add . and .. entries
                 entries.push(DirEntry {
                     name: ".".to_string(),
                     file_type: FileType::Directory,
                     size: 0,
                 });
-                
+
                 if path != "/" {
                     entries.push(DirEntry {
                         name: "..".to_string(),
@@ -420,7 +464,7 @@ impl VirtualFileSystem {
                         size: child.metadata().size,
                     });
                 }
-                
+
                 Ok(entries)
             }
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
@@ -443,7 +487,7 @@ impl VirtualFileSystem {
         let filename = get_filename(path);
 
         let parent = self.get_node_mut(&parent_path)?;
-        
+
         match parent {
             VfsNode::Directory { children, .. } => {
                 children.insert(filename.to_string(), VfsNode::new_directory());
@@ -455,13 +499,17 @@ impl VirtualFileSystem {
 
     /// Create directories recursively
     pub fn create_dir_all(&mut self, path: &str) -> AgaveResult<()> {
-        let parts: Vec<&str> = path.trim_start_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = path
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
         let mut current_path = String::new();
 
         for part in parts {
             current_path.push('/');
             current_path.push_str(part);
-            
+
             if self.get_node(&current_path).is_err() {
                 self.create_dir(&current_path)?;
             }
@@ -480,11 +528,10 @@ impl VirtualFileSystem {
         let filename = get_filename(path);
 
         let parent = self.get_node_mut(&parent_path)?;
-        
+
         match parent {
             VfsNode::Directory { children, .. } => {
-                children.remove(filename)
-                    .ok_or(AgaveError::NotFound)?;
+                children.remove(filename).ok_or(AgaveError::NotFound)?;
                 Ok(())
             }
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
@@ -502,7 +549,7 @@ impl VirtualFileSystem {
         }
 
         let parent = self.get_node_mut(&parent_path)?;
-        
+
         match parent {
             VfsNode::Directory { children, .. } => {
                 children.insert(filename.to_string(), VfsNode::new_file(content));
@@ -515,7 +562,7 @@ impl VirtualFileSystem {
     /// Read entire file content
     pub fn read_file(&self, path: &str) -> AgaveResult<Vec<u8>> {
         let node = self.get_node(path)?;
-        
+
         match node {
             VfsNode::File { content, .. } => Ok(content.clone()),
             VfsNode::Directory { .. } => Err(AgaveError::FileSystemError(FsError::IsDirectory)),
@@ -548,14 +595,17 @@ impl VirtualFileSystem {
 
     // Internal helper methods
     fn get_node(&self, path: &str) -> AgaveResult<&VfsNode> {
-        let parts: Vec<&str> = path.trim_start_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = path
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
         let mut current = &self.root;
 
         for part in parts {
             match current {
                 VfsNode::Directory { children, .. } => {
-                    current = children.get(part)
-                        .ok_or(AgaveError::NotFound)?;
+                    current = children.get(part).ok_or(AgaveError::NotFound)?;
                 }
                 VfsNode::Symlink { target, .. } => {
                     // Follow symlink
@@ -569,14 +619,17 @@ impl VirtualFileSystem {
     }
 
     fn get_node_mut(&mut self, path: &str) -> AgaveResult<&mut VfsNode> {
-        let parts: Vec<&str> = path.trim_start_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = path
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
         let mut current = &mut self.root;
 
         for part in parts {
             match current {
                 VfsNode::Directory { children, .. } => {
-                    current = children.get_mut(part)
-                        .ok_or(AgaveError::NotFound)?;
+                    current = children.get_mut(part).ok_or(AgaveError::NotFound)?;
                 }
                 _ => return Err(AgaveError::FileSystemError(FsError::NotDirectory)),
             }
@@ -592,11 +645,11 @@ static mut FILESYSTEM: Option<Mutex<VirtualFileSystem>> = None;
 /// Public API functions
 pub fn init_filesystem() -> AgaveResult<()> {
     log::info!("Initializing virtual file system...");
-    
+
     unsafe {
         FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
     }
-    
+
     log::info!("Virtual file system initialized");
     Ok(())
 }
@@ -677,7 +730,7 @@ fn get_parent_path(path: &str) -> String {
     if path == "/" {
         return "/".to_string();
     }
-    
+
     let path = path.trim_end_matches('/');
     if let Some(pos) = path.rfind('/') {
         if pos == 0 {

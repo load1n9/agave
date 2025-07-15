@@ -94,7 +94,7 @@ impl MemoryPool {
         if self.allocated_blocks >= self.total_blocks {
             return None;
         }
-        
+
         // Simplified allocation - in real implementation would use the pool
         self.allocated_blocks += 1;
         None // Placeholder
@@ -113,7 +113,7 @@ pub struct AllocFromCtx;
 unsafe impl core::alloc::GlobalAlloc for AllocFromCtx {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         let ptr = ALLOCATOR.alloc(layout);
-        
+
         // Update statistics
         if !ptr.is_null() {
             let mut stats = MEMORY_STATS.lock();
@@ -122,7 +122,7 @@ unsafe impl core::alloc::GlobalAlloc for AllocFromCtx {
             if stats.allocated > stats.peak_allocated {
                 stats.peak_allocated = stats.allocated;
             }
-            
+
             // Log large allocations
             if layout.size() > 1024 * 1024 {
                 log::info!("Large allocation: {} bytes", layout.size());
@@ -132,26 +132,34 @@ unsafe impl core::alloc::GlobalAlloc for AllocFromCtx {
             stats.failed_allocations += 1;
             log::warn!("Failed allocation: {} bytes", layout.size());
         }
-        
+
         ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
         ALLOCATOR.dealloc(ptr, layout);
-        
+
         // Update statistics
         let mut stats = MEMORY_STATS.lock();
         stats.allocated = stats.allocated.saturating_sub(layout.size());
         stats.deallocation_count += 1;
     }
 
-    unsafe fn realloc(&self, ptr: *mut u8, layout: core::alloc::Layout, new_size: usize) -> *mut u8 {
+    unsafe fn realloc(
+        &self,
+        ptr: *mut u8,
+        layout: core::alloc::Layout,
+        new_size: usize,
+    ) -> *mut u8 {
         let new_ptr = ALLOCATOR.realloc(ptr, layout, new_size);
-        
+
         // Update statistics
         if !new_ptr.is_null() {
             let mut stats = MEMORY_STATS.lock();
-            stats.allocated = stats.allocated.saturating_sub(layout.size()).saturating_add(new_size);
+            stats.allocated = stats
+                .allocated
+                .saturating_sub(layout.size())
+                .saturating_add(new_size);
             if new_size > layout.size() {
                 stats.allocation_count += 1;
             }
@@ -162,7 +170,7 @@ unsafe impl core::alloc::GlobalAlloc for AllocFromCtx {
             let mut stats = MEMORY_STATS.lock();
             stats.failed_allocations += 1;
         }
-        
+
         new_ptr
     }
 }
@@ -185,7 +193,7 @@ pub fn init_heap(
             .ok_or(AgaveError::OutOfMemory)?;
         let flags =
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
-        
+
         match unsafe { mapper.map_to(page, frame, flags, frame_allocator) } {
             Ok(tlb) => tlb.flush(),
             Err(MapToError::FrameAllocationFailed) => return Err(AgaveError::OutOfMemory),
@@ -193,7 +201,7 @@ pub fn init_heap(
             Err(MapToError::PageAlreadyMapped(_)) => {
                 log::warn!("Page already mapped during heap init: {:?}", page);
                 continue;
-            },
+            }
         }
     }
 
@@ -201,8 +209,11 @@ pub fn init_heap(
         ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
     }
 
-    log::info!("Heap initialized: start=0x{:x}, size={} MB", 
-               HEAP_START, HEAP_SIZE / 1024 / 1024);
+    log::info!(
+        "Heap initialized: start=0x{:x}, size={} MB",
+        HEAP_START,
+        HEAP_SIZE / 1024 / 1024
+    );
 
     Ok(())
 }
@@ -236,24 +247,26 @@ pub fn is_memory_low() -> bool {
 /// Force garbage collection hint (placeholder for future GC implementation)
 pub fn suggest_gc() {
     if is_memory_low() {
-        log::info!("Memory usage high ({}%), suggesting garbage collection", 
-                   memory_stats().utilization_percent());
+        log::info!(
+            "Memory usage high ({}%), suggesting garbage collection",
+            memory_stats().utilization_percent()
+        );
     }
 }
 
 /// Memory pressure levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryPressure {
-    Low,    // < 50% usage
-    Medium, // 50-75% usage
-    High,   // 75-90% usage
+    Low,      // < 50% usage
+    Medium,   // 50-75% usage
+    High,     // 75-90% usage
     Critical, // > 90% usage
 }
 
 /// Get current memory pressure level
 pub fn memory_pressure() -> MemoryPressure {
     let utilization = memory_stats().utilization_percent();
-    
+
     if utilization > 90.0 {
         MemoryPressure::Critical
     } else if utilization > 75.0 {
@@ -268,10 +281,9 @@ pub fn memory_pressure() -> MemoryPressure {
 /// Allocate aligned memory with error handling
 pub fn allocate_aligned(size: usize, align: usize) -> AgaveResult<*mut u8> {
     use core::alloc::{GlobalAlloc, Layout};
-    
-    let layout = Layout::from_size_align(size, align)
-        .map_err(|_| AgaveError::InvalidInput)?;
-    
+
+    let layout = Layout::from_size_align(size, align).map_err(|_| AgaveError::InvalidInput)?;
+
     let ptr = unsafe { ALLOCATOR.alloc(layout) };
     if ptr.is_null() {
         Err(AgaveError::OutOfMemory)
@@ -283,14 +295,13 @@ pub fn allocate_aligned(size: usize, align: usize) -> AgaveResult<*mut u8> {
 /// Safely deallocate aligned memory
 pub unsafe fn deallocate_aligned(ptr: *mut u8, size: usize, align: usize) -> AgaveResult<()> {
     use core::alloc::{GlobalAlloc, Layout};
-    
+
     if ptr.is_null() {
         return Ok(());
     }
-    
-    let layout = Layout::from_size_align(size, align)
-        .map_err(|_| AgaveError::InvalidInput)?;
-    
+
+    let layout = Layout::from_size_align(size, align).map_err(|_| AgaveError::InvalidInput)?;
+
     ALLOCATOR.dealloc(ptr, layout);
     Ok(())
 }

@@ -1,6 +1,5 @@
 /// VirtIO Memory Balloon Device Driver for Agave OS
 /// Provides dynamic memory management between guest and host
-
 use crate::sys::{
     create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
@@ -47,10 +46,10 @@ const MAX_PAGES_PER_OPERATION: usize = 256;
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioBalloonConfig {
-    num_pages: u32,           // Number of pages to balloon
-    actual: u32,             // Actual number of pages ballooned
+    num_pages: u32,             // Number of pages to balloon
+    actual: u32,                // Actual number of pages ballooned
     free_page_hint_cmd_id: u32, // Free page hint command ID
-    poison_val: u32,         // Page poison value
+    poison_val: u32,            // Page poison value
 }
 
 /// Balloon statistics tags
@@ -73,8 +72,8 @@ enum BalloonStatTag {
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioBalloonStat {
-    tag: u16,    // BalloonStatTag
-    val: u64,    // Statistics value
+    tag: u16, // BalloonStatTag
+    val: u64, // Statistics value
 }
 
 /// Memory balloon statistics
@@ -125,7 +124,7 @@ impl VirtioBalloon {
             | VIRTIO_BALLOON_F_STATS_VQ
             | VIRTIO_BALLOON_F_DEFLATE_ON_OOM
             | VIRTIO_BALLOON_F_PAGE_REPORTING;
-        
+
         let negotiated = virtio.negotiate_features(desired_features);
         log::info!("VirtIO Balloon negotiated features: 0x{:016x}", negotiated);
 
@@ -135,9 +134,21 @@ impl VirtioBalloon {
 
         // Read device configuration
         let config = Self::read_config(&mut virtio)?;
-        let num_pages = unsafe { core::ptr::read_unaligned((&config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32) };
-        let actual = unsafe { core::ptr::read_unaligned((&config as *const VirtioBalloonConfig as *const u8).add(4) as *const u32) };
-        log::info!("Balloon config: target={} pages, actual={} pages", num_pages, actual);
+        let num_pages = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32
+            )
+        };
+        let actual = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioBalloonConfig as *const u8).add(4) as *const u32
+            )
+        };
+        log::info!(
+            "Balloon config: target={} pages, actual={} pages",
+            num_pages,
+            actual
+        );
 
         let mut balloon = Self {
             virtio,
@@ -211,7 +222,7 @@ impl VirtioBalloon {
         // Allocate physical pages
         {
             let mut frame_allocator = FRAME_ALLOCATOR.get().unwrap().lock();
-            
+
             for _ in 0..pages_to_inflate {
                 if let Some(frame) = frame_allocator.allocate_frame() {
                     let page = BalloonPage {
@@ -237,18 +248,21 @@ impl VirtioBalloon {
 
         // Store inflated pages
         self.inflated_pages.extend(allocated_pages);
-        
+
         // Update statistics
         self.stats.pages_inflated += actual_pages as u64;
         self.stats.current_pages += actual_pages;
-        
+
         // Update device configuration
         self.config.actual = self.stats.current_pages;
         self.virtio.write_config_u32(4, self.config.actual)?;
 
-        log::info!("Inflated {} pages, total balloon size: {} pages", 
-                   actual_pages, self.stats.current_pages);
-        
+        log::info!(
+            "Inflated {} pages, total balloon size: {} pages",
+            actual_pages,
+            self.stats.current_pages
+        );
+
         Ok(actual_pages)
     }
 
@@ -294,14 +308,17 @@ impl VirtioBalloon {
         // Update statistics
         self.stats.pages_deflated += actual_pages as u64;
         self.stats.current_pages -= actual_pages;
-        
+
         // Update device configuration
         self.config.actual = self.stats.current_pages;
         self.virtio.write_config_u32(4, self.config.actual)?;
 
-        log::info!("Deflated {} pages, total balloon size: {} pages", 
-                   actual_pages, self.stats.current_pages);
-        
+        log::info!(
+            "Deflated {} pages, total balloon size: {} pages",
+            actual_pages,
+            self.stats.current_pages
+        );
+
         Ok(actual_pages)
     }
 
@@ -320,12 +337,12 @@ impl VirtioBalloon {
             unsafe {
                 let descs = self.virtio.common.cap.queue_desc as *mut Desc;
                 let mut desc = descs.offset(desc_id as isize).read_volatile();
-                
+
                 desc.addr = pfns.as_ptr() as u64;
                 desc.len = (pfns.len() * core::mem::size_of::<u32>()) as u32;
                 desc.flags = 1; // VIRTQ_DESC_F_NEXT
                 desc.next = desc_next_id;
-                
+
                 descs.offset(desc_id as isize).write_volatile(desc);
             }
 
@@ -354,27 +371,27 @@ impl VirtioBalloon {
 
         // Create statistics buffer
         let mut stats_buffer = Vec::new();
-        
+
         stats_buffer.push(VirtioBalloonStat {
             tag: BalloonStatTag::FreeMemory as u16,
             val: self.stats.free_memory,
         });
-        
+
         stats_buffer.push(VirtioBalloonStat {
             tag: BalloonStatTag::TotalMemory as u16,
             val: self.stats.total_memory,
         });
-        
+
         stats_buffer.push(VirtioBalloonStat {
             tag: BalloonStatTag::AvailableMemory as u16,
             val: self.stats.available_memory,
         });
-        
+
         stats_buffer.push(VirtioBalloonStat {
             tag: BalloonStatTag::MajorFaults as u16,
             val: self.stats.major_faults,
         });
-        
+
         stats_buffer.push(VirtioBalloonStat {
             tag: BalloonStatTag::MinorFaults as u16,
             val: self.stats.minor_faults,
@@ -382,17 +399,17 @@ impl VirtioBalloon {
 
         // Send statistics via stats queue
         self.virtio.queue_select(BALLOON_STATS_QUEUE);
-        
+
         if let Some((desc_id, desc_next_id)) = self.virtio.get_free_twice_desc_id() {
             unsafe {
                 let descs = self.virtio.common.cap.queue_desc as *mut Desc;
                 let mut desc = descs.offset(desc_id as isize).read_volatile();
-                
+
                 desc.addr = stats_buffer.as_ptr() as u64;
                 desc.len = (stats_buffer.len() * core::mem::size_of::<VirtioBalloonStat>()) as u32;
                 desc.flags = 1; // VIRTQ_DESC_F_NEXT
                 desc.next = desc_next_id;
-                
+
                 descs.offset(desc_id as isize).write_volatile(desc);
             }
 
@@ -415,15 +432,15 @@ impl VirtioBalloon {
     fn update_memory_stats(&mut self) -> AgaveResult<()> {
         // In a real implementation, this would gather actual memory statistics
         // For now, provide placeholder values
-        
+
         self.stats.total_memory = 1024 * 1024 * 1024; // 1GB placeholder
-        self.stats.free_memory = 512 * 1024 * 1024;   // 512MB placeholder
+        self.stats.free_memory = 512 * 1024 * 1024; // 512MB placeholder
         self.stats.available_memory = self.stats.free_memory;
-        
+
         // Increment fault counters (placeholders)
         self.stats.major_faults += 1;
         self.stats.minor_faults += 10;
-        
+
         Ok(())
     }
 
@@ -431,15 +448,32 @@ impl VirtioBalloon {
     pub fn process_requests(&mut self) -> AgaveResult<()> {
         // Check for configuration changes
         let new_config = Self::read_config(&mut self.virtio)?;
-        
-        let current_num_pages = unsafe { core::ptr::read_unaligned((&self.config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32) };
-        if new_config.num_pages != current_num_pages {                let new_num_pages = unsafe { core::ptr::read_unaligned((&new_config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32) };
-                log::info!("Balloon target changed: {} -> {} pages", 
-                           current_num_pages, new_num_pages);
-            
-            unsafe { core::ptr::write_unaligned((&mut self.config as *mut VirtioBalloonConfig as *mut u8).add(0) as *mut u32, new_config.num_pages) };
+
+        let current_num_pages = unsafe {
+            core::ptr::read_unaligned(
+                (&self.config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32,
+            )
+        };
+        if new_config.num_pages != current_num_pages {
+            let new_num_pages = unsafe {
+                core::ptr::read_unaligned(
+                    (&new_config as *const VirtioBalloonConfig as *const u8).add(0) as *const u32,
+                )
+            };
+            log::info!(
+                "Balloon target changed: {} -> {} pages",
+                current_num_pages,
+                new_num_pages
+            );
+
+            unsafe {
+                core::ptr::write_unaligned(
+                    (&mut self.config as *mut VirtioBalloonConfig as *mut u8).add(0) as *mut u32,
+                    new_config.num_pages,
+                )
+            };
             self.stats.target_pages = new_config.num_pages;
-            
+
             // Adjust balloon size to match target
             self.adjust_to_target()?;
         }
@@ -451,7 +485,7 @@ impl VirtioBalloon {
     fn adjust_to_target(&mut self) -> AgaveResult<()> {
         let current = self.stats.current_pages;
         let target = self.stats.target_pages;
-        
+
         if target > current {
             // Need to inflate
             let pages_to_inflate = target - current;
@@ -461,7 +495,7 @@ impl VirtioBalloon {
             let pages_to_deflate = current - target;
             self.deflate(pages_to_deflate)?;
         }
-        
+
         Ok(())
     }
 
@@ -472,7 +506,7 @@ impl VirtioBalloon {
         }
 
         log::warn!("Emergency balloon deflation: {} pages needed", pages_needed);
-        
+
         let pages_to_deflate = pages_needed.min(self.inflated_pages.len() as u32);
         self.deflate(pages_to_deflate)
     }
@@ -534,7 +568,7 @@ pub async fn drive(virtio: Virtio) {
             // Send statistics periodically (every 30 seconds)
             let now = crate::sys::interrupts::global_time_ms();
             let last_update = balloon.last_stats_update.load(Ordering::Relaxed);
-            
+
             if now.saturating_sub(last_update) > 30000 {
                 if let Err(e) = balloon.send_statistics() {
                     log::debug!("Error sending balloon statistics: {:?}", e);
@@ -579,12 +613,18 @@ pub fn emergency_deflate_balloon(pages_needed: u32) -> AgaveResult<u32> {
 
 /// Get balloon statistics
 pub fn get_balloon_stats() -> Option<BalloonStats> {
-    VIRTIO_BALLOON.lock().as_ref().map(|balloon| balloon.get_stats().clone())
+    VIRTIO_BALLOON
+        .lock()
+        .as_ref()
+        .map(|balloon| balloon.get_stats().clone())
 }
 
 /// Get current balloon size
 pub fn get_balloon_size() -> Option<u32> {
-    VIRTIO_BALLOON.lock().as_ref().map(|balloon| balloon.current_size())
+    VIRTIO_BALLOON
+        .lock()
+        .as_ref()
+        .map(|balloon| balloon.current_size())
 }
 
 /// Check if balloon is available

@@ -1,13 +1,12 @@
 /// VirtIO Block Device Driver for Agave OS
 /// Provides storage device support through VirtIO block interface
-
 use crate::sys::{
     create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
     task::executor::yield_once,
-    virtio::{Desc, Virtio, VirtQueue},
+    virtio::{Desc, VirtQueue, Virtio},
 };
-use alloc::{sync::Arc, vec::Vec, boxed::Box, vec};
+use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
 use core::{
     ptr::{read_volatile, write_volatile},
     sync::atomic::{AtomicU64, Ordering},
@@ -47,16 +46,16 @@ const MAX_SECTORS_PER_REQUEST: u32 = 256;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioBlkConfig {
-    capacity: u64,           // Device capacity in 512-byte sectors
-    size_max: u32,          // Maximum segment size
-    seg_max: u32,           // Maximum number of segments
+    capacity: u64, // Device capacity in 512-byte sectors
+    size_max: u32, // Maximum segment size
+    seg_max: u32,  // Maximum number of segments
     geometry: VirtioBlkGeometry,
-    blk_size: u32,          // Block size in bytes
+    blk_size: u32, // Block size in bytes
     topology: VirtioBlkTopology,
-    writeback: u8,          // Writeback mode
+    writeback: u8, // Writeback mode
     unused0: [u8; 3],
-    max_discard_sectors: u32,    // Maximum discard sectors
-    max_discard_seg: u32,        // Maximum discard segments
+    max_discard_sectors: u32,      // Maximum discard sectors
+    max_discard_seg: u32,          // Maximum discard segments
     discard_sector_alignment: u32, // Discard sector alignment
     max_write_zeroes_sectors: u32, // Maximum write zeroes sectors
     max_write_zeroes_seg: u32,     // Maximum write zeroes segments
@@ -75,19 +74,19 @@ struct VirtioBlkGeometry {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioBlkTopology {
-    physical_block_exp: u8,     // Physical block size = 2^(physical_block_exp + 9)
-    alignment_offset: u8,       // Alignment offset
-    min_io_size: u16,          // Minimum I/O size
-    opt_io_size: u32,          // Optimal I/O size
+    physical_block_exp: u8, // Physical block size = 2^(physical_block_exp + 9)
+    alignment_offset: u8,   // Alignment offset
+    min_io_size: u16,       // Minimum I/O size
+    opt_io_size: u32,       // Optimal I/O size
 }
 
 /// VirtIO Block request header
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioBlkReqHeader {
-    type_: u32,    // Request type (read/write/flush)
+    type_: u32, // Request type (read/write/flush)
     reserved: u32,
-    sector: u64,   // Starting sector number
+    sector: u64, // Starting sector number
 }
 
 /// Block I/O request
@@ -142,7 +141,7 @@ pub struct VirtioBlockDevice {
 }
 
 lazy_static! {
-    static ref BLOCK_WAKERS: Mutex<[Option<AtomicWaker>; 256]> = 
+    static ref BLOCK_WAKERS: Mutex<[Option<AtomicWaker>; 256]> =
         Mutex::new([(); 256].map(|_| None));
 }
 
@@ -152,14 +151,14 @@ impl VirtioBlockDevice {
         log::info!("Initializing VirtIO block device");
 
         // Feature negotiation
-        let desired_features = VIRTIO_BLK_F_SIZE_MAX 
-            | VIRTIO_BLK_F_SEG_MAX 
-            | VIRTIO_BLK_F_GEOMETRY 
-            | VIRTIO_BLK_F_BLK_SIZE 
-            | VIRTIO_BLK_F_TOPOLOGY 
-            | VIRTIO_BLK_F_DISCARD 
+        let desired_features = VIRTIO_BLK_F_SIZE_MAX
+            | VIRTIO_BLK_F_SEG_MAX
+            | VIRTIO_BLK_F_GEOMETRY
+            | VIRTIO_BLK_F_BLK_SIZE
+            | VIRTIO_BLK_F_TOPOLOGY
+            | VIRTIO_BLK_F_DISCARD
             | VIRTIO_BLK_F_WRITE_ZEROES;
-        
+
         let negotiated = virtio.negotiate_features(desired_features);
         log::info!("VirtIO Block negotiated features: 0x{:016x}", negotiated);
 
@@ -170,8 +169,11 @@ impl VirtioBlockDevice {
 
         // Read device configuration
         let config = Self::read_config(&mut virtio)?;
-        log::info!("Block device capacity: {} sectors ({} bytes)", 
-                   config.capacity, config.capacity * SECTOR_SIZE as u64);
+        log::info!(
+            "Block device capacity: {} sectors ({} bytes)",
+            config.capacity,
+            config.capacity * SECTOR_SIZE as u64
+        );
         log::info!("Block size: {} bytes", config.blk_size);
 
         Ok(Self {
@@ -188,28 +190,33 @@ impl VirtioBlockDevice {
     /// Read device configuration from VirtIO config space
     fn read_config(virtio: &mut Virtio) -> AgaveResult<VirtioBlkConfig> {
         // Read configuration fields
-        let capacity = virtio.read_config_u32(0)? as u64 | ((virtio.read_config_u32(4)? as u64) << 32);
+        let capacity =
+            virtio.read_config_u32(0)? as u64 | ((virtio.read_config_u32(4)? as u64) << 32);
         let size_max = virtio.read_config_u32(8)?;
         let seg_max = virtio.read_config_u32(12)?;
-        
+
         // Read geometry
         let cylinders = virtio.read_config_u16(16)?;
         let heads = virtio.read_config_u8(18)?;
         let sectors = virtio.read_config_u8(19)?;
-        
+
         let blk_size = virtio.read_config_u32(20)?;
-        
+
         // Read topology
         let physical_block_exp = virtio.read_config_u8(24)?;
         let alignment_offset = virtio.read_config_u8(25)?;
         let min_io_size = virtio.read_config_u16(26)?;
         let opt_io_size = virtio.read_config_u32(28)?;
-        
+
         Ok(VirtioBlkConfig {
             capacity,
             size_max,
             seg_max,
-            geometry: VirtioBlkGeometry { cylinders, heads, sectors },
+            geometry: VirtioBlkGeometry {
+                cylinders,
+                heads,
+                sectors,
+            },
             blk_size,
             topology: VirtioBlkTopology {
                 physical_block_exp,
@@ -230,7 +237,11 @@ impl VirtioBlockDevice {
     }
 
     /// Read sectors from the block device
-    pub async fn read_sectors(&mut self, start_sector: u64, sector_count: u32) -> AgaveResult<Vec<u8>> {
+    pub async fn read_sectors(
+        &mut self,
+        start_sector: u64,
+        sector_count: u32,
+    ) -> AgaveResult<Vec<u8>> {
         if sector_count == 0 || sector_count > MAX_SECTORS_PER_REQUEST {
             return Err(AgaveError::InvalidInput);
         }
@@ -238,11 +249,12 @@ impl VirtioBlockDevice {
         let data_size = sector_count as usize * SECTOR_SIZE;
         let mut buffer = vec![0u8; data_size];
 
-        self.submit_request(BlockOperation::Read, start_sector, &mut buffer).await?;
-        
+        self.submit_request(BlockOperation::Read, start_sector, &mut buffer)
+            .await?;
+
         self.stats.reads += 1;
         self.stats.bytes_read += data_size as u64;
-        
+
         Ok(buffer)
     }
 
@@ -262,24 +274,30 @@ impl VirtioBlockDevice {
         }
 
         let mut buffer = data.to_vec();
-        self.submit_request(BlockOperation::Write, start_sector, &mut buffer).await?;
-        
+        self.submit_request(BlockOperation::Write, start_sector, &mut buffer)
+            .await?;
+
         self.stats.writes += 1;
         self.stats.bytes_written += data.len() as u64;
-        
+
         Ok(())
     }
 
     /// Flush the device write cache
     pub async fn flush(&mut self) -> AgaveResult<()> {
         let mut empty_buffer = Vec::new();
-        self.submit_request(BlockOperation::Flush, 0, &mut empty_buffer).await?;
+        self.submit_request(BlockOperation::Flush, 0, &mut empty_buffer)
+            .await?;
         self.stats.flush_ops += 1;
         Ok(())
     }
 
     /// Discard sectors (TRIM command)
-    pub async fn discard_sectors(&mut self, start_sector: u64, sector_count: u32) -> AgaveResult<()> {
+    pub async fn discard_sectors(
+        &mut self,
+        start_sector: u64,
+        sector_count: u32,
+    ) -> AgaveResult<()> {
         if self.read_only || (self.features & VIRTIO_BLK_F_DISCARD) == 0 {
             return Err(AgaveError::NotImplemented);
         }
@@ -289,19 +307,25 @@ impl VirtioBlockDevice {
         }
 
         let mut empty_buffer = Vec::new();
-        self.submit_request(BlockOperation::Discard, start_sector, &mut empty_buffer).await?;
+        self.submit_request(BlockOperation::Discard, start_sector, &mut empty_buffer)
+            .await?;
         self.stats.discard_ops += 1;
         Ok(())
     }
 
     /// Submit a block I/O request
-    async fn submit_request(&mut self, operation: BlockOperation, sector: u64, buffer: &mut [u8]) -> AgaveResult<()> {
+    async fn submit_request(
+        &mut self,
+        operation: BlockOperation,
+        sector: u64,
+        buffer: &mut [u8],
+    ) -> AgaveResult<()> {
         // Select the first queue (assuming single queue for simplicity)
         self.virtio.queue_select(0);
 
         // Get descriptors for the request
         let desc_ids = self.get_descriptors_for_request(operation, buffer.len())?;
-        
+
         // Set up the request
         let request_header = VirtioBlkReqHeader {
             type_: match operation {
@@ -333,7 +357,11 @@ impl VirtioBlockDevice {
     }
 
     /// Get required descriptors for a request
-    fn get_descriptors_for_request(&mut self, operation: BlockOperation, data_size: usize) -> AgaveResult<Vec<u16>> {
+    fn get_descriptors_for_request(
+        &mut self,
+        operation: BlockOperation,
+        data_size: usize,
+    ) -> AgaveResult<Vec<u16>> {
         // We need: header descriptor + data descriptor(s) + status descriptor
         let mut desc_ids = Vec::new();
 
@@ -375,24 +403,39 @@ impl VirtioBlockDevice {
     }
 
     /// Set up the descriptor chain for a block request
-    fn setup_descriptor_chain(&mut self, desc_ids: &[u16], header: &VirtioBlkReqHeader, 
-                             buffer: &mut [u8], operation: BlockOperation) -> AgaveResult<()> {
+    fn setup_descriptor_chain(
+        &mut self,
+        desc_ids: &[u16],
+        header: &VirtioBlkReqHeader,
+        buffer: &mut [u8],
+        operation: BlockOperation,
+    ) -> AgaveResult<()> {
         // Create descriptor chain based on operation type
         let mut buffers = Vec::new();
 
         // Header buffer (always first)
         let header_addr = header as *const _ as u64;
-        buffers.push((header_addr, core::mem::size_of::<VirtioBlkReqHeader>() as u32, 0u16));
+        buffers.push((
+            header_addr,
+            core::mem::size_of::<VirtioBlkReqHeader>() as u32,
+            0u16,
+        ));
 
         // Data buffer(s) for read/write operations
         if matches!(operation, BlockOperation::Read | BlockOperation::Write) && !buffer.is_empty() {
             let data_addr = buffer.as_ptr() as u64;
-            let flags = if matches!(operation, BlockOperation::Read) { 2u16 } else { 0u16 }; // VIRTQ_DESC_F_WRITE for reads
+            let flags = if matches!(operation, BlockOperation::Read) {
+                2u16
+            } else {
+                0u16
+            }; // VIRTQ_DESC_F_WRITE for reads
             buffers.push((data_addr, buffer.len() as u32, flags));
         }
 
         // Status buffer (always last, write-only)
-        let status_addr = create_identity_virt_from_phys_n(1)?.start_address().as_u64();
+        let status_addr = create_identity_virt_from_phys_n(1)?
+            .start_address()
+            .as_u64();
         buffers.push((status_addr, 1, 2u16)); // VIRTQ_DESC_F_WRITE
 
         // Create the descriptor chain
@@ -411,21 +454,23 @@ impl VirtioBlockDevice {
             if self.virtio.has_used_descriptors() {
                 let mut completion_found = false;
                 let mut block_status = VIRTIO_BLK_S_OK;
-                
+
                 // First pass: check if our descriptor is complete
                 let _processed = self.virtio.process_used_descriptors(|used_elem| {
                     if used_elem.id == desc_id as u32 {
                         completion_found = true;
                     }
                 });
-                
+
                 // If our descriptor completed, read its status and handle completion
                 if completion_found {
                     let status_desc = self.virtio.read_desc(desc_id);
                     unsafe {
-                        block_status = read_volatile((status_desc.addr + status_desc.len as u64 - 1) as *const u8);
+                        block_status = read_volatile(
+                            (status_desc.addr + status_desc.len as u64 - 1) as *const u8,
+                        );
                     }
-                    
+
                     match block_status {
                         VIRTIO_BLK_S_OK => {
                             log::trace!("Block request completed successfully");
@@ -509,8 +554,11 @@ pub async fn drive(virtio: Virtio) {
         }
     };
 
-    log::info!("VirtIO block device initialized: {} sectors, block size {} bytes",
-               block_device.capacity_sectors(), block_device.block_size());
+    log::info!(
+        "VirtIO block device initialized: {} sectors, block size {} bytes",
+        block_device.capacity_sectors(),
+        block_device.block_size()
+    );
 
     // TODO: Register the block device with the filesystem layer
     // For now, just keep the driver running
@@ -536,11 +584,11 @@ impl BlockDevice for VirtioBlockDevice {
         if buffer.len() != self.block_size() as usize {
             return Err(AgaveError::InvalidInput);
         }
-        
+
         // Convert block number to sector number
         let sectors_per_block = self.block_size() / SECTOR_SIZE as u32;
         let start_sector = block_num * sectors_per_block as u64;
-        
+
         // This would need to be made async in a real implementation
         // For now, return an error indicating async operation needed
         Err(AgaveError::NotImplemented)
@@ -550,15 +598,15 @@ impl BlockDevice for VirtioBlockDevice {
         if self.read_only {
             return Err(AgaveError::PermissionDenied);
         }
-        
+
         if buffer.len() != self.block_size() as usize {
             return Err(AgaveError::InvalidInput);
         }
-        
+
         // Convert block number to sector number
         let sectors_per_block = self.block_size() / SECTOR_SIZE as u32;
         let start_sector = block_num * sectors_per_block as u64;
-        
+
         // This would need to be made async in a real implementation
         // For now, return an error indicating async operation needed
         Err(AgaveError::NotImplemented)

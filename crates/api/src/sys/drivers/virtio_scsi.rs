@@ -1,13 +1,18 @@
 /// VirtIO SCSI Device Driver for Agave OS
 /// Provides SCSI device support through VirtIO interface
-
 use crate::sys::{
     create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
     task::executor::yield_once,
     virtio::{Desc, Virtio},
 };
-use alloc::{sync::Arc, vec::Vec, string::{String, ToString}, boxed::Box, vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
 use core::{
     ptr::{read_volatile, write_volatile},
     sync::atomic::{AtomicU32, Ordering},
@@ -63,27 +68,27 @@ const VIRTIO_SCSI_SENSE_SIZE: usize = 96;
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiConfig {
-    num_queues: u32,        // Number of request queues
-    seg_max: u32,          // Maximum number of segments per request
-    max_sectors: u32,      // Maximum number of sectors per request
-    cmd_per_lun: u32,      // Maximum commands per LUN
-    event_info_size: u32,  // Event information size
-    sense_size: u32,       // Sense data size
-    cdb_size: u32,         // Command descriptor block size
-    max_channel: u16,      // Maximum channel number
-    max_target: u16,       // Maximum target number
-    max_lun: u32,          // Maximum LUN number
+    num_queues: u32,      // Number of request queues
+    seg_max: u32,         // Maximum number of segments per request
+    max_sectors: u32,     // Maximum number of sectors per request
+    cmd_per_lun: u32,     // Maximum commands per LUN
+    event_info_size: u32, // Event information size
+    sense_size: u32,      // Sense data size
+    cdb_size: u32,        // Command descriptor block size
+    max_channel: u16,     // Maximum channel number
+    max_target: u16,      // Maximum target number
+    max_lun: u32,         // Maximum LUN number
 }
 
 /// SCSI request header
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiReqHeader {
-    lun: [u8; 8],          // Logical unit number
-    tag: u64,              // Request tag
-    task_attr: u8,         // Task attributes
-    prio: u8,              // Priority
-    crn: u8,               // Command reference number
+    lun: [u8; 8],                    // Logical unit number
+    tag: u64,                        // Request tag
+    task_attr: u8,                   // Task attributes
+    prio: u8,                        // Priority
+    crn: u8,                         // Command reference number
     cdb: [u8; VIRTIO_SCSI_CDB_SIZE], // Command descriptor block
 }
 
@@ -91,11 +96,11 @@ struct VirtioScsiReqHeader {
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiRespHeader {
-    sense_len: u32,        // Sense data length
-    resid: u32,            // Residual data length
-    status_qualifier: u16, // Status qualifier
-    status: u8,            // SCSI status
-    response: u8,          // VirtIO SCSI response
+    sense_len: u32,                      // Sense data length
+    resid: u32,                          // Residual data length
+    status_qualifier: u16,               // Status qualifier
+    status: u8,                          // SCSI status
+    response: u8,                        // VirtIO SCSI response
     sense: [u8; VIRTIO_SCSI_SENSE_SIZE], // Sense data
 }
 
@@ -103,26 +108,26 @@ struct VirtioScsiRespHeader {
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiCtrlTmfReq {
-    type_: u32,            // Request type
-    subtype: u32,          // Request subtype
-    lun: [u8; 8],          // Logical unit number
-    tag: u64,              // Request tag
+    type_: u32,   // Request type
+    subtype: u32, // Request subtype
+    lun: [u8; 8], // Logical unit number
+    tag: u64,     // Request tag
 }
 
 /// SCSI control response
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiCtrlTmfResp {
-    response: u8,          // Response code
+    response: u8, // Response code
 }
 
 /// SCSI event
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiEvent {
-    event: u32,            // Event type
-    lun: [u8; 8],          // Logical unit number
-    reason: u32,           // Event reason
+    event: u32,   // Event type
+    lun: [u8; 8], // Logical unit number
+    reason: u32,  // Event reason
 }
 
 /// SCSI device information
@@ -182,8 +187,8 @@ pub struct ScsiCommand {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScsiDirection {
     None,
-    ToDevice,    // Write
-    FromDevice,  // Read
+    ToDevice,   // Write
+    FromDevice, // Read
 }
 
 /// SCSI operation result
@@ -217,11 +222,11 @@ impl VirtioScsi {
         log::info!("Initializing VirtIO SCSI device");
 
         // Feature negotiation
-        let desired_features = VIRTIO_SCSI_F_INOUT 
-            | VIRTIO_SCSI_F_HOTPLUG 
-            | VIRTIO_SCSI_F_CHANGE 
+        let desired_features = VIRTIO_SCSI_F_INOUT
+            | VIRTIO_SCSI_F_HOTPLUG
+            | VIRTIO_SCSI_F_CHANGE
             | VIRTIO_SCSI_F_T10_PI;
-        
+
         let negotiated = virtio.negotiate_features(desired_features);
         log::info!("VirtIO SCSI negotiated features: 0x{:016x}", negotiated);
 
@@ -230,15 +235,49 @@ impl VirtioScsi {
 
         // Read device configuration
         let config = Self::read_config(&mut virtio)?;
-        let num_queues = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(0) as *const u32) };
-        let max_sectors = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(8) as *const u32) };
-        let cmd_per_lun = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(12) as *const u32) };
-        log::info!("SCSI config: {} queues, max_sectors={}, cmd_per_lun={}", num_queues, max_sectors, cmd_per_lun);
-        
-        let max_channel = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(16) as *const u16) };
-        let max_target = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(18) as *const u16) };
-        let max_lun = unsafe { core::ptr::read_unaligned((&config as *const VirtioScsiConfig as *const u8).add(20) as *const u32) };
-        log::info!("SCSI addressing: channels=0-{}, targets=0-{}, luns=0-{}", max_channel, max_target, max_lun);
+        let num_queues = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(0) as *const u32
+            )
+        };
+        let max_sectors = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(8) as *const u32
+            )
+        };
+        let cmd_per_lun = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(12) as *const u32
+            )
+        };
+        log::info!(
+            "SCSI config: {} queues, max_sectors={}, cmd_per_lun={}",
+            num_queues,
+            max_sectors,
+            cmd_per_lun
+        );
+
+        let max_channel = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(16) as *const u16
+            )
+        };
+        let max_target = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(18) as *const u16
+            )
+        };
+        let max_lun = unsafe {
+            core::ptr::read_unaligned(
+                (&config as *const VirtioScsiConfig as *const u8).add(20) as *const u32
+            )
+        };
+        log::info!(
+            "SCSI addressing: channels=0-{}, targets=0-{}, luns=0-{}",
+            max_channel,
+            max_target,
+            max_lun
+        );
 
         let mut scsi = Self {
             virtio,
@@ -256,7 +295,10 @@ impl VirtioScsi {
         // Scan for devices
         scsi.scan_devices()?;
 
-        log::info!("VirtIO SCSI device initialized with {} devices", scsi.devices.len());
+        log::info!(
+            "VirtIO SCSI device initialized with {} devices",
+            scsi.devices.len()
+        );
         Ok(scsi)
     }
 
@@ -307,58 +349,78 @@ impl VirtioScsi {
     /// Scan for SCSI devices
     fn scan_devices(&mut self) -> AgaveResult<()> {
         log::info!("Scanning for SCSI devices...");
-        
+
         // Scan all possible addresses
         for channel in 0..=self.config.max_channel {
             for target in 0..=self.config.max_target {
                 for lun in 0..=self.config.max_lun.min(255) {
                     if let Ok(device) = self.probe_device(channel, target, lun) {
-                        log::info!("Found SCSI device: {}:{}:{} - {} {} {}", 
-                                  channel, target, lun, 
-                                  device.vendor, device.product, device.revision);
+                        log::info!(
+                            "Found SCSI device: {}:{}:{} - {} {} {}",
+                            channel,
+                            target,
+                            lun,
+                            device.vendor,
+                            device.product,
+                            device.revision
+                        );
                         self.devices.push(device);
                     }
                 }
             }
         }
 
-        log::info!("SCSI device scan complete: {} devices found", self.devices.len());
+        log::info!(
+            "SCSI device scan complete: {} devices found",
+            self.devices.len()
+        );
         Ok(())
     }
 
     /// Probe for a device at specific address
     fn probe_device(&mut self, channel: u16, target: u16, lun: u32) -> AgaveResult<ScsiDevice> {
         let mut device = ScsiDevice::new(channel, target, lun);
-        
+
         // Send INQUIRY command to probe device
         let inquiry_result = self.send_inquiry(&device)?;
-        
+
         if inquiry_result.status == 0 && inquiry_result.data.len() >= 36 {
             let data = &inquiry_result.data;
-            
+
             // Parse INQUIRY response
             device.device_type = data[0] & 0x1F;
-            
+
             // Extract vendor, product, and revision
             if data.len() >= 36 {
                 device.vendor = String::from_utf8_lossy(&data[8..16]).trim().to_string();
                 device.product = String::from_utf8_lossy(&data[16..32]).trim().to_string();
                 device.revision = String::from_utf8_lossy(&data[32..36]).trim().to_string();
             }
-            
+
             device.online = true;
-            
+
             // For direct access devices, get capacity
             if device.device_type == 0 {
                 if let Ok(capacity_result) = self.send_read_capacity(&device) {
                     if capacity_result.data.len() >= 8 {
                         let cap_data = &capacity_result.data;
-                        device.capacity = u32::from_be_bytes([cap_data[0], cap_data[1], cap_data[2], cap_data[3]]) as u64 + 1;
-                        device.block_size = u32::from_be_bytes([cap_data[4], cap_data[5], cap_data[6], cap_data[7]]);
+                        device.capacity = u32::from_be_bytes([
+                            cap_data[0],
+                            cap_data[1],
+                            cap_data[2],
+                            cap_data[3],
+                        ]) as u64
+                            + 1;
+                        device.block_size = u32::from_be_bytes([
+                            cap_data[4],
+                            cap_data[5],
+                            cap_data[6],
+                            cap_data[7],
+                        ]);
                     }
                 }
             }
-            
+
             Ok(device)
         } else {
             Err(AgaveError::NotFound)
@@ -369,12 +431,12 @@ impl VirtioScsi {
     fn send_inquiry(&mut self, device: &ScsiDevice) -> AgaveResult<ScsiResult> {
         let mut cdb = [0u8; VIRTIO_SCSI_CDB_SIZE];
         cdb[0] = 0x12; // INQUIRY
-        cdb[1] = 0;    // EVPD=0, CMDDT=0
-        cdb[2] = 0;    // Page code
-        cdb[3] = 0;    // Reserved
-        cdb[4] = 96;   // Allocation length
-        cdb[5] = 0;    // Control
-        
+        cdb[1] = 0; // EVPD=0, CMDDT=0
+        cdb[2] = 0; // Page code
+        cdb[3] = 0; // Reserved
+        cdb[4] = 96; // Allocation length
+        cdb[5] = 0; // Control
+
         let command = ScsiCommand {
             device: device.clone(),
             cdb,
@@ -384,7 +446,7 @@ impl VirtioScsi {
             sense_buffer: [0u8; VIRTIO_SCSI_SENSE_SIZE],
             tag: self.request_counter.fetch_add(1, Ordering::SeqCst) as u64,
         };
-        
+
         self.execute_command(command)
     }
 
@@ -392,12 +454,12 @@ impl VirtioScsi {
     fn send_read_capacity(&mut self, device: &ScsiDevice) -> AgaveResult<ScsiResult> {
         let mut cdb = [0u8; VIRTIO_SCSI_CDB_SIZE];
         cdb[0] = 0x25; // READ CAPACITY(10)
-        cdb[1] = 0;    // RelAdr=0
-        // LBA = 0 (bytes 2-5)
-        // Reserved (bytes 6-7)
-        cdb[8] = 0;    // PMI=0
-        cdb[9] = 0;    // Control
-        
+        cdb[1] = 0; // RelAdr=0
+                    // LBA = 0 (bytes 2-5)
+                    // Reserved (bytes 6-7)
+        cdb[8] = 0; // PMI=0
+        cdb[9] = 0; // Control
+
         let command = ScsiCommand {
             device: device.clone(),
             cdb,
@@ -407,7 +469,7 @@ impl VirtioScsi {
             sense_buffer: [0u8; VIRTIO_SCSI_SENSE_SIZE],
             tag: self.request_counter.fetch_add(1, Ordering::SeqCst) as u64,
         };
-        
+
         self.execute_command(command)
     }
 
@@ -417,7 +479,7 @@ impl VirtioScsi {
 
         // Get descriptors for the request
         let desc_ids = self.get_descriptors_for_request(&command)?;
-        
+
         // Set up request header
         let req_header = VirtioScsiReqHeader {
             lun: command.device.to_lun_array(),
@@ -480,13 +542,21 @@ impl VirtioScsi {
     }
 
     /// Set up descriptor chain for SCSI request
-    fn setup_scsi_descriptor_chain(&mut self, _desc_ids: &[u16], header: &VirtioScsiReqHeader, 
-                                  command: &mut ScsiCommand) -> AgaveResult<()> {
+    fn setup_scsi_descriptor_chain(
+        &mut self,
+        _desc_ids: &[u16],
+        header: &VirtioScsiReqHeader,
+        command: &mut ScsiCommand,
+    ) -> AgaveResult<()> {
         let mut buffers = Vec::new();
 
         // Request header (read-only)
         let header_addr = header as *const _ as u64;
-        buffers.push((header_addr, core::mem::size_of::<VirtioScsiReqHeader>() as u32, 0u16));
+        buffers.push((
+            header_addr,
+            core::mem::size_of::<VirtioScsiReqHeader>() as u32,
+            0u16,
+        ));
 
         // Data buffer (read or write depending on direction)
         if !command.data.is_empty() {
@@ -500,8 +570,14 @@ impl VirtioScsi {
         }
 
         // Response header (write-only)
-        let resp_addr = create_identity_virt_from_phys_n(1)?.start_address().as_u64();
-        buffers.push((resp_addr, core::mem::size_of::<VirtioScsiRespHeader>() as u32, 2u16));
+        let resp_addr = create_identity_virt_from_phys_n(1)?
+            .start_address()
+            .as_u64();
+        buffers.push((
+            resp_addr,
+            core::mem::size_of::<VirtioScsiRespHeader>() as u32,
+            2u16,
+        ));
 
         // Create the descriptor chain
         if self.virtio.create_descriptor_chain(&buffers).is_none() {
@@ -518,7 +594,7 @@ impl VirtioScsi {
             if self.virtio.has_used_descriptors() {
                 let mut completion_found = false;
                 let mut found_desc_id = 0u16;
-                
+
                 // First pass: check if our descriptors are complete
                 self.virtio.process_used_descriptors(|used_elem| {
                     if desc_ids.contains(&(used_elem.id as u16)) {
@@ -526,15 +602,17 @@ impl VirtioScsi {
                         found_desc_id = used_elem.id as u16;
                     }
                 });
-                
+
                 // If our descriptors completed, read the response
                 if completion_found {
                     let resp_desc = self.virtio.read_desc(desc_ids.last().unwrap().clone());
                     let result = unsafe {
                         let response = read_volatile(resp_desc.addr as *const VirtioScsiRespHeader);
-                        
+
                         let sense_data = if response.sense_len > 0 {
-                            response.sense[0..response.sense_len.min(VIRTIO_SCSI_SENSE_SIZE as u32) as usize].to_vec()
+                            response.sense
+                                [0..response.sense_len.min(VIRTIO_SCSI_SENSE_SIZE as u32) as usize]
+                                .to_vec()
                         } else {
                             Vec::new()
                         };
@@ -547,18 +625,23 @@ impl VirtioScsi {
                             data: Vec::new(), // Data is already in command.data
                         }
                     };
-                    
+
                     return Ok(result);
                 }
             }
-            
+
             // Yield to prevent busy waiting
             core::hint::spin_loop();
         }
     }
 
     /// Read data from SCSI device
-    pub fn read_blocks(&mut self, device_index: usize, lba: u64, block_count: u32) -> AgaveResult<Vec<u8>> {
+    pub fn read_blocks(
+        &mut self,
+        device_index: usize,
+        lba: u64,
+        block_count: u32,
+    ) -> AgaveResult<Vec<u8>> {
         if device_index >= self.devices.len() {
             return Err(AgaveError::InvalidInput);
         }
@@ -569,18 +652,18 @@ impl VirtioScsi {
         }
 
         let data_size = block_count as usize * device.block_size as usize;
-        
+
         let mut cdb = [0u8; VIRTIO_SCSI_CDB_SIZE];
         cdb[0] = 0x28; // READ(10)
-        cdb[1] = 0;    // RelAdr=0, FUA=0, DPO=0
+        cdb[1] = 0; // RelAdr=0, FUA=0, DPO=0
         cdb[2] = ((lba >> 24) & 0xFF) as u8;
         cdb[3] = ((lba >> 16) & 0xFF) as u8;
         cdb[4] = ((lba >> 8) & 0xFF) as u8;
         cdb[5] = (lba & 0xFF) as u8;
-        cdb[6] = 0;    // Reserved
+        cdb[6] = 0; // Reserved
         cdb[7] = ((block_count >> 8) & 0xFF) as u8;
         cdb[8] = (block_count & 0xFF) as u8;
-        cdb[9] = 0;    // Control
+        cdb[9] = 0; // Control
 
         let command = ScsiCommand {
             device: device.clone(),
@@ -593,11 +676,15 @@ impl VirtioScsi {
         };
 
         let result = self.execute_command(command)?;
-        
+
         if result.status == 0 && result.response == VIRTIO_SCSI_S_OK {
             Ok(result.data)
         } else {
-            log::error!("SCSI read failed: status={}, response={}", result.status, result.response);
+            log::error!(
+                "SCSI read failed: status={}, response={}",
+                result.status,
+                result.response
+            );
             Err(AgaveError::IoError)
         }
     }
@@ -618,18 +705,18 @@ impl VirtioScsi {
         }
 
         let block_count = data.len() / device.block_size as usize;
-        
+
         let mut cdb = [0u8; VIRTIO_SCSI_CDB_SIZE];
         cdb[0] = 0x2A; // WRITE(10)
-        cdb[1] = 0;    // RelAdr=0, FUA=0, DPO=0
+        cdb[1] = 0; // RelAdr=0, FUA=0, DPO=0
         cdb[2] = ((lba >> 24) & 0xFF) as u8;
         cdb[3] = ((lba >> 16) & 0xFF) as u8;
         cdb[4] = ((lba >> 8) & 0xFF) as u8;
         cdb[5] = (lba & 0xFF) as u8;
-        cdb[6] = 0;    // Reserved
+        cdb[6] = 0; // Reserved
         cdb[7] = ((block_count >> 8) & 0xFF) as u8;
         cdb[8] = (block_count & 0xFF) as u8;
-        cdb[9] = 0;    // Control
+        cdb[9] = 0; // Control
 
         let command = ScsiCommand {
             device: device.clone(),
@@ -642,11 +729,15 @@ impl VirtioScsi {
         };
 
         let result = self.execute_command(command)?;
-        
+
         if result.status == 0 && result.response == VIRTIO_SCSI_S_OK {
             Ok(())
         } else {
-            log::error!("SCSI write failed: status={}, response={}", result.status, result.response);
+            log::error!(
+                "SCSI write failed: status={}, response={}",
+                result.status,
+                result.response
+            );
             Err(AgaveError::IoError)
         }
     }
@@ -658,15 +749,15 @@ impl VirtioScsi {
         }
 
         self.virtio.queue_select(SCSI_EVENT_QUEUE);
-        
+
         while let Some(used_elem) = unsafe { self.virtio.next_used() } {
             let desc = self.virtio.read_desc(used_elem.id as u16);
-            
+
             unsafe {
                 let event = read_volatile(desc.addr as *const VirtioScsiEvent);
                 self.handle_scsi_event(&event)?;
             }
-            
+
             // Return descriptor to available ring
             self.virtio.set_writable_available(used_elem.id as u16);
         }
@@ -676,8 +767,13 @@ impl VirtioScsi {
 
     /// Handle SCSI event
     fn handle_scsi_event(&mut self, event: &VirtioScsiEvent) -> AgaveResult<()> {
-        let event_type = unsafe { core::ptr::read_unaligned(event as *const VirtioScsiEvent as *const u32) };
-        let event_reason = unsafe { core::ptr::read_unaligned((event as *const VirtioScsiEvent as *const u8).add(4) as *const u32) };
+        let event_type =
+            unsafe { core::ptr::read_unaligned(event as *const VirtioScsiEvent as *const u32) };
+        let event_reason = unsafe {
+            core::ptr::read_unaligned(
+                (event as *const VirtioScsiEvent as *const u8).add(4) as *const u32
+            )
+        };
         log::debug!("SCSI event: type={}, reason={}", event_type, event_reason);
 
         match event_type {

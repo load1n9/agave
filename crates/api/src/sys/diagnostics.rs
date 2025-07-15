@@ -1,12 +1,17 @@
 /// Real-time system diagnostics and health monitoring
 use crate::sys::{
-    allocator::{memory_stats, memory_pressure, MemoryPressure},
+    allocator::{memory_pressure, memory_stats, MemoryPressure},
     interrupts::TIME_MS,
-    task::executor::TASK_METRICS,
     monitor::{get_system_metrics, SystemMetrics},
+    task::executor::TASK_METRICS,
 };
-use alloc::{vec::Vec, string::{String, ToString}, format, collections::BTreeMap};
-use core::{sync::atomic::Ordering, fmt::Write};
+use alloc::{
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt::Write, sync::atomic::Ordering};
 use spin::Mutex;
 
 /// System diagnostic levels
@@ -91,17 +96,26 @@ static HEALTH_CHECKER: Mutex<HealthChecker> = Mutex::new(HealthChecker {
 
 impl HealthChecker {
     /// Add a diagnostic entry
-    pub fn add_diagnostic(&mut self, level: DiagnosticLevel, category: DiagnosticCategory, message: String, details: Option<String>) {
+    pub fn add_diagnostic(
+        &mut self,
+        level: DiagnosticLevel,
+        category: DiagnosticCategory,
+        message: String,
+        details: Option<String>,
+    ) {
         let now = TIME_MS.load(Ordering::Relaxed);
-        
+
         // Check if we already have this diagnostic (merge similar entries)
-        if let Some(existing) = self.diagnostics.iter_mut()
-            .find(|d| d.category == category && d.message == message && now - d.timestamp < 60000) {
+        if let Some(existing) = self
+            .diagnostics
+            .iter_mut()
+            .find(|d| d.category == category && d.message == message && now - d.timestamp < 60000)
+        {
             existing.count += 1;
             existing.timestamp = now;
             return;
         }
-        
+
         let entry = DiagnosticEntry {
             timestamp: now,
             level,
@@ -110,47 +124,47 @@ impl HealthChecker {
             details,
             count: 1,
         };
-        
+
         self.diagnostics.push(entry);
-        
+
         // Keep only recent entries
         if self.diagnostics.len() > self.max_entries {
             self.diagnostics.remove(0);
         }
     }
-    
+
     /// Perform comprehensive system health check
     pub fn perform_health_check(&mut self) -> SystemHealthReport {
         let now = TIME_MS.load(Ordering::Relaxed);
         let metrics = get_system_metrics();
-        
+
         let mut issues = Vec::new();
         let mut overall_status = SystemHealthStatus::Healthy;
-        
+
         // Memory health check
         if self.should_check(DiagnosticCategory::Memory, now) {
             let memory_issues = self.check_memory_health(&metrics);
             issues.extend(memory_issues);
         }
-        
+
         // Task system health check
         if self.should_check(DiagnosticCategory::Tasks, now) {
             let task_issues = self.check_task_health(&metrics);
             issues.extend(task_issues);
         }
-        
+
         // Performance health check
         if self.should_check(DiagnosticCategory::Performance, now) {
             let perf_issues = self.check_performance_health(&metrics);
             issues.extend(perf_issues);
         }
-        
+
         // System stability check
         if self.should_check(DiagnosticCategory::System, now) {
             let system_issues = self.check_system_stability(&metrics);
             issues.extend(system_issues);
         }
-        
+
         // Determine overall status based on highest severity issue
         for issue in &issues {
             match issue.level {
@@ -171,7 +185,7 @@ impl HealthChecker {
                 _ => {}
             }
         }
-        
+
         SystemHealthReport {
             status: overall_status,
             timestamp: now,
@@ -180,7 +194,7 @@ impl HealthChecker {
             uptime_ms: metrics.uptime_ms,
         }
     }
-    
+
     fn should_check(&mut self, category: DiagnosticCategory, now: u64) -> bool {
         let last_check = self.last_checks.get(&category).copied().unwrap_or(0);
         if now - last_check >= self.thresholds.uptime_check_interval_ms {
@@ -190,11 +204,11 @@ impl HealthChecker {
             false
         }
     }
-    
+
     fn check_memory_health(&mut self, metrics: &SystemMetrics) -> Vec<DiagnosticEntry> {
         let mut issues = Vec::new();
         let utilization = metrics.memory.utilization_percent();
-        
+
         if utilization >= self.thresholds.memory_critical_percent {
             issues.push(DiagnosticEntry {
                 timestamp: metrics.uptime_ms,
@@ -219,7 +233,7 @@ impl HealthChecker {
                 count: 1,
             });
         }
-        
+
         // Check memory pressure
         match metrics.memory_pressure {
             MemoryPressure::Critical => {
@@ -244,13 +258,13 @@ impl HealthChecker {
             }
             _ => {}
         }
-        
+
         issues
     }
-    
+
     fn check_task_health(&mut self, metrics: &SystemMetrics) -> Vec<DiagnosticEntry> {
         let mut issues = Vec::new();
-        
+
         // Check task completion rate
         let tasks = &metrics.tasks;
         if tasks.total_tasks_spawned > 0 {
@@ -263,14 +277,13 @@ impl HealthChecker {
                     message: format!("Low task completion rate: {:.1}%", completion_rate * 100.0),
                     details: Some(format!(
                         "Spawned: {}, Completed: {}",
-                        tasks.total_tasks_spawned,
-                        tasks.tasks_completed
+                        tasks.total_tasks_spawned, tasks.tasks_completed
                     )),
                     count: 1,
                 });
             }
         }
-        
+
         // Check context switch rate
         let uptime_sec = metrics.uptime_ms as f32 / 1000.0;
         if uptime_sec > 0.0 {
@@ -286,25 +299,28 @@ impl HealthChecker {
                 });
             }
         }
-        
+
         issues
     }
-    
+
     fn check_performance_health(&mut self, metrics: &SystemMetrics) -> Vec<DiagnosticEntry> {
         let mut issues = Vec::new();
-        
+
         // Check CPU utilization
         if metrics.cpu_utilization_percent > 95.0 {
             issues.push(DiagnosticEntry {
                 timestamp: metrics.uptime_ms,
                 level: DiagnosticLevel::Warning,
                 category: DiagnosticCategory::Performance,
-                message: format!("High CPU utilization: {:.1}%", metrics.cpu_utilization_percent),
+                message: format!(
+                    "High CPU utilization: {:.1}%",
+                    metrics.cpu_utilization_percent
+                ),
                 details: Some("System may be overloaded".to_string()),
                 count: 1,
             });
         }
-        
+
         // Check interrupt rate
         let uptime_sec = metrics.uptime_ms as f32 / 1000.0;
         if uptime_sec > 0.0 {
@@ -320,13 +336,13 @@ impl HealthChecker {
                 });
             }
         }
-        
+
         issues
     }
-    
+
     fn check_system_stability(&mut self, metrics: &SystemMetrics) -> Vec<DiagnosticEntry> {
         let mut issues = Vec::new();
-        
+
         // Check system uptime milestones
         let uptime_hours = metrics.uptime_ms as f32 / (1000.0 * 60.0 * 60.0);
         if uptime_hours >= 24.0 && (uptime_hours as u32 % 24) == 0 {
@@ -339,27 +355,27 @@ impl HealthChecker {
                 count: 1,
             });
         }
-        
+
         issues
     }
-    
+
     /// Get recent diagnostics
     pub fn get_recent_diagnostics(&self, limit: usize) -> Vec<DiagnosticEntry> {
-        self.diagnostics.iter()
-            .rev()
-            .take(limit)
-            .cloned()
-            .collect()
+        self.diagnostics.iter().rev().take(limit).cloned().collect()
     }
-    
+
     /// Get diagnostics by category
-    pub fn get_diagnostics_by_category(&self, category: DiagnosticCategory) -> Vec<DiagnosticEntry> {
-        self.diagnostics.iter()
+    pub fn get_diagnostics_by_category(
+        &self,
+        category: DiagnosticCategory,
+    ) -> Vec<DiagnosticEntry> {
+        self.diagnostics
+            .iter()
             .filter(|d| d.category == category)
             .cloned()
             .collect()
     }
-    
+
     /// Clear old diagnostics
     pub fn clear_old_diagnostics(&mut self, max_age_ms: u64) {
         let now = TIME_MS.load(Ordering::Relaxed);
@@ -391,14 +407,34 @@ impl SystemHealthReport {
     /// Generate a human-readable summary
     pub fn summary(&self) -> String {
         let mut summary = String::new();
-        
+
         writeln!(&mut summary, "=== System Health Report ===").ok();
         writeln!(&mut summary, "Status: {:?}", self.status).ok();
-        writeln!(&mut summary, "Uptime: {:.2} hours", self.uptime_ms as f32 / (1000.0 * 60.0 * 60.0)).ok();
-        writeln!(&mut summary, "Memory Usage: {:.1}%", self.metrics.memory.utilization_percent()).ok();
-        writeln!(&mut summary, "CPU Usage: {:.1}%", self.metrics.cpu_utilization_percent).ok();
-        writeln!(&mut summary, "Active Tasks: {}", self.metrics.tasks.total_tasks_spawned - self.metrics.tasks.tasks_completed).ok();
-        
+        writeln!(
+            &mut summary,
+            "Uptime: {:.2} hours",
+            self.uptime_ms as f32 / (1000.0 * 60.0 * 60.0)
+        )
+        .ok();
+        writeln!(
+            &mut summary,
+            "Memory Usage: {:.1}%",
+            self.metrics.memory.utilization_percent()
+        )
+        .ok();
+        writeln!(
+            &mut summary,
+            "CPU Usage: {:.1}%",
+            self.metrics.cpu_utilization_percent
+        )
+        .ok();
+        writeln!(
+            &mut summary,
+            "Active Tasks: {}",
+            self.metrics.tasks.total_tasks_spawned - self.metrics.tasks.tasks_completed
+        )
+        .ok();
+
         if !self.issues.is_empty() {
             writeln!(&mut summary, "\nIssues Found:").ok();
             for issue in &self.issues {
@@ -410,13 +446,18 @@ impl SystemHealthReport {
         } else {
             writeln!(&mut summary, "\nNo issues detected.").ok();
         }
-        
+
         summary
     }
 }
 
 /// Public API functions
-pub fn add_diagnostic(level: DiagnosticLevel, category: DiagnosticCategory, message: String, details: Option<String>) {
+pub fn add_diagnostic(
+    level: DiagnosticLevel,
+    category: DiagnosticCategory,
+    message: String,
+    details: Option<String>,
+) {
     let mut checker = HEALTH_CHECKER.lock();
     checker.add_diagnostic(level, category, message, details);
 }
@@ -448,14 +489,14 @@ pub fn init_diagnostics() {
         DiagnosticLevel::Info,
         DiagnosticCategory::System,
         "Diagnostics system initialized".to_string(),
-        Some("Real-time health monitoring enabled".to_string())
+        Some("Real-time health monitoring enabled".to_string()),
     );
 }
 
 /// Periodic diagnostic check (should be called regularly)
 pub fn periodic_diagnostic_check() {
     let report = perform_health_check();
-    
+
     match report.status {
         SystemHealthStatus::Critical => {
             log::error!("CRITICAL: System health is critical!");
@@ -469,10 +510,13 @@ pub fn periodic_diagnostic_check() {
             log::info!("System health warning detected");
         }
         _ => {
-            log::trace!("System health check completed - status: {:?}", report.status);
+            log::trace!(
+                "System health check completed - status: {:?}",
+                report.status
+            );
         }
     }
-    
+
     // Clean up old diagnostics (keep last 24 hours)
     clear_old_diagnostics(24 * 60 * 60 * 1000);
 }

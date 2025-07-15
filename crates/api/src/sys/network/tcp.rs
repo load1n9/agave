@@ -1,6 +1,6 @@
 /// TCP implementation for Agave OS
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{vec::Vec, collections::BTreeMap};
+use alloc::{collections::BTreeMap, vec::Vec};
 use core::net::SocketAddr;
 
 /// TCP socket state
@@ -65,7 +65,7 @@ impl TcpSocket {
         if self.state != TcpState::Established {
             return Err(AgaveError::InvalidInput);
         }
-        
+
         self.send_buffer.extend_from_slice(data);
         // TODO: Actually send the data
         Ok(data.len())
@@ -79,7 +79,7 @@ impl TcpSocket {
         let bytes_to_read = buffer.len().min(self.recv_buffer.len());
         buffer[..bytes_to_read].copy_from_slice(&self.recv_buffer[..bytes_to_read]);
         self.recv_buffer.drain(..bytes_to_read);
-        
+
         Ok(bytes_to_read)
     }
 
@@ -115,7 +115,7 @@ impl TcpManager {
 
         let socket = TcpSocket::new(local_addr);
         self.sockets.insert(socket_id, socket);
-        
+
         Ok(socket_id)
     }
 

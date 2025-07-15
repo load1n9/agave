@@ -1,7 +1,7 @@
 /// Socket abstraction for network communication
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{vec::Vec, string::String};
-use core::net::{SocketAddr, Ipv4Addr};
+use alloc::{string::String, vec::Vec};
+use core::net::{Ipv4Addr, SocketAddr};
 
 /// Socket types
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -46,7 +46,11 @@ impl SocketManager {
     }
 
     /// Create a new socket
-    pub fn create_socket(&mut self, socket_type: SocketType, local_addr: SocketAddr) -> AgaveResult<u64> {
+    pub fn create_socket(
+        &mut self,
+        socket_type: SocketType,
+        local_addr: SocketAddr,
+    ) -> AgaveResult<u64> {
         let socket_id = self.next_socket_id;
         self.next_socket_id += 1;
 
@@ -83,12 +87,18 @@ impl SocketManager {
     }
 
     /// Get TCP socket
-    pub fn get_tcp_socket(&mut self, socket_id: u64) -> Option<&mut crate::sys::network::tcp::TcpSocket> {
+    pub fn get_tcp_socket(
+        &mut self,
+        socket_id: u64,
+    ) -> Option<&mut crate::sys::network::tcp::TcpSocket> {
         self.tcp_sockets.get_mut(&socket_id)
     }
 
     /// Get UDP socket
-    pub fn get_udp_socket(&mut self, socket_id: u64) -> Option<&mut crate::sys::network::udp::UdpSocket> {
+    pub fn get_udp_socket(
+        &mut self,
+        socket_id: u64,
+    ) -> Option<&mut crate::sys::network::udp::UdpSocket> {
         self.udp_sockets.get_mut(&socket_id)
     }
 

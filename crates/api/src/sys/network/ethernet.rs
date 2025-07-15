@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 #[repr(C, packed)]
 pub struct EthernetFrame {
     pub dst_mac: [u8; 6],
-    pub src_mac: [u8; 6], 
+    pub src_mac: [u8; 6],
     pub ethertype: u16,
 }
 
@@ -43,17 +43,17 @@ impl EthernetFrame {
     /// Convert frame to bytes
     pub fn to_bytes(&self, payload: &[u8]) -> Vec<u8> {
         let mut frame = Vec::with_capacity(Self::HEADER_SIZE + payload.len());
-        
+
         frame.extend_from_slice(&self.dst_mac);
         frame.extend_from_slice(&self.src_mac);
         frame.extend_from_slice(&self.ethertype.to_be_bytes());
         frame.extend_from_slice(payload);
-        
+
         // Pad frame to minimum size if necessary
         while frame.len() < Self::MIN_FRAME_SIZE {
             frame.push(0);
         }
-        
+
         frame
     }
 
@@ -116,9 +116,11 @@ impl MacAddress {
 
 impl core::fmt::Display for MacAddress {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-               self.0[0], self.0[1], self.0[2], 
-               self.0[3], self.0[4], self.0[5])
+        write!(
+            f,
+            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
+        )
     }
 }
 

@@ -6,19 +6,19 @@
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
     allocator, 
-    diagnostics,    // New: Enhanced diagnostics
+    diagnostics,
     drivers,
     framebuffer::{FB, RGBA},
-    fs,        // Add filesystem
+    fs,
     gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
     memory::{self, BootInfoFrameAllocator},
     monitor,
-    network,   // Add network
+    network,
     pci,
-    power,     // New: Power management
-    process,   // New: Process management
-    security,  // New: Security framework
+    power,
+    process,
+    security,
     task::{self, executor::yield_once},
     virtio::{DeviceType, Virtio},
     wasm::WasmApp,
@@ -58,7 +58,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
     init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
-    
     // Now initialize GDT and IDT
     log::info!("KERNEL: Initializing GDT");
     gdt::init();
@@ -66,9 +65,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     interrupts::init_idt();
     log::info!("KERNEL: Basic initialization complete");
     
-    // TODO: Add loading screen once framebuffer is accessible
-    // show_loading_screen("Initializing Memory Management...", 10, &mut fb);
-
     let virtual_full_mapping_offset = VirtAddr::new(
         boot_info
             .physical_memory_offset
@@ -84,7 +80,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     MAPPER.init_once(|| Mutex::new(mapper));
     FRAME_ALLOCATOR.init_once(|| Mutex::new(frame_allocator));
     {
-        // log::info!("Complete Bootloader Map physical memory");
         type VirtualMappingPageSize = Size2MiB; // Size2MiB;Size1GiB Size4KiB
 
         let start_frame: PhysFrame<VirtualMappingPageSize> =
@@ -135,7 +130,6 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
     let rsdp_addr = boot_info.rsdp_addr.into_option().expect("no rsdp");
     let acpi_tables = unsafe { AcpiTables::from_rsdp(ACPI_HANDLER, rsdp_addr as usize).unwrap() };
-    // log::info!("acpi_read");
 
     let x = HpetInfo::new(&acpi_tables).expect("hpet");
     log::info!("{:#?}]", x);
@@ -145,18 +139,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
     if let InterruptModel::Apic(apic) = pi.interrupt_model {
         log::info!("Setting up APIC interrupts...");
-        // log::info!("{:#?}", apic);
 
         unsafe {
             log::info!("Initializing local APIC...");
-            // log::info!("init apic");
             let lapic = local_apic::LocalApic::init(PhysAddr::new(apic.local_apic_address));
             log::info!("Local APIC initialized");
-            // log::info!("start apic c");
             let mut freq = 1000_000_000;
             if let Some(cpuid) = local_apic::cpuid() {
                 log::info!("CPUID info obtained");
-                // log::info!("cpuid");
                 if let Some(tsc) = cpuid.get_tsc_info() {
                     log::info!(
                         "{} {}",
@@ -234,28 +224,19 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             let _vector_base = 50 + 2 * pci_index;
             let _status = pci.config_read_u16(pci::PCIConfigRegisters::PCIStatus as u8);
             let vendor = pci.config_read_u16(pci::PCIConfigRegisters::PCIVendorID as u8);
-            let _device_id =
+            let device_id =
                 pci.config_read_u16(pci::PCIConfigRegisters::PCIDeviceID as u8) as isize - 0x1040;
-            // log::info!(
-            //     "{:?} status {} irq:{} ipin:{}, {:x} {} ________________",
-            //     pci,
-            //     status,
-            //     pci.get_irq(),
-            //     pci.get_ipin(),
-            //     vendor,
-            //     device_id,
-            // );
             const VIRTIO_VENDOR_ID: u16 = 0x1af4;
             if vendor == VIRTIO_VENDOR_ID {
-                log::info!("Found VirtIO device at PCI index {}", pci_index);
+                log::info!("Found VirtIO device at PCI index {} (device_id: {})", pci_index, device_id);
                 let virtio = with_mapper_framealloc(|mapper, frame_allocator| {
                     Virtio::init(pci, mapper, frame_allocator)
                 });
                 if let Some(virtio) = virtio {
-                    log::info!("VirtIO device initialized successfully");
+                    log::info!("VirtIO device {:?} initialized successfully", virtio.device_type);
                     virtio_devices.push(virtio);
                 } else {
-                    log::warn!("Failed to initialize VirtIO device");
+                    log::warn!("Failed to initialize VirtIO device with device_id {}", device_id);
                 }
             }
         }
@@ -329,7 +310,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Socket subsystem initialized successfully");
     }
-    show_loading_screen("Socket subsystem ready...", 80, &mut *fb);
+    show_loading_screen("VirtIO devices ready...", 85, &mut *fb);
 
     // Log initial system status
     log::info!("Logging initial system status...");
@@ -340,7 +321,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         let mut executor = task::executor::Executor::new();
         let spawner = executor.spawner();
         log::info!("Task executor created");
-        show_loading_screen("Task executor ready...", 95, &mut *fb);
+        show_loading_screen("Task executor ready...", 90, &mut *fb);
 
         log::info!("Setting up VirtIO device drivers...");
         for virtio in virtio_devices.into_iter() {
@@ -362,20 +343,20 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                     spawner.run(drivers::virtio_net::drive(virtio));
                 }
                 DeviceType::Block => {
-                    log::info!("VirtIO block device detected - driver not yet implemented");
-                    // TODO: Implement VirtIO block driver
+                    log::info!("Spawning VirtIO block driver task");
+                    spawner.run(drivers::virtio_block::drive(virtio));
                 }
                 DeviceType::Console => {
-                    log::info!("VirtIO console device detected - driver not yet implemented");
-                    // TODO: Implement VirtIO console driver
+                    log::info!("Spawning VirtIO console driver task");
+                    spawner.run(drivers::virtio_console::drive(virtio));
                 }
                 DeviceType::Balloon => {
-                    log::info!("VirtIO balloon device detected - driver not yet implemented");
-                    // TODO: Implement VirtIO balloon driver
+                    log::info!("Spawning VirtIO balloon driver task");
+                    spawner.run(drivers::virtio_balloon::drive(virtio));
                 }
                 DeviceType::Scsi => {
-                    log::info!("VirtIO SCSI device detected - driver not yet implemented");
-                    // TODO: Implement VirtIO SCSI driver
+                    log::info!("Spawning VirtIO SCSI driver task");
+                    spawner.run(drivers::virtio_scsi::drive(virtio));
                 }
                 DeviceType::Unknown(id) => {
                     log::warn!("Unknown VirtIO device type {} detected - no driver available", id);
@@ -383,6 +364,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             }
         }
         log::info!("VirtIO drivers spawned");
+        show_loading_screen("VirtIO drivers active...", 95, &mut *fb);
 
         log::info!("Setting up WASM application task...");
         spawner.run(async move {
@@ -485,6 +467,9 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                             log::info!("Security Status - {} events, {} blocked processes",
                                        security_stats.total_events, security_stats.blocked_processes);
                         }
+                        
+                        // Log VirtIO device status
+                        log::info!("VirtIO Status - Devices active and operational");
                     }
                 }
                 

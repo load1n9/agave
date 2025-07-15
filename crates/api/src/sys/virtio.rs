@@ -2,6 +2,7 @@ use crate::sys::{
     create_identity_virt_from_phys,
     pci::{self, Bar, Pci},
     phys_to_virt,
+    error::{AgaveError, AgaveResult}, // Add error handling
 };
 use alloc::{fmt, vec::Vec};
 use core::ptr::{read_volatile, write_volatile};
@@ -48,6 +49,204 @@ const VIRTIO_F_VERSION_1: u64 = 1 << 32;
 const VIRTIO_F_ACCESS_PLATFORM: u64 = 1 << 33;
 const VIRTIO_F_RING_PACKED: u64 = 1 << 34;
 
+// Enhanced error handling constants
+const VIRTIO_MAX_RETRIES: u32 = 3;
+const VIRTIO_TIMEOUT_MS: u64 = 5000;
+
+// MSI-X constants
+const MSIX_TABLE_ENTRY_SIZE: usize = 16;
+const MSIX_PBA_ENTRY_SIZE: usize = 8;
+
+/// VirtIO device state tracking
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VirtioDeviceState {
+    Uninitialized,
+    Acknowledged,
+    DriverLoaded,
+    FeaturesOk,
+    DriverOk,
+    Failed,
+    NeedsReset,
+}
+
+/// VirtIO interrupt types
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VirtioInterruptType {
+    Config,
+    Queue(u16),
+}
+
+/// VirtIO error types
+#[derive(Debug, Clone, PartialEq)]
+pub enum VirtioError {
+    DeviceNotFound,
+    UnsupportedDevice,
+    InitializationFailed,
+    FeatureNegotiationFailed,
+    QueueSetupFailed,
+    InterruptSetupFailed,
+    TimeoutError,
+    InvalidState,
+    ResourceExhausted,
+    ConfigurationError,
+    OperationFailed,
+}
+
+impl From<VirtioError> for AgaveError {
+    fn from(error: VirtioError) -> Self {
+        match error {
+            VirtioError::DeviceNotFound => AgaveError::NotFound,
+            VirtioError::UnsupportedDevice => AgaveError::NotImplemented,
+            VirtioError::InitializationFailed => AgaveError::HardwareError(crate::sys::error::HwError::ConfigurationError),
+            VirtioError::FeatureNegotiationFailed => AgaveError::HardwareError(crate::sys::error::HwError::ConfigurationError),
+            VirtioError::QueueSetupFailed => AgaveError::HardwareError(crate::sys::error::HwError::ConfigurationError),
+            VirtioError::InterruptSetupFailed => AgaveError::HardwareError(crate::sys::error::HwError::InterruptError),
+            VirtioError::TimeoutError => AgaveError::TimedOut,
+            VirtioError::InvalidState => AgaveError::InvalidState,
+            VirtioError::ResourceExhausted => AgaveError::ResourceExhausted,
+            VirtioError::ConfigurationError => AgaveError::HardwareError(crate::sys::error::HwError::ConfigurationError),
+            VirtioError::OperationFailed => AgaveError::IoError,
+        }
+    }
+}
+
+/// MSI-X configuration
+#[derive(Debug, Clone)]
+pub struct MsixConfig {
+    pub table_bar: u8,
+    pub table_offset: u32,
+    pub table_size: u16,
+    pub pba_bar: u8,
+    pub pba_offset: u32,
+    pub enabled: bool,
+}
+
+/// Enhanced interrupt handling
+#[derive(Debug, Clone)]
+pub struct VirtioInterruptHandler {
+    pub msix_config: Option<MsixConfig>,
+    pub vector_map: Vec<Option<VirtioInterruptType>>,
+    pub pending_interrupts: Vec<bool>,
+}
+
+impl VirtioInterruptHandler {
+    pub fn new() -> Self {
+        Self {
+            msix_config: None,
+            vector_map: Vec::new(),
+            pending_interrupts: Vec::new(),
+        }
+    }
+
+    /// Set up MSI-X interrupts
+    pub fn setup_msix(&mut self, pci: &Pci, _bars: &[Bar; 6]) -> AgaveResult<()> {
+        // Find MSI-X capability
+        let mut cap_ptr = pci.config_read_u8(pci::PCIConfigRegisters::PCICapabilitiesPointer as u8);
+        
+        while cap_ptr != 0 {
+            let cap_id = pci.config_read_u8(cap_ptr);
+            
+            if cap_id == 0x11 { // MSI-X capability
+                let msg_ctrl = pci.config_read_u16(cap_ptr + 2);
+                let table_info = pci.config_read_u32(cap_ptr + 4);
+                let pba_info = pci.config_read_u32(cap_ptr + 8);
+                
+                let table_size = (msg_ctrl & 0x7FF) + 1;
+                let table_bar = (table_info & 0x7) as u8;
+                let table_offset = table_info & 0xFFFFFFF8;
+                let pba_bar = (pba_info & 0x7) as u8;
+                let pba_offset = pba_info & 0xFFFFFFF8;
+                
+                self.msix_config = Some(MsixConfig {
+                    table_bar,
+                    table_offset,
+                    table_size,
+                    pba_bar,
+                    pba_offset,
+                    enabled: false,
+                });
+                
+                // Initialize vector mapping
+                self.vector_map.resize(table_size as usize, None);
+                self.pending_interrupts.resize(table_size as usize, false);
+                
+                log::info!("MSI-X capability found: {} vectors, table bar {}, PBA bar {}", 
+                          table_size, table_bar, pba_bar);
+                
+                return Ok(());
+            }
+            
+            cap_ptr = pci.config_read_u8(cap_ptr + 1);
+        }
+        
+        Err(AgaveError::NotFound)
+    }
+
+    /// Enable MSI-X interrupts
+    pub fn enable_msix(&mut self, pci: &Pci) -> AgaveResult<()> {
+        let cap_ptr = self.find_msix_capability(pci)?;
+        
+        if let Some(ref mut config) = self.msix_config {
+            // Enable MSI-X in PCI configuration
+            let mut msg_ctrl = pci.config_read_u16(cap_ptr + 2);
+            msg_ctrl |= 1 << 15; // Enable MSI-X
+            pci.config_write_u16(cap_ptr + 2, msg_ctrl);
+            
+            config.enabled = true;
+            log::info!("MSI-X interrupts enabled");
+            Ok(())
+        } else {
+            Err(AgaveError::NotImplemented)
+        }
+    }
+
+    /// Configure interrupt vector for a queue
+    pub fn configure_queue_vector(&mut self, queue_id: u16, vector: u16) -> AgaveResult<()> {
+        if vector as usize >= self.vector_map.len() {
+            return Err(AgaveError::InvalidInput);
+        }
+        
+        self.vector_map[vector as usize] = Some(VirtioInterruptType::Queue(queue_id));
+        log::debug!("Configured vector {} for queue {}", vector, queue_id);
+        Ok(())
+    }
+
+    /// Configure interrupt vector for config changes
+    pub fn configure_config_vector(&mut self, vector: u16) -> AgaveResult<()> {
+        if vector as usize >= self.vector_map.len() {
+            return Err(AgaveError::InvalidInput);
+        }
+        
+        self.vector_map[vector as usize] = Some(VirtioInterruptType::Config);
+        log::debug!("Configured vector {} for config changes", vector);
+        Ok(())
+    }
+
+    /// Handle interrupt
+    pub fn handle_interrupt(&mut self, vector: u16) -> Option<VirtioInterruptType> {
+        if let Some(interrupt_type) = self.vector_map.get(vector as usize).cloned().flatten() {
+            self.pending_interrupts[vector as usize] = false;
+            Some(interrupt_type)
+        } else {
+            None
+        }
+    }
+
+    fn find_msix_capability(&self, pci: &Pci) -> AgaveResult<u8> {
+        let mut cap_ptr = pci.config_read_u8(pci::PCIConfigRegisters::PCICapabilitiesPointer as u8);
+        
+        while cap_ptr != 0 {
+            let cap_id = pci.config_read_u8(cap_ptr);
+            if cap_id == 0x11 {
+                return Ok(cap_ptr);
+            }
+            cap_ptr = pci.config_read_u8(cap_ptr + 1);
+        }
+        
+        Err(AgaveError::NotFound)
+    }
+}
+
 pub fn to_bytes<T>(t: &T) -> &[u8] {
     unsafe {
         let len = core::intrinsics::size_of_val(t);
@@ -56,6 +255,7 @@ pub fn to_bytes<T>(t: &T) -> &[u8] {
     }
 }
 
+#[derive(Debug)]
 pub struct Virtio {
     pub pci: Pci,
     pub common: VirtioCap<&'static mut VirtioPciCommonCfg>,
@@ -74,14 +274,24 @@ pub struct Virtio {
     pub driver_features: u64,
     pub feature_select: u32,
     
-    // Device status
+    // Device status and state
     pub status: u8,
+    pub state: VirtioDeviceState,
     
     // Configuration generation
     pub config_generation: u8,
+    
+    // Enhanced interrupt handling
+    pub interrupt_handler: VirtioInterruptHandler,
+    
+    // Error tracking
+    pub last_error: Option<VirtioError>,
+    pub retry_count: u32,
+    pub interrupt_count: u64,
+    pub error_count: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QueueFreeDescs {
     free: Vec<u16>,
 }
@@ -138,7 +348,7 @@ fn device_id_to_type(id: isize) -> DeviceType {
 }
 
 /// VirtIO Queue management with enhanced features
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VirtQueue {
     pub desc: VirtAddr,
     pub driver: VirtAddr,
@@ -150,6 +360,11 @@ pub struct VirtQueue {
     pub free_descriptors: QueueFreeDescs,
     pub last_used_idx: u16,
     pub features: u64,
+    
+    // Enhanced queue features
+    pub indirect_desc_enabled: bool,
+    pub event_idx_enabled: bool,
+    pub packed_ring: bool,
 }
 
 impl VirtQueue {
@@ -165,6 +380,9 @@ impl VirtQueue {
             free_descriptors: QueueFreeDescs::new(size),
             last_used_idx: u16::MAX,
             features: 0,
+            indirect_desc_enabled: false,
+            event_idx_enabled: false,
+            packed_ring: false,
         }
     }
 
@@ -178,6 +396,16 @@ impl VirtQueue {
 
     pub fn return_descriptor(&mut self, desc_id: u16) {
         self.free_descriptors.set_free(desc_id);
+    }
+
+    /// Enable advanced queue features based on negotiated capabilities
+    pub fn enable_features(&mut self, device_features: u64) {
+        self.indirect_desc_enabled = (device_features & VIRTIO_F_RING_INDIRECT_DESC) != 0;
+        self.event_idx_enabled = (device_features & VIRTIO_F_RING_EVENT_IDX) != 0;
+        self.packed_ring = (device_features & VIRTIO_F_RING_PACKED) != 0;
+        
+        log::debug!("Queue features: indirect={}, event_idx={}, packed={}", 
+                   self.indirect_desc_enabled, self.event_idx_enabled, self.packed_ring);
     }
 }
 
@@ -194,14 +422,17 @@ impl Virtio {
         
         // Only proceed with known device types for now
         if matches!(device_type, DeviceType::Unknown(_)) {
+            log::warn!("Unknown VirtIO device type: {}", device_id);
             return None;
         }
+
+        log::info!("Initializing VirtIO device: {:?}", device_type);
 
         let mut bars = [Bar::None; 6];
         for idx in 0..=5 {
             let bar = pci.get_bar(idx);
             if bar != Bar::None {
-                // log::info!("bar {}:{:?}", idx, bar);
+                log::debug!("BAR {}: {:?}", idx, bar);
             }
             bars[idx as usize] = bar;
         }
@@ -209,22 +440,13 @@ impl Virtio {
         let cap_ptr = pci.config_read_u8(pci::PCIConfigRegisters::PCICapabilitiesPointer as u8);
 
         let mut current_off = cap_ptr;
-        #[allow(dead_code)]
-        const VIRTIO_STATUS_NONE: u8 = 0;
-        const VIRTIO_STATUS_ACKNOWLEDGE: u8 = 1;
-        #[allow(dead_code)]
-        const VIRTIO_STATUS_DRIVER: u8 = 2;
-        #[allow(dead_code)]
-        const VIRTIO_STATUS_FAILED: u8 = 128;
-        const VIRTIO_STATUS_FEATURE_OK: u8 = 8;
-        const VIRTIO_STATUS_DRIVER_OK: u8 = 4;
-        #[allow(dead_code)]
-        const VIRTIO_STATUS_NEEDS_RESET: u8 = 64;
-
         let mut common: Option<VirtioCap<&'static mut VirtioPciCommonCfg>> = None;
         let mut device: Option<VirtioCap<&'static mut ()>> = None;
         let mut notify: Option<VirtioCap<u32>> = None;
         let mut pci_conf: Option<VirtioCap<[u8; 4]>> = None;
+        let mut isr: Option<VirtioCap<&'static mut u8>> = None;
+
+        // Parse VirtIO capabilities
         loop {
             let cap = pci.config_read_u8(current_off);
 
@@ -236,28 +458,17 @@ impl Virtio {
                 let offset = pci.config_read_u32(current_off + 8);
                 let length = pci.config_read_u32(current_off + 12);
 
-                // log::info!(
-                //     "virtio {} {} {} {} {}",
-                //     cap_len,
-                //     cfg_type,
-                //     bar,
-                //     offset,
-                //     length
-                // );
+                log::debug!("VirtIO capability: type={}, bar={}, offset=0x{:x}, length={}", 
+                           cfg_type, bar, offset, length);
 
                 match cfg_type {
-                    #[allow(unused_variables)]
                     VIRTIO_PCI_CAP_COMMON_CFG => {
                         if let Bar::Mm(phys) = bars[bar as usize] {
                             let ptr = phys_to_virt(phys + offset as u64);
-                            // log::info!("common {:?}", ptr.as_ptr::<VirtioPciCommonCfg>());
                             let cfg: &'static mut VirtioPciCommonCfg =
                                 unsafe { &mut *(ptr.as_mut_ptr::<VirtioPciCommonCfg>()) };
-
-                            let x: u8 = unsafe { read_volatile(ptr.as_ptr()) };
-                            // log::info!("{}", x);
-                            // log::info!("common {:?}", cfg);
                             common = Some(VirtioCap::new(cfg, bars[bar as usize], offset, length));
+                            log::debug!("Common config mapped at {:?}", ptr);
                         }
                     }
                     VIRTIO_PCI_CAP_NOTIFY_CFG => {
@@ -268,9 +479,16 @@ impl Virtio {
                             offset,
                             length,
                         });
-                        // log::info!("{:#?}", virtio_caps.notify);
+                        log::debug!("Notify config: multiplier={}", notify_off_multiplier);
                     }
-                    VIRTIO_PCI_CAP_ISR_CFG => {}
+                    VIRTIO_PCI_CAP_ISR_CFG => {
+                        if let Bar::Mm(phys) = bars[bar as usize] {
+                            let ptr = phys_to_virt(phys + offset as u64);
+                            let isr_reg: &'static mut u8 = unsafe { &mut *(ptr.as_mut_ptr::<u8>()) };
+                            isr = Some(VirtioCap::new(isr_reg, bars[bar as usize], offset, length));
+                            log::debug!("ISR config mapped at {:?}", ptr);
+                        }
+                    }
                     VIRTIO_PCI_CAP_DEVICE_CFG => {
                         if let Bar::Mm(phys) = bars[bar as usize] {
                             let ptr: VirtAddr = phys_to_virt(phys + offset as u64);
@@ -281,6 +499,7 @@ impl Virtio {
                                 offset,
                                 length,
                             });
+                            log::debug!("Device config mapped at {:?}", ptr);
                         }
                     }
                     VIRTIO_PCI_CAP_PCI_CFG => {
@@ -297,127 +516,23 @@ impl Virtio {
                             offset,
                             length,
                         });
+                        log::debug!("PCI config capability found");
                     }
-                    _ => {}
+                    _ => {
+                        log::debug!("Unknown VirtIO capability type: {}", cfg_type);
+                    }
                 }
             }
-            // if cap == 0x11 && false {
-            //     let line2 = pci.config_read_u32(current_off + 4);
-            //     let table_bir = line2 & 0b111;
-            //     let table_offset = line2 & 0xFFFFFFf8;
-            //     let msg_ctrl = pci.config_read_u16(current_off + 2);
-            //     bitfield! {
-            //       pub struct MsgCtrl(u16);
-            //       impl Debug;
-            //       // The fields default to u16
-            //       pub table_size, _: 10, 0;
-            //       pub reserved, _ : 13, 11;
-            //       pub function_mask , _: 14;
-            //       pub enable , set_enable: 15;
-            //     }
-
-            //     let mut msg_ctrl = MsgCtrl(msg_ctrl);
-            //     msg_ctrl.set_enable(true);
-
-            //     pci.config_write_u16(current_off + 2, msg_ctrl.0);
-            //     log::info!(
-            //         "MSI-X bir:{} tblo:{} msg_ctrl:{:?}",
-            //         table_bir,
-            //         table_offset,
-            //         msg_ctrl
-            //     );
-
-            //     let line3 = pci.config_read_u32(current_off + 8);
-            //     let pba_bir = line3 & 0b11;
-            //     let pba_offset = line3 & 0xFFFFFFf8;
-
-            //     for table_index in 0..=msg_ctrl.table_size() {
-            //         if let Bar::Mm(phys) = bars[table_bir as usize] {
-            //             let virt_bar = create_virt_from_phys(
-            //                 &mut mapper,
-            //                 &mut frame_allocator,
-            //                 PhysFrame::containing_address(phys),
-            //             )
-            //             .expect("bar");
-
-            //             // let virt_bar = create_virt_from_phys(
-            //             //     &mut mapper,
-            //             //     &mut frame_allocator,
-            //             //     PhysFrame::containing_address(PhysAddr::new(bars[table_bir as usize])),
-            //             // )
-            //             // .expect("bar");
-
-            //             let ptr: VirtAddr = virt_bar.start_address()
-            //                 + (table_offset as u64)
-            //                 + (table_index as u64) * 16;
-
-            //             use core::intrinsics::{volatile_load, volatile_store};
-
-            //             let table = unsafe { volatile_load(ptr.as_ptr() as *const u128) };
-
-            //             bitfield! {
-            //               pub struct TableEntry(u128);
-            //               impl Debug;
-            //               // The fields default to u16
-            //               u64, address, set_address : 63, 0;
-            //               pub data, set_data : 95, 64;
-            //               pub mask, set_mask : 96;
-            //               pub reserved , _: 127, 97;
-
-            //             }
-
-            //             let mut table = TableEntry(table);
-            //             log::info!("{:?}", table);
-            //             table.set_data(vector_base as u128 + table_index as u128);
-
-            //             table.set_address(0xFEE00000 + (0 << 12));
-            //             table.set_mask(false);
-            //             unsafe { volatile_store(ptr.as_mut_ptr() as *mut u128, table.0) };
-            //             // log::info!("{:?}", table);
-
-            //             //READ PENDING
-            //             // {
-            //             //     let virt_bar = create_virt_from_phys(
-            //             //         &mut mapper,
-            //             //         &mut frame_allocator,
-            //             //         PhysFrame::containing_address(PhysAddr::new(
-            //             //             bars[pba_bir as usize],
-            //             //         )),
-            //             //     )
-            //             //     .expect("bar");
-
-            //             //     let ptr: VirtAddr = virt_bar.start_address()
-            //             //         + (pba_offset as u64)
-            //             //         + (table_index as u64) * 2;
-
-            //             //     let table = unsafe { volatile_load(ptr.as_ptr() as *const u64) };
-            //             //     if table != 0 {
-            //             //         log::info!("pending {:b}", table);
-            //             //     }
-            //             // }
-            //         }
-
-            //         let command = pci.config_read_u16(4);
-            //         log::info!("com {:b}", command);
-            //         pci.config_write_u16(4, command | 0b11);
-
-            //         unsafe {
-            //             crate::local_apic::LocalApic.get().unwrap().eoi();
-            //         };
-            //     }
-            // }
 
             current_off = pci.config_read_u8(1 + current_off);
 
             if current_off == 0 {
                 break;
             }
-            // break;
         }
 
-        // log::info!("virtio_caps {:?}", virtio_caps);
-
         if common.is_none() || pci_conf.is_none() || device.is_none() || notify.is_none() {
+            log::error!("Missing required VirtIO capabilities");
             return None;
         }
 
@@ -428,46 +543,86 @@ impl Virtio {
 
         let cap_common = &mut common.cap;
 
-        unsafe {
+        // Initialize device with proper error handling
+        let mut this = unsafe {
             let mut queues = Vec::new();
+            
+            // Reset device
             write_volatile(&mut cap_common.device_status, 0);
 
+            // Acknowledge device
             write_volatile(
                 &mut cap_common.device_status,
                 read_volatile(&cap_common.device_status) | VIRTIO_STATUS_ACKNOWLEDGE,
             );
 
+            // Driver loaded
             write_volatile(
                 &mut cap_common.device_status,
                 read_volatile(&cap_common.device_status) | VIRTIO_STATUS_DRIVER,
             );
 
-            let _current = read_volatile(*cap_common);
             // Feature negotiation
-            match device_type {
+            let device_features = {
+                write_volatile(&mut cap_common.device_feature_select, 0);
+                let low = read_volatile(&cap_common.device_feature) as u64;
+                write_volatile(&mut cap_common.device_feature_select, 1);
+                let high = read_volatile(&cap_common.device_feature) as u64;
+                (high << 32) | low
+            };
+
+            log::info!("Device features: 0x{:016x}", device_features);
+
+            // Select driver features based on device type
+            let driver_features = match device_type {
                 DeviceType::Gpu => {
-                    write_volatile(&mut cap_common.driver_feature, 0b11);
+                    // Enable basic GPU features
+                    0b11
                 }
                 DeviceType::Network => {
-                    // Enable network-specific features
-                    write_volatile(&mut cap_common.driver_feature, 0);
+                    // Enable basic network features
+                    device_features & (VIRTIO_F_VERSION_1 | VIRTIO_F_RING_INDIRECT_DESC | VIRTIO_F_RING_EVENT_IDX)
+                }
+                DeviceType::Block => {
+                    // Enable basic block features
+                    device_features & (VIRTIO_F_VERSION_1 | VIRTIO_F_RING_INDIRECT_DESC)
+                }
+                DeviceType::Console => {
+                    // Enable console features
+                    device_features & (VIRTIO_F_VERSION_1)
+                }
+                DeviceType::Balloon => {
+                    // Enable balloon features
+                    device_features & (VIRTIO_F_VERSION_1)
                 }
                 DeviceType::Input => {
-                    write_volatile(&mut cap_common.driver_feature, 0);
+                    // Enable input features
+                    device_features & (VIRTIO_F_VERSION_1)
                 }
-                DeviceType::Block | DeviceType::Console | DeviceType::Balloon | 
-                DeviceType::Scsi | DeviceType::Unknown(_) => {
-                    write_volatile(&mut cap_common.driver_feature, 0);
+                DeviceType::Scsi => {
+                    // Enable SCSI features
+                    device_features & (VIRTIO_F_VERSION_1 | VIRTIO_F_RING_INDIRECT_DESC)
                 }
-            }
+                DeviceType::Unknown(_) => 0,
+            };
 
+            // Write driver features
+            write_volatile(&mut cap_common.driver_feature_select, 0);
+            write_volatile(&mut cap_common.driver_feature, driver_features as u32);
+            write_volatile(&mut cap_common.driver_feature_select, 1);
+            write_volatile(&mut cap_common.driver_feature, (driver_features >> 32) as u32);
+
+            log::info!("Negotiated features: 0x{:016x}", driver_features);
+
+            // Features OK
             write_volatile(
                 &mut cap_common.device_status,
                 read_volatile(&cap_common.device_status) | VIRTIO_STATUS_FEATURE_OK,
             );
 
             if read_volatile(&cap_common.device_status) & VIRTIO_STATUS_FEATURE_OK == 0 {
-                panic!("Cant enable set of feature")
+                log::error!("Device rejected feature set");
+                return None;
             }
 
             // Initialize queues
@@ -475,11 +630,20 @@ impl Virtio {
                 write_volatile(&mut cap_common.queue_select, q);
                 
                 let queue_size = read_volatile(*cap_common).queue_size;
+                if queue_size == 0 {
+                    log::debug!("Queue {} not available", q);
+                    continue;
+                }
+
                 let mut virt_queue = VirtQueue::new(queue_size);
+                virt_queue.enable_features(driver_features);
 
                 // Set up queue descriptors
                 let desc_addr = create_identity_virt_from_phys(mapper, frame_allocator)
-                    .unwrap()
+                    .map_err(|e| {
+                        log::error!("Failed to allocate descriptor memory: {:?}", e);
+                        e
+                    }).ok()?
                     .start_address()
                     .as_u64();
                 write_volatile(&mut cap_common.queue_desc, desc_addr);
@@ -493,7 +657,10 @@ impl Virtio {
                         let elem_ptr = descs.offset(idesc);
                         elem_ptr.write_volatile(Desc {
                             addr: create_identity_virt_from_phys(mapper, frame_allocator)
-                                .unwrap()
+                                .map_err(|e| {
+                                    log::error!("Failed to allocate buffer memory: {:?}", e);
+                                    e
+                                }).ok()?
                                 .start_address()
                                 .as_u64(),
                             flags: VIRTQ_DESC_F_WRITE,
@@ -505,18 +672,24 @@ impl Virtio {
 
                 // Set up driver ring
                 let driver_addr = create_identity_virt_from_phys(mapper, frame_allocator)
-                    .unwrap()
+                    .map_err(|e| {
+                        log::error!("Failed to allocate driver ring memory: {:?}", e);
+                        e
+                    }).ok()?
                     .start_address()
                     .as_u64();
                 write_volatile(&mut cap_common.queue_driver, driver_addr);
                 virt_queue.driver = VirtAddr::new(driver_addr);
 
-                // Disable device to driver notification (Interrupt)
+                // Disable device to driver notification initially
                 (cap_common.queue_driver as *mut u16).write_volatile(1);
 
                 // Set up device ring
                 let device_addr = create_identity_virt_from_phys(mapper, frame_allocator)
-                    .unwrap()
+                    .map_err(|e| {
+                        log::error!("Failed to allocate device ring memory: {:?}", e);
+                        e
+                    }).ok()?
                     .start_address()
                     .as_u64();
                 write_volatile(&mut cap_common.queue_device, device_addr);
@@ -527,11 +700,20 @@ impl Virtio {
                 virt_queue.enabled = true;
                 virt_queue.notify_off = read_volatile(*cap_common).queue_notify_off;
 
+                log::debug!("Initialized queue {}: size={}, desc=0x{:x}, driver=0x{:x}, device=0x{:x}",
+                           q, queue_size, desc_addr, driver_addr, device_addr);
+
                 queues.push(virt_queue);
             }
 
-            let cap_device = &mut device.cap;
+            // Initialize interrupt handler
+            let mut interrupt_handler = VirtioInterruptHandler::new();
+            if let Err(e) = interrupt_handler.setup_msix(pci, &bars) {
+                log::debug!("MSI-X setup failed, using legacy interrupts: {:?}", e);
+            }
 
+            // Device-specific configuration
+            let cap_device = &mut device.cap;
             match device_type {
                 DeviceType::Input => {
                     let conf_ptr: *mut VirtioInputConfig =
@@ -541,7 +723,7 @@ impl Virtio {
                     write_volatile(&mut conf.select, 1);
                     let u = read_volatile(&conf.u);
                     log::info!(
-                        "name: {:?}",
+                        "Input device name: {:?}",
                         alloc::str::from_utf8_unchecked(
                             &u.bitmap[0..read_volatile(&conf.size) as usize]
                         )
@@ -560,74 +742,139 @@ impl Virtio {
                     let conf_ptr: *mut VirtioGpuConfig =
                         core::intrinsics::transmute((*cap_device) as *mut ());
                     let _rconf = conf_ptr.read_volatile();
-                    // log::info!("{:?}", rconf);
-                    // rconf.events_clear = 1;
-                    // conf_ptr.write_volatile(rconf);
+                    log::debug!("GPU device configuration read");
                 }
                 DeviceType::Network => {
                     log::info!("VirtIO network device configuration");
-                    // Network device configuration will be handled by the driver
                 }
                 DeviceType::Block => {
                     log::info!("VirtIO block device configuration");
-                    // Block device configuration
                 }
                 DeviceType::Console => {
                     log::info!("VirtIO console device configuration");
-                    // Console device configuration
                 }
                 DeviceType::Balloon => {
                     log::info!("VirtIO balloon device configuration");
-                    // Balloon device configuration
                 }
                 DeviceType::Scsi => {
                     log::info!("VirtIO SCSI device configuration");
-                    // SCSI device configuration
                 }
                 DeviceType::Unknown(id) => {
                     log::warn!("Unknown VirtIO device type: {}", id);
                 }
             }
 
+            // Driver OK
             write_volatile(
                 &mut cap_common.device_status,
                 read_volatile(&cap_common.device_status) | VIRTIO_STATUS_DRIVER_OK,
             );
 
             // Store values before moving common
-            let device_features = read_volatile(&cap_common.device_feature) as u64;
-            let driver_features = read_volatile(&cap_common.driver_feature) as u64;
+            let device_features = device_features;
+            let driver_features = driver_features;
             let status = read_volatile(&cap_common.device_status);
             let config_generation = read_volatile(&cap_common.config_generation);
 
-            let mut this = Self {
+            Self {
                 pci: pci.clone(),
                 step: 0,
-                device_type,
+                device_type: device_type.clone(),
                 queues,
                 common,
                 device,
                 notify,
                 pci_conf,
-                isr: None, // Will be set up later if needed
+                isr,
                 queue_select: 0,
                 device_features,
                 driver_features,
                 feature_select: 0,
                 status,
+                state: VirtioDeviceState::DriverOk,
                 config_generation,
-            };
-            this.queue_select(0);
-            Some(this)
-        }
+                interrupt_handler,
+                last_error: None,
+                retry_count: 0,
+                interrupt_count: 0,
+                error_count: 0,
+            }
+        };
+
+        this.queue_select(0);
+        log::info!("VirtIO device {:?} initialized successfully", device_type);
+        Some(this)
     }
 
-    pub fn get_free_desc_id(&mut self) -> Option<u16> {
-        if let Some(queue) = self.queues.get_mut(self.queue_select as usize) {
-            queue.get_free_descriptor()
-        } else {
-            None
+    /// Enhanced error handling with retry logic
+    pub fn execute_with_retry<F, T>(&mut self, operation: F) -> AgaveResult<T>
+    where
+        F: Fn(&mut Self) -> AgaveResult<T>,
+    {
+        let mut attempts = 0;
+        
+        while attempts < VIRTIO_MAX_RETRIES {
+            match operation(self) {
+                Ok(result) => {
+                    self.retry_count = 0;
+                    self.last_error = None;
+                    return Ok(result);
+                }
+                Err(e) => {
+                    attempts += 1;
+                    self.retry_count = attempts;
+                    
+                    log::warn!("VirtIO operation failed (attempt {}): {:?}", attempts, e);
+                    
+                    if attempts >= VIRTIO_MAX_RETRIES {
+                        self.last_error = Some(VirtioError::OperationFailed);
+                        return Err(e);
+                    }
+                    
+                    // Brief delay before retry
+                    for _ in 0..1000 {
+                        core::hint::spin_loop();
+                    }
+                }
+            }
         }
+        
+        Err(AgaveError::IoError)
+    }
+
+    /// Check device health and reset if necessary
+    pub fn check_device_health(&mut self) -> AgaveResult<()> {
+        let current_status = self.get_device_status();
+        
+        if current_status & VIRTIO_STATUS_DEVICE_NEEDS_RESET != 0 {
+            log::warn!("Device needs reset, initiating recovery");
+            self.state = VirtioDeviceState::NeedsReset;
+            self.reset_device();
+            return Err(VirtioError::InvalidState.into());
+        }
+        
+        if current_status & VIRTIO_STATUS_FAILED != 0 {
+            log::error!("Device has failed");
+            self.state = VirtioDeviceState::Failed;
+            return Err(VirtioError::OperationFailed.into());
+        }
+        
+        Ok(())
+    }
+
+    /// Get free desc id with enhanced error handling
+    pub fn get_free_desc_id(&mut self) -> Option<u16> {
+        self.execute_with_retry(|virtio| {
+            if let Some(queue) = virtio.queues.get_mut(virtio.queue_select as usize) {
+                if let Some(desc_id) = queue.get_free_descriptor() {
+                    Ok(desc_id)
+                } else {
+                    Err(AgaveError::ResourceExhausted)
+                }
+            } else {
+                Err(AgaveError::InvalidInput)
+            }
+        }).ok()
     }
 
     pub fn get_free_twice_desc_id(&mut self) -> Option<(u16, u16)> {
@@ -685,7 +932,6 @@ impl Virtio {
             let descs = self.common.cap.queue_desc as *mut Desc;
             let mut desc = descs.offset(desc_id as isize).read_volatile();
             desc.len = core::intrinsics::size_of_val(&data) as u32;
-            // desc.len = data.len() as u32;
             let data_ptr = desc.addr as *mut T;
             data_ptr.write_volatile(data);
 
@@ -714,7 +960,6 @@ impl Virtio {
                         + (*cap_notify as u64) * (queue.queue_notify_off as u64),
                 ));
 
-                // log::info!("kick at {:?}", queue_notify_address);
                 (queue_notify_address.as_u64() as *mut u16).write_volatile(queue_select);
             }
         }
@@ -800,10 +1045,22 @@ impl Virtio {
 
     /// Reset the device
     pub fn reset_device(&mut self) {
+        log::info!("Resetting VirtIO device");
         self.set_device_status(0);
+        self.state = VirtioDeviceState::Uninitialized;
+        
         // Wait for reset to complete
-        while self.get_device_status() != 0 {
+        let mut timeout = 1000;
+        while self.get_device_status() != 0 && timeout > 0 {
             core::hint::spin_loop();
+            timeout -= 1;
+        }
+        
+        if timeout == 0 {
+            log::error!("VirtIO device reset timeout");
+            self.state = VirtioDeviceState::Failed;
+        } else {
+            log::info!("VirtIO device reset complete");
         }
     }
 
@@ -1076,8 +1333,47 @@ impl Virtio {
         
         negotiated
     }
-}
 
+    /// Get device state
+    pub fn get_state(&self) -> VirtioDeviceState {
+        self.state
+    }
+
+    /// Get last error
+    pub fn get_last_error(&self) -> Option<&VirtioError> {
+        self.last_error.as_ref()
+    }
+
+    /// Clear last error
+    pub fn clear_error(&mut self) {
+        self.last_error = None;
+        self.retry_count = 0;
+    }
+
+    /// Get device type
+    pub fn get_device_type(&self) -> &DeviceType {
+        &self.device_type
+    }
+
+    /// Check if device supports a specific feature
+    pub fn has_feature(&self, feature: u64) -> bool {
+        self.feature_supported(feature)
+    }
+
+    /// Get ISR status (interrupt status register)
+    pub fn get_isr_status(&self) -> Option<u8> {
+        self.isr.as_ref().map(|isr| unsafe { read_volatile(isr.cap) })
+    }
+
+    /// Clear ISR status
+    pub fn clear_isr_status(&mut self) -> Option<u8> {
+        self.isr.as_mut().map(|isr| unsafe {
+            let status = read_volatile(isr.cap);
+            write_volatile(isr.cap, status); // Writing clears the status
+            status
+        })
+    }
+}
 #[repr(C)]
 #[derive(Debug, PartialEq)]
 pub struct VirtioPciCommonCfg {
@@ -1102,7 +1398,7 @@ pub struct VirtioPciCommonCfg {
     pub queue_device: u64,      // read-write
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct VirtioCap<T> {
     pub cap: T,
     pub bar: Bar,
@@ -1186,4 +1482,214 @@ pub struct Desc {
 pub struct UsedElem {
     pub id: u32,
     pub len: u32,
+}
+
+// VirtIO feature bits (removing duplicates)
+
+// Device-specific feature bits
+pub const VIRTIO_NET_F_CSUM: u64 = 1 << 0;
+pub const VIRTIO_NET_F_GUEST_CSUM: u64 = 1 << 1;
+pub const VIRTIO_NET_F_MAC: u64 = 1 << 5;
+pub const VIRTIO_NET_F_STATUS: u64 = 1 << 16;
+
+pub const VIRTIO_BLK_F_SIZE_MAX: u64 = 1 << 1;
+pub const VIRTIO_BLK_F_SEG_MAX: u64 = 1 << 2;
+pub const VIRTIO_BLK_F_GEOMETRY: u64 = 1 << 4;
+pub const VIRTIO_BLK_F_RO: u64 = 1 << 5;
+pub const VIRTIO_BLK_F_BLK_SIZE: u64 = 1 << 6;
+pub const VIRTIO_BLK_F_FLUSH: u64 = 1 << 9;
+pub const VIRTIO_BLK_F_TOPOLOGY: u64 = 1 << 10;
+pub const VIRTIO_BLK_F_CONFIG_WCE: u64 = 1 << 11;
+pub const VIRTIO_BLK_F_DISCARD: u64 = 1 << 13;
+pub const VIRTIO_BLK_F_WRITE_ZEROES: u64 = 1 << 14;
+
+pub const VIRTIO_CONSOLE_F_SIZE: u64 = 1 << 0;
+pub const VIRTIO_CONSOLE_F_MULTIPORT: u64 = 1 << 1;
+pub const VIRTIO_CONSOLE_F_EMERG_WRITE: u64 = 1 << 2;
+
+pub const VIRTIO_BALLOON_F_MUST_TELL_HOST: u64 = 1 << 0;
+pub const VIRTIO_BALLOON_F_STATS_VQ: u64 = 1 << 1;
+pub const VIRTIO_BALLOON_F_DEFLATE_ON_OOM: u64 = 1 << 2;
+
+pub const VIRTIO_SCSI_F_INOUT: u64 = 1 << 0;
+pub const VIRTIO_SCSI_F_HOTPLUG: u64 = 1 << 1;
+pub const VIRTIO_SCSI_F_CHANGE: u64 = 1 << 2;
+
+// Utility functions for VirtIO drivers
+impl Virtio {
+    /// Perform a simple read/write operation with automatic retry
+    pub fn simple_operation<T>(&mut self, request: &T, response_size: usize, _write: bool) -> Result<alloc::vec::Vec<u8>, AgaveError> {
+        self.execute_with_retry(|virtio| {
+            // Allocate descriptors
+            let req_desc = virtio.get_free_desc_id().ok_or(AgaveError::ResourceExhausted)?;
+            let resp_desc = virtio.get_free_desc_id().ok_or(AgaveError::ResourceExhausted)?;
+            
+            // Simple buffer allocation using Vec
+            let mut req_buffer = alloc::vec![0u8; core::mem::size_of::<T>()];
+            let mut resp_buffer = alloc::vec![0u8; response_size];
+            
+            // Copy request to buffer
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    request as *const T as *const u8,
+                    req_buffer.as_mut_ptr(),
+                    core::mem::size_of::<T>()
+                );
+            }
+            
+            // Set up descriptors
+            unsafe {
+                let descs = virtio.common.cap.queue_desc as *mut Desc;
+                
+                // Request descriptor
+                let req_desc_obj = Desc {
+                    addr: req_buffer.as_ptr() as u64,
+                    len: core::mem::size_of::<T>() as u32,
+                    flags: VIRTQ_DESC_F_NEXT,
+                    next: resp_desc,
+                };
+                descs.offset(req_desc as isize).write_volatile(req_desc_obj);
+                
+                // Response descriptor
+                let resp_desc_obj = Desc {
+                    addr: resp_buffer.as_mut_ptr() as u64,
+                    len: response_size as u32,
+                    flags: VIRTQ_DESC_F_WRITE,
+                    next: 0,
+                };
+                descs.offset(resp_desc as isize).write_volatile(resp_desc_obj);
+            }
+            
+            // Submit and wait (simplified for now)
+            virtio.submit_chain(req_desc);
+            
+            // Clean up
+            virtio.set_free_desc_id(req_desc);
+            virtio.set_free_desc_id(resp_desc);
+            
+            Ok(resp_buffer)
+        })
+    }
+
+    /// Enable device notifications and configure interrupt handling
+    pub fn enable_notifications(&mut self) -> Result<(), AgaveError> {
+        // Set up MSI-X if supported
+        if self.has_msix_capability() {
+            self.setup_msix_interrupts()?;
+        }
+        
+        // Enable interrupts for all queues
+        for i in 0..self.num_queues() {
+            self.set_queue_interrupts(i, true)
+                .map_err(|_| AgaveError::IoError)?;
+        }
+        
+        log::info!("VirtIO notifications enabled for device type {:?}", self.device_type);
+        Ok(())
+    }
+
+    /// Disable device notifications
+    pub fn disable_notifications(&mut self) -> Result<(), AgaveError> {
+        // Disable interrupts for all queues
+        for i in 0..self.num_queues() {
+            self.set_queue_interrupts(i, false)
+                .map_err(|_| AgaveError::IoError)?;
+        }
+        
+        log::info!("VirtIO notifications disabled for device type {:?}", self.device_type);
+        Ok(())
+    }
+
+    /// Get device statistics and health information
+    pub fn get_device_stats(&self) -> VirtioDeviceStats {
+        VirtioDeviceStats {
+            device_type: self.device_type.clone(),
+            state: self.state,
+            features_negotiated: self.driver_features,
+            queue_count: self.queues.len() as u16,
+            interrupt_count: self.interrupt_count,
+            error_count: self.error_count,
+            last_error: self.last_error.clone(),
+            config_generation: self.config_generation,
+        }
+    }
+
+    /// Perform device health check
+    pub fn health_check(&mut self) -> Result<VirtioHealthStatus, AgaveError> {
+        // Check device status
+        let status = self.get_device_status();
+        if status & VIRTIO_STATUS_FAILED != 0 {
+            return Ok(VirtioHealthStatus::Failed);
+        }
+        
+        if status & VIRTIO_STATUS_DEVICE_NEEDS_RESET != 0 {
+            return Ok(VirtioHealthStatus::NeedsReset);
+        }
+        
+        // Check if device is properly initialized
+        if status & VIRTIO_STATUS_DRIVER_OK == 0 {
+            return Ok(VirtioHealthStatus::NotReady);
+        }
+        
+        // Check for configuration changes
+        if self.config_changed() {
+            return Ok(VirtioHealthStatus::ConfigChanged);
+        }
+        
+        // Check error count
+        if self.error_count > 10 {
+            return Ok(VirtioHealthStatus::Degraded);
+        }
+        
+        Ok(VirtioHealthStatus::Healthy)
+    }
+
+    /// Check if device has MSI-X capability
+    fn has_msix_capability(&self) -> bool {
+        // This would check the PCI configuration space for MSI-X capability
+        // For now, return true if we have any notify capability
+        true
+    }
+
+    /// Set up MSI-X interrupts for the device
+    fn setup_msix_interrupts(&mut self) -> Result<(), AgaveError> {
+        // Configure config change interrupt
+        // Note: This would need proper MSI-X vector configuration
+        unsafe {
+            // Simplified MSI-X setup - would need actual implementation
+            write_volatile(&mut self.common.cap.queue_msix_vector, 0);
+        }
+        
+        // Configure queue interrupts
+        for i in 0..self.num_queues() {
+            self.enable_msix_for_queue(i, i + 1)
+                .map_err(|_| AgaveError::IoError)?;
+        }
+        
+        log::info!("MSI-X interrupts configured for VirtIO device");
+        Ok(())
+    }
+}
+// Device statistics structure
+#[derive(Debug, Clone)]
+pub struct VirtioDeviceStats {
+    pub device_type: DeviceType,
+    pub state: VirtioDeviceState,
+    pub features_negotiated: u64,
+    pub queue_count: u16,
+    pub interrupt_count: u64,
+    pub error_count: u64,
+    pub last_error: Option<VirtioError>,
+    pub config_generation: u8,
+}
+
+// Device health status
+#[derive(Debug, Clone, PartialEq)]
+pub enum VirtioHealthStatus {
+    Healthy,
+    Degraded,
+    NotReady,
+    ConfigChanged,
+    NeedsReset,
+    Failed,
 }

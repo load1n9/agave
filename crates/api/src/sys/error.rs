@@ -32,6 +32,8 @@ pub enum AgaveError {
     TaskError(TaskError),
     /// Hardware error
     HardwareError(HwError),
+    /// VirtIO subsystem error
+    VirtIO(VirtioError),
     /// Security violation
     SecurityViolation,
     /// Invalid system state
@@ -81,6 +83,20 @@ pub enum TaskError {
     InvalidPriority,
 }
 
+/// VirtIO subsystem errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VirtioError {
+    DeviceNotFound,
+    DeviceNotResponding,
+    ConfigurationError,
+    QueueError,
+    DescriptorError,
+    FeatureNegotiationFailed,
+    InvalidConfiguration,
+    BufferError,
+    InterruptError,
+}
+
 /// Hardware-specific errors
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HwError {
@@ -108,6 +124,7 @@ impl fmt::Display for AgaveError {
             AgaveError::WasmError(e) => write!(f, "WASM error: {:?}", e),
             AgaveError::TaskError(e) => write!(f, "Task error: {:?}", e),
             AgaveError::HardwareError(e) => write!(f, "Hardware error: {:?}", e),
+            AgaveError::VirtIO(e) => write!(f, "VirtIO error: {:?}", e),
             AgaveError::SecurityViolation => write!(f, "Security violation"),
             AgaveError::InvalidState => write!(f, "Invalid system state"),
             AgaveError::ResourceExhausted => write!(f, "Resource exhausted"),
@@ -119,6 +136,28 @@ impl fmt::Display for AgaveError {
 
 /// Result type alias for Agave OS operations
 pub type AgaveResult<T> = Result<T, AgaveError>;
+
+/// From implementations for error conversion
+impl From<VirtioError> for AgaveError {
+    fn from(err: VirtioError) -> Self {
+        AgaveError::VirtIO(err)
+    }
+}
+
+impl From<&str> for AgaveError {
+    fn from(_err: &str) -> Self {
+        AgaveError::VirtIO(VirtioError::ConfigurationError)
+    }
+}
+
+impl<S> From<x86_64::structures::paging::mapper::MapToError<S>> for AgaveError 
+where
+    S: x86_64::structures::paging::page::PageSize,
+{
+    fn from(_err: x86_64::structures::paging::mapper::MapToError<S>) -> Self {
+        AgaveError::HardwareError(HwError::ConfigurationError)
+    }
+}
 
 /// Error recovery strategies
 #[derive(Debug, Clone)]

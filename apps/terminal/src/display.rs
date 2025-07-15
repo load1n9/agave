@@ -1,5 +1,6 @@
 use agave_lib::{
-    clear_screen, draw_rectangle, draw_text, fill_rectangle, get_dimensions, Position, RGBA,
+    clear_screen, draw_line, draw_rectangle, draw_text, fill_rectangle, get_dimensions, Position,
+    RGBA,
 };
 
 use crate::state::{ANIMATION_FRAME, CURSOR_BLINK, TERMINAL};
@@ -95,6 +96,113 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             "A WASM-based operating system",
             colors.text_secondary,
         );
+
+        let logo_x = margin + content_width - 180;
+        let logo_y = 70;
+        let logo_width = 120.0;
+        let logo_height = 120.0;
+
+        let svg_x = |x: f32| -> i32 {
+            let min_x = 168.0;
+            let max_x = 168.0 + 563.0;
+            let scale = logo_width / (max_x - min_x);
+            (logo_x as f32 + (x - min_x) * scale) as i32
+        };
+        let svg_y = |y: f32| -> i32 {
+            let min_y = -20.0;
+            let max_y = -20.0 + 606.0;
+            let scale = logo_height / (max_y - min_y);
+            (logo_y as f32 + (y - min_y) * scale) as i32
+        };
+
+        let svg_paths: &[&[(f32, f32)]] = &[
+            &[
+                (480.0, 345.0),
+                (484.0, 423.0),
+                (536.0, 353.0),
+                (629.0, 119.0),
+                (480.0, 345.0),
+            ],
+            &[
+                (480.0, 308.0),
+                (472.0, 224.0),
+                (558.0, 56.0),
+                (531.0, 208.0),
+                (480.0, 308.0),
+            ],
+            &[
+                (364.0, 584.0),
+                (552.4641, 390.15118),
+                (714.0, 224.0),
+                (426.0, 586.0),
+                (364.0, 584.0),
+            ],
+            &[
+                (509.0, 508.0),
+                (588.0, 408.0),
+                (731.0, 324.0),
+                (602.0, 456.0),
+                (509.0, 508.0),
+            ],
+            &[
+                (456.0, 580.0),
+                (482.0, 538.0),
+                (712.0, 421.0),
+                (532.0, 584.0),
+                (456.0, 580.0),
+            ],
+            &[
+                (340.0, 578.0),
+                (372.0, 532.0),
+                (174.0, 435.0),
+                (340.0, 578.0),
+            ],
+            &[
+                (375.0, 515.0),
+                (171.0, 351.0),
+                (281.0, 476.0),
+                (375.0, 515.0),
+            ],
+            &[
+                (400.0, 516.0),
+                (413.0, 500.0),
+                (168.0, 234.0),
+                (400.0, 516.0),
+            ],
+            &[
+                (381.0, 432.0),
+                (391.0, 360.0),
+                (251.0, 120.0),
+                (312.0, 356.0),
+                (381.0, 432.0),
+            ],
+            &[
+                (400.0, 455.0),
+                (424.0, 486.0),
+                (471.0, 430.0),
+                (439.0, -20.0),
+                (400.0, 455.0),
+            ],
+            &[
+                (398.0, 319.0),
+                (403.0, 203.0),
+                (320.0, 52.0),
+                (360.0, 235.0),
+                (398.0, 319.0),
+            ],
+        ];
+
+        for path in svg_paths {
+            for pair in path.windows(2) {
+                let (x1, y1) = pair[0];
+                let (x2, y2) = pair[1];
+                draw_line(
+                    Position::new(svg_x(x1), svg_y(y1)),
+                    Position::new(svg_x(x2), svg_y(y2)),
+                    colors.accent_green,
+                );
+            }
+        }
 
         // Status section with visual separation
         draw_section_divider(Position::new(margin, 270), content_width, colors);

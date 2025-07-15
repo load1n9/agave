@@ -1,3 +1,4 @@
+use core::ops::{AddAssign, SubAssign};
 use core::cmp::{Ord, Ordering};
 use core::ops::{Add, Sub};
 
@@ -54,6 +55,34 @@ impl Sub<Coordinate> for Coordinate {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
         }
+    }
+}
+
+impl AddAssign<(isize, isize)> for Coordinate {
+    fn add_assign(&mut self, rhs: (isize, isize)) {
+        self.x += rhs.0;
+        self.y += rhs.1;
+    }
+}
+
+impl SubAssign<(isize, isize)> for Coordinate {
+    fn sub_assign(&mut self, rhs: (isize, isize)) {
+        self.x -= rhs.0;
+        self.y -= rhs.1;
+    }
+}
+
+impl AddAssign<Coordinate> for Coordinate {
+    fn add_assign(&mut self, rhs: Coordinate) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+    }
+}
+
+impl SubAssign<Coordinate> for Coordinate {
+    fn sub_assign(&mut self, rhs: Coordinate) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
     }
 }
 
@@ -114,5 +143,19 @@ impl Sub<Coordinate> for Rectangle {
             top_left: self.top_left - rhs,
             bottom_right: self.bottom_right - rhs,
         }
+    }
+}
+
+impl AddAssign<Coordinate> for Rectangle {
+    fn add_assign(&mut self, rhs: Coordinate) {
+        self.top_left += rhs;
+        self.bottom_right += rhs;
+    }
+}
+
+impl SubAssign<Coordinate> for Rectangle {
+    fn sub_assign(&mut self, rhs: Coordinate) {
+        self.top_left -= rhs;
+        self.bottom_right -= rhs;
     }
 }

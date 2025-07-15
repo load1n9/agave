@@ -4,7 +4,7 @@ use crate::sys::{
     ipc::ProcessId,
 };
 use alloc::{collections::BTreeMap, vec::Vec};
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use spin::Mutex;
 
 /// Standard Unix-like signals
@@ -235,6 +235,7 @@ pub struct SignalHandler {
     actions: BTreeMap<Signal, SignalAction>,
     pending_signals: Mutex<Vec<SignalInfo>>,
     blocked_signals: Mutex<SignalMask>,
+    #[allow(dead_code)]
     signal_stack: Option<SignalStack>,
     stats: Mutex<SignalStats>,
 }
@@ -343,7 +344,7 @@ impl SignalHandler {
         &self,
         signal: Signal,
         sender: ProcessId,
-        data: Option<u64>,
+       _data: Option<u64>,
     ) -> AgaveResult<()> {
         let action = self.get_action(signal);
         let mut stats = self.stats.lock();

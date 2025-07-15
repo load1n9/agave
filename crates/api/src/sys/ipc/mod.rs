@@ -1,11 +1,7 @@
 /// Inter-Process Communication (IPC) system for Agave OS
 /// Provides pipes, shared memory, message queues, and signals
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{
-    collections::{BTreeMap, VecDeque},
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 use core::sync::atomic::{AtomicU64, Ordering};
 use spin::Mutex;
 

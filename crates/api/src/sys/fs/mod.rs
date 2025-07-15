@@ -12,8 +12,8 @@ use spin::Mutex;
 pub mod disk;
 pub mod simple_fs;
 
-use disk::{DiskBackend, RamDisk};
-use simple_fs::{FileSystemStats, SimpleFileSystem};
+use disk::RamDisk;
+use simple_fs::SimpleFileSystem;
 
 /// File system types
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -700,20 +700,25 @@ pub fn switch_filesystem_type(fs_type: FileSystemType) -> AgaveResult<()> {
             _ => {}
         }
 
+        let current_fs_type = CURRENT_FS_TYPE;
         log::info!(
             "Switching file system from {:?} to {:?}",
-            CURRENT_FS_TYPE,
+            current_fs_type,
             fs_type
         );
 
         // Initialize new filesystem if not already done
         match fs_type {
-            FileSystemType::Virtual => {
+            FileSystemType::Virtual =>
+            {
+                #[allow(static_mut_refs)]
                 if FILESYSTEM.is_none() {
                     FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
                 }
             }
-            FileSystemType::Persistent => {
+            FileSystemType::Persistent =>
+            {
+                #[allow(static_mut_refs)]
                 if PERSISTENT_FS.is_none() {
                     let ram_disk = RamDisk::new(1024)?;
                     let persistent_fs = SimpleFileSystem::format(ram_disk)?;

@@ -185,6 +185,7 @@ pub struct RamDiskStats {
 
 /// Virtual disk backed by VirtIO block device
 pub struct VirtioDisk {
+    #[allow(dead_code)]
     device_id: u32,
     block_count: u64,
     read_only: bool,

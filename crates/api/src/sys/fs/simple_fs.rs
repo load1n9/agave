@@ -1,7 +1,7 @@
 /// Simple file system with persistence support
 use crate::sys::{
     error::{AgaveError, AgaveResult},
-    fs::disk::{BlockNumber, DiskBackend, BLOCK_SIZE},
+    fs::disk::{DiskBackend, BLOCK_SIZE},
 };
 use alloc::{
     collections::BTreeMap,
@@ -18,8 +18,10 @@ const FS_MAGIC: u32 = 0x41474156; // "AGAV" in ASCII
 const FS_VERSION: u32 = 1;
 
 /// Size of on-disk structures
+#[allow(dead_code)]
 const SUPERBLOCK_SIZE: usize = 512;
 const INODE_SIZE: usize = 128;
+#[allow(dead_code)]
 const DIR_ENTRY_SIZE: usize = 64;
 
 /// Maximum filename length
@@ -254,7 +256,7 @@ pub struct SimpleFileSystem<D: DiskBackend> {
 
 impl<D: DiskBackend> SimpleFileSystem<D> {
     /// Create a new file system on the disk
-    pub fn format(mut disk: D) -> AgaveResult<Self> {
+    pub fn format(disk: D) -> AgaveResult<Self> {
         if !disk.is_writable() {
             return Err(AgaveError::PermissionDenied);
         }
@@ -369,7 +371,7 @@ impl<D: DiskBackend> SimpleFileSystem<D> {
     }
 
     /// Mount an existing file system
-    pub fn mount(mut disk: D) -> AgaveResult<Self> {
+    pub fn mount(disk: D) -> AgaveResult<Self> {
         // Read superblock
         let mut block = [0u8; BLOCK_SIZE];
         disk.read_block(0, &mut block)?;

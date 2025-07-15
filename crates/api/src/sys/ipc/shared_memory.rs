@@ -318,7 +318,7 @@ pub fn unmap_shared_memory(mapping: &MemoryMapping) -> AgaveResult<()> {
 /// This is useful for DMA operations or when sharing with hardware
 pub fn allocate_contiguous_shared_memory(
     size: usize,
-    alignment: usize,
+    _alignment: usize,
 ) -> AgaveResult<SharedMemorySegment> {
     if size == 0 || size > MAX_SHARED_MEMORY_SIZE {
         return Err(AgaveError::InvalidParameter);

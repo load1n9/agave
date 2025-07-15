@@ -3,7 +3,7 @@ use crate::sys::{
     error::{AgaveError, AgaveResult},
     ipc::{IpcPermissions, ProcessId},
 };
-use alloc::{collections::VecDeque, sync::Arc, vec::Vec};
+use alloc::{collections::VecDeque, sync::Arc};
 use spin::Mutex;
 
 /// Pipe buffer size constants

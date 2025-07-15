@@ -952,53 +952,6 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         );
         current_y += 20;
     }
-
-    // Keyboard shortcuts section
-    current_y = 420;
-    draw_section_header(
-        Position::new(col1_x, current_y),
-        "⌨️ Quick Shortcuts",
-        colors,
-    );
-    current_y += 25;
-
-    draw_text(
-        Position::new(col1_x + 10, current_y),
-        "(when command line is empty)",
-        colors.text_muted,
-    );
-    current_y += 25;
-
-    let shortcuts = [
-        ("L", "ls command"),
-        ("H", "help command"),
-        ("S", "system command"),
-        ("P", "ps command"),
-        ("U", "uname command"),
-        ("C", "clear command"),
-        ("M", "main screen"),
-        ("T", "next theme"),
-    ];
-
-    for (key, action) in shortcuts.iter() {
-        draw_text(
-            Position::new(col1_x + 20, current_y),
-            key,
-            colors.accent_purple,
-        );
-        draw_text(
-            Position::new(col1_x + 40, current_y),
-            "-",
-            colors.text_muted,
-        );
-        draw_text(
-            Position::new(col1_x + 60, current_y),
-            action,
-            colors.text_secondary,
-        );
-        current_y += 20;
-    }
-
     // Instructions
     draw_section_divider(
         Position::new(margin, dim.height - 120),

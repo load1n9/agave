@@ -1,5 +1,5 @@
 pub mod allocator;
-pub mod diagnostics; // New: Enhanced system diagnostics
+pub mod diagnostics;
 pub mod drivers;
 pub mod error;
 pub mod framebuffer;
@@ -8,17 +8,18 @@ pub mod gdt;
 pub mod globals;
 pub mod interrupts;
 pub mod ioapic;
+pub mod ipc;
 pub mod local_apic;
 pub mod logger;
 pub mod memory;
 pub mod monitor;
-pub mod network; // New: Network stack
+pub mod network;
 pub mod pci;
 pub mod pic;
-pub mod power; // New: Power management
-pub mod process; // New: Enhanced process management
+pub mod power;
+pub mod process;
 pub mod random;
-pub mod security; // New: Security framework
+pub mod security;
 pub mod serial;
 pub mod task;
 pub mod virtio;
@@ -41,8 +42,6 @@ use x86_64::{
     },
     PhysAddr, VirtAddr,
 };
-
-const _ACPI_HANDLER: AcpiHandlerImpl = AcpiHandlerImpl;
 
 pub static MAPPER: OnceCell<Mutex<OffsetPageTable>> = OnceCell::uninit();
 

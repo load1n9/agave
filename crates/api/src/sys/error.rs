@@ -44,6 +44,26 @@ pub enum AgaveError {
     NotImplemented,
     /// Unknown error
     Unknown,
+    /// IPC-related error
+    IpcError(IpcError),
+    /// Invalid operation
+    InvalidOperation,
+    /// Invalid parameter
+    InvalidParameter,
+    /// Operation would block
+    WouldBlock,
+    /// Broken pipe
+    BrokenPipe,
+    /// Buffer too small
+    BufferTooSmall,
+    /// Message too large
+    MessageTooLarge,
+    /// Queue full
+    QueueFull,
+    /// Queue empty
+    QueueEmpty,
+    /// Operation not supported
+    Unsupported,
 }
 
 /// Filesystem-specific errors
@@ -107,6 +127,18 @@ pub enum HwError {
     InterruptError,
 }
 
+/// IPC-specific errors
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IpcError {
+    PipeError,
+    SharedMemoryError,
+    MessageQueueError,
+    SignalError,
+    HandleNotFound,
+    PermissionDenied,
+    ResourceLimitExceeded,
+}
+
 impl fmt::Display for AgaveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -130,6 +162,16 @@ impl fmt::Display for AgaveError {
             AgaveError::ResourceExhausted => write!(f, "Resource exhausted"),
             AgaveError::NotImplemented => write!(f, "Feature not implemented"),
             AgaveError::Unknown => write!(f, "Unknown error"),
+            AgaveError::IpcError(e) => write!(f, "IPC error: {:?}", e),
+            AgaveError::InvalidOperation => write!(f, "Invalid operation"),
+            AgaveError::InvalidParameter => write!(f, "Invalid parameter"),
+            AgaveError::WouldBlock => write!(f, "Operation would block"),
+            AgaveError::BrokenPipe => write!(f, "Broken pipe"),
+            AgaveError::BufferTooSmall => write!(f, "Buffer too small"),
+            AgaveError::MessageTooLarge => write!(f, "Message too large"),
+            AgaveError::QueueFull => write!(f, "Queue full"),
+            AgaveError::QueueEmpty => write!(f, "Queue empty"),
+            AgaveError::Unsupported => write!(f, "Operation not supported"),
         }
     }
 }

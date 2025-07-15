@@ -291,6 +291,15 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     }
     show_loading_screen("Filesystem initialized...", 65, &mut *fb);
 
+    // Initialize IPC system
+    log::info!("Initializing IPC system...");
+    if let Err(e) = agave_api::sys::ipc::init_ipc() {
+        log::error!("Failed to initialize IPC: {:?}", e);
+    } else {
+        log::info!("IPC system initialized successfully");
+    }
+    show_loading_screen("IPC system ready...", 70, &mut *fb);
+
     // Initialize network stack
     log::info!("Initializing network stack...");
     if let Err(e) = network::init_network() {

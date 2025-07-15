@@ -1,5 +1,5 @@
 /// Enhanced filesystem implementation for Agave OS
-/// Supports virtual filesystem with multiple backends
+/// Supports virtual filesystem with multiple backends and persistence
 use crate::sys::error::{AgaveError, AgaveResult, FsError};
 use alloc::{
     collections::BTreeMap,
@@ -9,13 +9,17 @@ use alloc::{
 };
 use spin::Mutex;
 
+pub mod disk;
+pub mod simple_fs;
+
+use disk::{DiskBackend, RamDisk};
+use simple_fs::{FileSystemStats, SimpleFileSystem};
+
 /// File system types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum FileSystemType {
-    Virtual, // In-memory filesystem
-    TarFs,   // Read-only tar archive
-    RamDisk, // RAM-based disk
-    Network, // Network filesystem (future)
+    Virtual,    // In-memory filesystem
+    Persistent, // Persistent to disk
 }
 
 /// File types
@@ -640,16 +644,196 @@ impl VirtualFileSystem {
 /// Global file system instance
 static mut FILESYSTEM: Option<Mutex<VirtualFileSystem>> = None;
 
+/// Global persistent file system instance
+static mut PERSISTENT_FS: Option<Mutex<SimpleFileSystem<RamDisk>>> = None;
+
+static mut CURRENT_FS_TYPE: FileSystemType = FileSystemType::Virtual;
+
 /// Public API functions
 pub fn init_filesystem() -> AgaveResult<()> {
-    log::info!("Initializing virtual file system...");
+    init_filesystem_with_type(FileSystemType::Virtual)
+}
+
+/// Initialize filesystem with specific type
+pub fn init_filesystem_with_type(fs_type: FileSystemType) -> AgaveResult<()> {
+    log::info!("Initializing file system (type: {:?})...", fs_type);
 
     unsafe {
-        FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
+        CURRENT_FS_TYPE = fs_type;
+
+        match fs_type {
+            FileSystemType::Virtual => {
+                FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
+                log::info!("Virtual file system initialized");
+            }
+            FileSystemType::Persistent => {
+                // Create a RAM disk for demonstration (4MB)
+                let ram_disk = RamDisk::new(1024)?; // 1024 blocks = 4MB
+
+                // Format the disk with our simple filesystem
+                let persistent_fs = SimpleFileSystem::format(ram_disk)?;
+
+                PERSISTENT_FS = Some(Mutex::new(persistent_fs));
+                log::info!("Persistent file system initialized and formatted");
+            }
+        }
     }
 
-    log::info!("Virtual file system initialized");
     Ok(())
+}
+
+/// Switch between file system types
+pub fn switch_filesystem_type(fs_type: FileSystemType) -> AgaveResult<()> {
+    unsafe {
+        if CURRENT_FS_TYPE == fs_type {
+            return Ok(()); // Already using this type
+        }
+
+        // Sync current filesystem if needed
+        match CURRENT_FS_TYPE {
+            FileSystemType::Persistent => {
+                if let Some(ref fs) = PERSISTENT_FS {
+                    let mut guard = fs.lock();
+                    guard.sync()?;
+                }
+            }
+            _ => {}
+        }
+
+        log::info!(
+            "Switching file system from {:?} to {:?}",
+            CURRENT_FS_TYPE,
+            fs_type
+        );
+
+        // Initialize new filesystem if not already done
+        match fs_type {
+            FileSystemType::Virtual => {
+                if FILESYSTEM.is_none() {
+                    FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
+                }
+            }
+            FileSystemType::Persistent => {
+                if PERSISTENT_FS.is_none() {
+                    let ram_disk = RamDisk::new(1024)?;
+                    let persistent_fs = SimpleFileSystem::format(ram_disk)?;
+                    PERSISTENT_FS = Some(Mutex::new(persistent_fs));
+                }
+            }
+        }
+
+        CURRENT_FS_TYPE = fs_type;
+    }
+
+    Ok(())
+}
+
+/// Mount an existing persistent filesystem from disk
+pub fn mount_persistent_filesystem(disk: RamDisk) -> AgaveResult<()> {
+    log::info!("Mounting existing persistent file system...");
+
+    let persistent_fs = SimpleFileSystem::mount(disk)?;
+
+    unsafe {
+        PERSISTENT_FS = Some(Mutex::new(persistent_fs));
+        CURRENT_FS_TYPE = FileSystemType::Persistent;
+    }
+
+    log::info!("Persistent file system mounted successfully");
+    Ok(())
+}
+
+/// Get current filesystem type
+pub fn get_current_filesystem_type() -> FileSystemType {
+    unsafe { CURRENT_FS_TYPE }
+}
+
+/// Get filesystem statistics
+pub fn get_filesystem_stats() -> AgaveResult<FilesystemStats> {
+    unsafe {
+        match CURRENT_FS_TYPE {
+            FileSystemType::Virtual => {
+                if let Some(ref fs) = FILESYSTEM {
+                    let guard = fs.lock();
+
+                    // Calculate stats for virtual filesystem
+                    let mut total_files = 0;
+                    let mut total_size = 0;
+
+                    fn count_files(node: &VfsNode, files: &mut usize, size: &mut u64) {
+                        match node {
+                            VfsNode::File { content, .. } => {
+                                *files += 1;
+                                *size += content.len() as u64;
+                            }
+                            VfsNode::Directory { children, .. } => {
+                                *files += 1; // Count the directory itself
+                                for child in children.values() {
+                                    count_files(child, files, size);
+                                }
+                            }
+                            VfsNode::Symlink { .. } => {
+                                *files += 1;
+                            }
+                        }
+                    }
+
+                    count_files(&guard.root, &mut total_files, &mut total_size);
+
+                    Ok(FilesystemStats {
+                        fs_type: "Virtual File System".to_string(),
+                        total_size: 0, // Virtual FS has no fixed size
+                        used_size: total_size,
+                        free_size: u64::MAX, // Unlimited for virtual FS
+                        total_files: total_files as u64,
+                        total_dirs: 0, // Would need separate counting
+                        block_size: 0,
+                        mount_time: 0,
+                        is_persistent: false,
+                    })
+                } else {
+                    Err(AgaveError::NotReady)
+                }
+            }
+            FileSystemType::Persistent => {
+                if let Some(ref fs) = PERSISTENT_FS {
+                    let guard = fs.lock();
+                    if !guard.is_mounted() {
+                        return Err(AgaveError::InvalidState);
+                    }
+
+                    let stats = guard.get_stats();
+                    Ok(FilesystemStats {
+                        fs_type: format!("Simple File System ({})", stats.backend_type),
+                        total_size: stats.total_blocks * stats.block_size,
+                        used_size: stats.used_blocks * stats.block_size,
+                        free_size: stats.free_blocks * stats.block_size,
+                        total_files: stats.total_inodes,
+                        total_dirs: 0, // Would need tracking
+                        block_size: stats.block_size,
+                        mount_time: stats.last_mount_time,
+                        is_persistent: true,
+                    })
+                } else {
+                    Err(AgaveError::NotReady)
+                }
+            }
+        }
+    }
+}
+
+/// Combined filesystem statistics
+#[derive(Debug, Clone)]
+pub struct FilesystemStats {
+    pub fs_type: String,
+    pub total_size: u64,
+    pub used_size: u64,
+    pub free_size: u64,
+    pub total_files: u64,
+    pub total_dirs: u64,
+    pub block_size: u64,
+    pub mount_time: u64,
+    pub is_persistent: bool,
 }
 
 /// Helper to access the filesystem safely
@@ -658,12 +842,69 @@ where
     F: FnOnce(&mut VirtualFileSystem) -> AgaveResult<R>,
 {
     unsafe {
-        #[allow(static_mut_refs)]
-        if let Some(fs) = &FILESYSTEM {
-            let mut guard = fs.lock();
-            f(&mut *guard)
-        } else {
-            Err(AgaveError::NotReady)
+        match CURRENT_FS_TYPE {
+            FileSystemType::Virtual =>
+            {
+                #[allow(static_mut_refs)]
+                if let Some(fs) = &FILESYSTEM {
+                    let mut guard = fs.lock();
+                    f(&mut *guard)
+                } else {
+                    Err(AgaveError::NotReady)
+                }
+            }
+            FileSystemType::Persistent => {
+                // For persistent FS, we need to adapt the interface
+                // This is a simplified approach - in reality you'd implement
+                // the same interface for both filesystem types
+                Err(AgaveError::NotImplemented)
+            }
+        }
+    }
+}
+
+/// Sync the current filesystem to persistent storage
+pub fn sync_filesystem() -> AgaveResult<()> {
+    unsafe {
+        match CURRENT_FS_TYPE {
+            FileSystemType::Virtual => {
+                // Virtual FS doesn't need syncing
+                Ok(())
+            }
+            FileSystemType::Persistent => {
+                if let Some(ref fs) = PERSISTENT_FS {
+                    let mut guard = fs.lock();
+                    guard.sync()
+                } else {
+                    Err(AgaveError::NotReady)
+                }
+            }
+        }
+    }
+}
+
+/// Unmount the current filesystem
+pub fn unmount_filesystem() -> AgaveResult<()> {
+    unsafe {
+        match CURRENT_FS_TYPE {
+            FileSystemType::Virtual => {
+                // Just clear the virtual filesystem
+                FILESYSTEM = None;
+                log::info!("Virtual filesystem unmounted");
+                Ok(())
+            }
+            FileSystemType::Persistent => {
+                if let Some(ref fs) = PERSISTENT_FS {
+                    let mut guard = fs.lock();
+                    guard.unmount()?;
+                    drop(guard);
+                    PERSISTENT_FS = None;
+                    log::info!("Persistent filesystem unmounted");
+                    Ok(())
+                } else {
+                    Err(AgaveError::NotReady)
+                }
+            }
         }
     }
 }

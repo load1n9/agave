@@ -12,10 +12,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use core::{
-    cmp::{max, min},
-    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
-};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use spin::Mutex;
 
 /// CPU power states
@@ -69,6 +66,7 @@ pub struct CpuFrequencyScaler {
     min_freq_mhz: u32,
     max_freq_mhz: u32,
     available_frequencies: Vec<u32>,
+    #[allow(dead_code)]
     scaling_governor: ScalingGovernor,
 }
 
@@ -248,6 +246,7 @@ pub enum CoolingAction {
 }
 
 impl ThermalManager {
+    #[allow(dead_code)]
     fn new() -> Self {
         let mut manager = Self {
             cpu_temperature_celsius: 45.0, // Simulated temperature
@@ -416,6 +415,7 @@ pub struct PowerManager {
 }
 
 impl PowerManager {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             current_state: PowerState::Active,
@@ -593,7 +593,7 @@ impl PowerManager {
         Ok(())
     }
 
-    fn update_statistics(&mut self, now: u64) {
+    fn update_statistics(&mut self, _now: u64) {
         // Update power consumption estimates
         let freq_ratio =
             self.freq_scaler.current_freq_mhz as f32 / self.freq_scaler.max_freq_mhz as f32;

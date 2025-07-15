@@ -5,11 +5,8 @@ use crate::sys::{
     task::executor::yield_once,
     virtio::{Desc, Virtio},
 };
-use alloc::{collections::VecDeque, format, string::String, sync::Arc, vec::Vec};
-use core::{
-    ptr::{read_volatile, write_volatile},
-    sync::atomic::{AtomicBool, AtomicU16, Ordering},
-};
+use alloc::{collections::VecDeque, format, string::String, vec::Vec};
+use core::ptr::read_volatile;
 use futures::task::AtomicWaker;
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -83,7 +80,7 @@ impl ConsolePort {
     /// Read data from the port
     pub fn read(&mut self, buffer: &mut [u8]) -> usize {
         let mut bytes_read = 0;
-        for (i, byte) in buffer.iter_mut().enumerate() {
+        for (_i, byte) in buffer.iter_mut().enumerate() {
             if let Some(data) = self.rx_queue.pop_front() {
                 *byte = data;
                 bytes_read += 1;
@@ -128,6 +125,7 @@ impl ConsolePort {
 pub struct VirtioConsole {
     virtio: Virtio,
     config: VirtioConsoleConfig,
+    #[allow(dead_code)]
     features: u64,
     ports: Vec<ConsolePort>,
     multiport: bool,
@@ -233,6 +231,7 @@ impl VirtioConsole {
 
     /// Set up receive buffers for all ports
     fn setup_receive_buffers(&mut self) -> AgaveResult<()> {
+        #[allow(dead_code)]
         const BUFFER_SIZE: usize = 1024;
 
         // Set up buffers for port 0 (main console)
@@ -548,7 +547,6 @@ impl VirtioConsole {
     }
 }
 
-/// Global console instance
 lazy_static! {
     pub static ref VIRTIO_CONSOLE: Mutex<Option<VirtioConsole>> = Mutex::new(None);
 }

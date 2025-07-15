@@ -16,7 +16,7 @@ pub fn clock_res_get(id: Clockid) -> WasiResult<Timestamp> {
     }
 }
 
-pub fn clock_time_get(id: Clockid, precision: Timestamp) -> WasiResult<Timestamp> {
+pub fn clock_time_get(id: Clockid, _precision: Timestamp) -> WasiResult<Timestamp> {
     // In a real implementation, this would get actual system time
     // For now, we'll simulate time progression
     unsafe {
@@ -76,7 +76,7 @@ pub fn subscribe_instant(when: Timestamp) -> WasiResult<super::types::Pollable> 
 }
 
 // Timezone support (Preview 2 extension)
-pub fn timezone_display(when: Timestamp, timezone: &str) -> WasiResult<String> {
+pub fn timezone_display(_when: Timestamp, timezone: &str) -> WasiResult<String> {
     // Basic timezone display - in a real implementation this would use proper timezone data
     match timezone {
         "UTC" | "GMT" => Ok("UTC".to_string()),
@@ -89,7 +89,7 @@ pub fn timezone_display(when: Timestamp, timezone: &str) -> WasiResult<String> {
     }
 }
 
-pub fn timezone_utc_offset(when: Timestamp, timezone: &str) -> WasiResult<i32> {
+pub fn timezone_utc_offset(_when: Timestamp, timezone: &str) -> WasiResult<i32> {
     // Basic timezone offset - in a real implementation this would consider DST
     match timezone {
         "UTC" | "GMT" => Ok(0),

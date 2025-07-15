@@ -1,10 +1,10 @@
 /// System monitoring and diagnostics for Agave OS
 use crate::sys::{
     allocator::{memory_pressure, memory_stats, MemoryPressure, MemoryStats},
-    interrupts::{RANDTHING1, RANDTHING2, TIME_MS},
+    interrupts::{RANDTHING1, TIME_MS},
     task::executor::{TaskMetrics, TASK_METRICS},
 };
-use alloc::{format, string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::sync::atomic::Ordering;
 use spin::Mutex;
 

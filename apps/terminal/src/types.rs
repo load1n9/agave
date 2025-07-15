@@ -90,6 +90,7 @@ pub struct TerminalApp {
     pub uptime: u64,
     pub processes: [Process; 8],
     pub process_count: usize,
+    #[allow(dead_code)]
     pub current_directory: &'static str,
     pub file_system: [FileEntry; 16],
     pub file_count: usize,

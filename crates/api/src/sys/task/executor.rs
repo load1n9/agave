@@ -204,7 +204,9 @@ pub struct Executor {
     task_queue: Arc<ArrayQueue<TaskId>>,
     spawn_queue: Arc<ArrayQueue<Task>>,
     waker_cache: BTreeMap<TaskId, Waker>,
+    #[allow(dead_code)]
     priority_queue: PriorityQueue,
+    #[allow(dead_code)]
     task_slice_us: u64, // Time slice per task in microseconds
 }
 

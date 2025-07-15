@@ -1,12 +1,11 @@
 // WASI Preview 1 (legacy) implementation for Agave OS
 // This provides the original WASI snapshot_preview1 API for compatibility
 
-use super::error::*;
 use super::types::*;
-use super::{cli, clocks, filesystem, io, random, sockets};
-use alloc::vec::Vec;
-use wasmi::{Caller, Func, Linker, Store};
+use super::{cli, clocks, filesystem, random};
+use wasmi::{Caller, Linker, Store};
 
+#[allow(dependency_on_unit_never_type_fallback)]
 pub fn link_preview1_functions<T>(
     linker: &mut Linker<T>,
     _store: &mut Store<T>,

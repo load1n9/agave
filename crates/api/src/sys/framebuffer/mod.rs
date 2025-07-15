@@ -243,6 +243,7 @@ impl FB {
         self.h = h;
     }
 
+    #[allow(mismatched_lifetime_syntaxes)]
     pub fn share(&mut self) -> FBShare {
         FBShare {
             pixels: &mut self.pixels[..],
@@ -1202,26 +1203,4 @@ impl ParticleSystem {
             }
         }
     }
-}
-
-/// Mouse input functions
-#[no_mangle]
-pub extern "C" fn get_mouse_x() -> i32 {
-    // For now, return a default value - in a real implementation this would
-    // read from the mouse hardware/VirtIO device
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn get_mouse_y() -> i32 {
-    // For now, return a default value - in a real implementation this would
-    // read from the mouse hardware/VirtIO device
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn is_mouse_button_down(_button: i32) -> bool {
-    // For now, return false - in a real implementation this would
-    // check the actual mouse button state
-    false
 }

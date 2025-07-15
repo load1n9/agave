@@ -3,11 +3,7 @@ use alloc::vec::Vec;
 use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
 
 use super::{
-    framebuffer::{
-        display::{text::TextDisplay, Displayable},
-        shapes::Coordinate,
-        FB, RGBA,
-    },
+    framebuffer::{shapes::Coordinate, FB, RGBA},
     globals::Input,
     wasi,
 };

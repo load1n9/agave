@@ -7,7 +7,7 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use core::net::{IpAddr, Ipv4Addr, SocketAddr};
+use core::net::Ipv4Addr;
 use spin::Mutex;
 
 pub mod dns;
@@ -78,6 +78,7 @@ pub static NETWORK_MANAGER: Mutex<NetworkManager> = Mutex::new(NetworkManager::n
 pub struct NetworkManager {
     interfaces: BTreeMap<String, NetworkInterface>,
     routing_table: Vec<Route>,
+    #[allow(dead_code)]
     arp_table: BTreeMap<Ipv4Addr, [u8; 6]>,
 }
 

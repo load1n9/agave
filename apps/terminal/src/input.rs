@@ -1,10 +1,9 @@
 use agave_lib::{
-    is_key_pressed, is_key_down, key_code_to_char, get_key_history_count, get_key_history_event,
-    KEY_ENTER, KEY_BACKSPACE, KEY_LEFTSHIFT, KEY_RIGHTSHIFT, KEY_ESC, 
-    KEY_L, KEY_P, KEY_S, KEY_H, KEY_U, KEY_C, KEY_M, KEY_T
+    get_key_history_count, get_key_history_event, is_key_down, key_code_to_char, KEY_BACKSPACE,
+    KEY_ENTER, KEY_ESC, KEY_LEFTSHIFT, KEY_RIGHTSHIFT,
 };
 
-use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
+use crate::state::{COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX, TERMINAL};
 
 // Add arrow keys and page keys for navigation
 const KEY_UP: i32 = 103;
@@ -17,22 +16,22 @@ const KEY_END: i32 = 107;
 pub fn handle_keyboard_input() {
     unsafe {
         let shift_pressed = is_key_down(KEY_LEFTSHIFT) || is_key_down(KEY_RIGHTSHIFT);
-        
+
         // Process keyboard history to catch all events
         let history_count = get_key_history_count();
         static mut LAST_PROCESSED_COUNT: i32 = 0;
-        
+
         // Process new keyboard events
         if history_count > LAST_PROCESSED_COUNT {
             for i in LAST_PROCESSED_COUNT..history_count {
                 let (key_code, pressed) = get_key_history_event(i);
-                
+
                 if pressed {
                     // Handle special keys first
                     if handle_special_key(key_code, shift_pressed) {
                         continue;
                     }
-                    
+
                     // Handle character input
                     if let Some(ch) = key_code_to_char(key_code, shift_pressed) {
                         handle_character_input(ch);
@@ -41,17 +40,15 @@ pub fn handle_keyboard_input() {
             }
             LAST_PROCESSED_COUNT = history_count;
         }
-        
-        // Handle quick shortcuts only when no character input is being processed
-        handle_shortcut_keys();
     }
 }
 
 // Separate function to handle special keys
-fn handle_special_key(key_code: i32, shift_pressed: bool) -> bool {
+fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
     unsafe {
         match key_code {
             KEY_ENTER => {
+                #[allow(static_mut_refs)]
                 TERMINAL.process_command();
                 true
             }
@@ -72,6 +69,7 @@ fn handle_special_key(key_code: i32, shift_pressed: bool) -> bool {
             KEY_UP => {
                 if TERMINAL.command_length == 0 {
                     // No command typed, scroll up in output history
+                    #[allow(static_mut_refs)]
                     TERMINAL.scroll_up(3);
                 } else if COMMAND_HISTORY_INDEX > 0 {
                     // Command typed, navigate command history
@@ -91,6 +89,7 @@ fn handle_special_key(key_code: i32, shift_pressed: bool) -> bool {
             KEY_DOWN => {
                 if TERMINAL.command_length == 0 {
                     // No command typed, scroll down in output history
+                    #[allow(static_mut_refs)]
                     TERMINAL.scroll_down(3);
                 } else if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
                     // Command typed, navigate command history
@@ -116,26 +115,30 @@ fn handle_special_key(key_code: i32, shift_pressed: bool) -> bool {
                 true
             }
             KEY_PAGEUP => {
+                #[allow(static_mut_refs)]
                 TERMINAL.scroll_up(10);
                 true
             }
             KEY_PAGEDOWN => {
+                #[allow(static_mut_refs)]
                 TERMINAL.scroll_down(10);
                 true
             }
             KEY_HOME => {
                 if TERMINAL.command_length == 0 {
+                    #[allow(static_mut_refs)]
                     TERMINAL.scroll_to_top();
                 }
                 true
             }
             KEY_END => {
                 if TERMINAL.command_length == 0 {
+                    #[allow(static_mut_refs)]
                     TERMINAL.scroll_to_bottom();
                 }
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 }
@@ -148,122 +151,22 @@ fn handle_character_input(ch: char) {
         if ch_byte < 32 || ch_byte > 126 {
             return; // Skip non-printable characters
         }
-        
+
         // Check buffer bounds more conservatively
-        if TERMINAL.command_length < 510 { // Leave more space for safety
+        if TERMINAL.command_length < 510 {
+            // Leave more space for safety
             TERMINAL.command_buffer[TERMINAL.command_length] = ch_byte;
             TERMINAL.command_length += 1;
             // Ensure null termination
             TERMINAL.command_buffer[TERMINAL.command_length] = 0;
         } else {
             // Command too long - auto-clear to prevent issues
+            #[allow(static_mut_refs)]
             TERMINAL.add_output_line(b"Command too long - cleared");
             TERMINAL.command_length = 0;
             for j in 0..512 {
                 TERMINAL.command_buffer[j] = 0;
             }
-        }
-    }
-}
-
-fn handle_shortcut_keys() {
-    unsafe {
-        // Only handle shortcuts when command line is empty to avoid conflicts
-        if TERMINAL.command_length > 0 {
-            return;
-        }
-        
-        if is_key_pressed(KEY_L) {
-            // Quick 'ls' shortcut
-            TERMINAL.command_buffer[0] = b'l';
-            TERMINAL.command_buffer[1] = b's';
-            TERMINAL.command_length = 2;
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_P) {
-            // Quick 'ps' shortcut
-            TERMINAL.command_buffer[0] = b'p';
-            TERMINAL.command_buffer[1] = b's';
-            TERMINAL.command_length = 2;
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_H) {
-            // Quick 'help' shortcut
-            let help_cmd = b"help";
-            for (i, &byte) in help_cmd.iter().enumerate() {
-                TERMINAL.command_buffer[i] = byte;
-            }
-            TERMINAL.command_length = help_cmd.len();
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_S) {
-            // Quick 'system' shortcut
-            let sys_cmd = b"system";
-            for (i, &byte) in sys_cmd.iter().enumerate() {
-                TERMINAL.command_buffer[i] = byte;
-            }
-            TERMINAL.command_length = sys_cmd.len();
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_U) {
-            // Quick 'uname' shortcut
-            let uname_cmd = b"uname";
-            for (i, &byte) in uname_cmd.iter().enumerate() {
-                TERMINAL.command_buffer[i] = byte;
-            }
-            TERMINAL.command_length = uname_cmd.len();
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_C) {
-            // Quick 'clear' shortcut
-            let clear_cmd = b"clear";
-            for (i, &byte) in clear_cmd.iter().enumerate() {
-                TERMINAL.command_buffer[i] = byte;
-            }
-            TERMINAL.command_length = clear_cmd.len();
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_M) {
-            // Quick 'main' shortcut
-            let main_cmd = b"main";
-            for (i, &byte) in main_cmd.iter().enumerate() {
-                TERMINAL.command_buffer[i] = byte;
-            }
-            TERMINAL.command_length = main_cmd.len();
-            TERMINAL.process_command();
-            return;
-        }
-        
-        if is_key_pressed(KEY_T) {
-            // Quick 'theme next' shortcut
-            TERMINAL.current_theme = TERMINAL.current_theme.next_theme();
-            let theme_name = TERMINAL.current_theme.name();
-            
-            let mut response = [0u8; 120];
-            let prefix = b"Switched to theme: ";
-            let mut pos = 0;
-            
-            for &byte in prefix {
-                if pos < 119 { response[pos] = byte; pos += 1; }
-            }
-            for &byte in theme_name.as_bytes() {
-                if pos < 119 { response[pos] = byte; pos += 1; }
-            }
-            
-            TERMINAL.add_output_line(&response);
-            return;
         }
     }
 }

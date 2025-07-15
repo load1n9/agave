@@ -189,6 +189,7 @@ pub fn init_dns(dns_servers: Vec<Ipv4Addr>) -> AgaveResult<()> {
 /// Resolve hostname to IP address
 pub async fn resolve(hostname: &str) -> AgaveResult<Ipv4Addr> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(resolver) = &mut DNS_RESOLVER {
             resolver.resolve(hostname).await
         } else {
@@ -200,6 +201,7 @@ pub async fn resolve(hostname: &str) -> AgaveResult<Ipv4Addr> {
 /// Add a DNS server
 pub fn add_dns_server(server: Ipv4Addr) -> AgaveResult<()> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(resolver) = &mut DNS_RESOLVER {
             resolver.add_dns_server(server);
             Ok(())
@@ -212,6 +214,7 @@ pub fn add_dns_server(server: Ipv4Addr) -> AgaveResult<()> {
 /// Clear DNS cache
 pub fn clear_dns_cache() -> AgaveResult<()> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(resolver) = &mut DNS_RESOLVER {
             resolver.clear_cache();
             Ok(())

@@ -4,17 +4,15 @@ use crate::sys::{
     create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
     task::executor::yield_once,
-    virtio::{Desc, Virtio},
+    virtio::Virtio,
 };
 use alloc::{
-    boxed::Box,
     string::{String, ToString},
-    sync::Arc,
     vec,
     vec::Vec,
 };
 use core::{
-    ptr::{read_volatile, write_volatile},
+    ptr::read_volatile,
     sync::atomic::{AtomicU32, Ordering},
 };
 use lazy_static::lazy_static;
@@ -27,34 +25,54 @@ const VIRTIO_SCSI_F_CHANGE: u64 = 1 << 2;
 const VIRTIO_SCSI_F_T10_PI: u64 = 1 << 3;
 
 /// SCSI queue indices
+#[allow(dead_code)]
 const SCSI_CONTROL_QUEUE: u16 = 0;
 const SCSI_EVENT_QUEUE: u16 = 1;
 const SCSI_REQUEST_QUEUE: u16 = 2;
 
 /// SCSI response codes
 const VIRTIO_SCSI_S_OK: u8 = 0;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_OVERRUN: u8 = 1;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_ABORTED: u8 = 2;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_BAD_TARGET: u8 = 3;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_RESET: u8 = 4;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_BUSY: u8 = 5;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_TRANSPORT_FAILURE: u8 = 6;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_TARGET_FAILURE: u8 = 7;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_NEXUS_FAILURE: u8 = 8;
+#[allow(dead_code)]
 const VIRTIO_SCSI_S_FAILURE: u8 = 9;
 
 /// SCSI task management functions
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_ABORT_TASK: u32 = 0;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_ABORT_TASK_SET: u32 = 1;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_CLEAR_ACA: u32 = 2;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_CLEAR_TASK_SET: u32 = 3;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_I_T_NEXUS_RESET: u32 = 4;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_LOGICAL_UNIT_RESET: u32 = 5;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_QUERY_TASK: u32 = 6;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_TMF_QUERY_TASK_SET: u32 = 7;
 
 /// SCSI event types
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_EVENTS_MISSED: u32 = 0x40000000;
+#[allow(dead_code)]
 const VIRTIO_SCSI_T_NO_EVENT: u32 = 0;
 const VIRTIO_SCSI_T_TRANSPORT_RESET: u32 = 1;
 const VIRTIO_SCSI_T_ASYNC_NOTIFY: u32 = 2;
@@ -105,6 +123,7 @@ struct VirtioScsiRespHeader {
 }
 
 /// SCSI control request
+#[allow(dead_code)]
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiCtrlTmfReq {
@@ -115,6 +134,7 @@ struct VirtioScsiCtrlTmfReq {
 }
 
 /// SCSI control response
+#[allow(dead_code)]
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 struct VirtioScsiCtrlTmfResp {
@@ -205,6 +225,7 @@ pub struct ScsiResult {
 pub struct VirtioScsi {
     virtio: Virtio,
     config: VirtioScsiConfig,
+    #[allow(dead_code)]
     features: u64,
     devices: Vec<ScsiDevice>,
     request_counter: AtomicU32,

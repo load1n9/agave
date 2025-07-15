@@ -29,9 +29,4 @@ unsafe extern "C" {
     pub fn is_key_released(key_code: i32) -> bool;
     pub fn get_key_history_count() -> i32;
     pub fn get_key_history_event(index: i32) -> i64; // Returns key code in low 32 bits, pressed state in high 32 bits
-
-    // Mouse input functions (placeholder - will use default values for now)
-    pub fn get_mouse_x() -> i32;
-    pub fn get_mouse_y() -> i32;
-    pub fn is_mouse_button_down(button: i32) -> bool;
 }

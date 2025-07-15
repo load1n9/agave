@@ -10,6 +10,7 @@ use spin::Mutex;
 // HTTP Fields type for headers
 #[derive(Debug, Clone)]
 pub struct Fields {
+    #[allow(dead_code)]
     headers: BTreeMap<String, String>,
 }
 

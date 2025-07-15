@@ -21,6 +21,7 @@ fn wasi_error_to_stream_error(_err: WasiError) -> StreamError {
 }
 
 // Additional helper functions for various error conversion patterns
+#[allow(dead_code)]
 fn wasi_error_to_u16(error: WasiError) -> u16 {
     error.errno
 }

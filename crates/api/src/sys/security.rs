@@ -11,10 +11,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    hash::{Hash, Hasher},
-    sync::atomic::{AtomicU64, Ordering},
-};
+use core::{hash::Hash, sync::atomic::Ordering};
 use spin::Mutex;
 
 /// Security context for processes and operations
@@ -265,6 +262,7 @@ pub enum SecurityAction {
 }
 
 impl SecurityMonitor {
+    #[allow(dead_code)]
     fn new() -> Self {
         let mut monitor = Self {
             events: Vec::new(),
@@ -606,6 +604,7 @@ pub struct AccessControlManager {
 }
 
 impl AccessControlManager {
+    #[allow(dead_code)]
     fn new() -> Self {
         let mut manager = Self {
             contexts: BTreeMap::new(),

@@ -133,6 +133,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         );
         draw_text(
             Position::new(margin + 100, 345),
+            #[allow(static_mut_refs)]
             TERMINAL.current_theme.name(),
             colors.accent_purple,
         );
@@ -972,6 +973,7 @@ fn draw_status_bar(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         draw_text(Position::new(500, status_y + 12), "│", colors.border_color);
 
         // Show current theme name
+        #[allow(static_mut_refs)]
         let theme_text = TERMINAL.current_theme.name();
         draw_text(
             Position::new(520, status_y + 12),

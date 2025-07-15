@@ -1,9 +1,8 @@
 /// Real-time system diagnostics and health monitoring
 use crate::sys::{
-    allocator::{memory_pressure, memory_stats, MemoryPressure},
+    allocator::MemoryPressure,
     interrupts::TIME_MS,
     monitor::{get_system_metrics, SystemMetrics},
-    task::executor::TASK_METRICS,
 };
 use alloc::{
     collections::BTreeMap,

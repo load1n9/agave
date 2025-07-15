@@ -2,13 +2,11 @@
 /// Supports virtual filesystem with multiple backends
 use crate::sys::error::{AgaveError, AgaveResult, FsError};
 use alloc::{
-    boxed::Box,
     collections::BTreeMap,
     format,
     string::{String, ToString},
     vec::Vec,
 };
-use core::fmt;
 use spin::Mutex;
 
 /// File system types
@@ -291,7 +289,7 @@ impl VirtualFileSystem {
                 log::warn!("Failed to create binary {}: {:?}", binary, e);
             } else {
                 // Make executable
-                if let Ok(mut node) = self.get_node_mut(binary) {
+                if let Ok(node) = self.get_node_mut(binary) {
                     let metadata = node.metadata_mut();
                     metadata.permissions.owner_execute = true;
                     metadata.permissions.group_execute = true;
@@ -660,6 +658,7 @@ where
     F: FnOnce(&mut VirtualFileSystem) -> AgaveResult<R>,
 {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(fs) = &FILESYSTEM {
             let mut guard = fs.lock();
             f(&mut *guard)

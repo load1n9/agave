@@ -1,6 +1,6 @@
-use crate::state::{TERMINAL, COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
+use crate::state::{COMMAND_HISTORY, COMMAND_HISTORY_COUNT, COMMAND_HISTORY_INDEX};
+use crate::themes::get_theme_description;
 use crate::types::{Screen, TerminalApp, Theme};
-use crate::themes::{get_theme_description};
 
 impl TerminalApp {
     pub fn process_command(&mut self) {
@@ -14,7 +14,7 @@ impl TerminalApp {
             }
             return;
         }
-        
+
         // Add command to history
         unsafe {
             if COMMAND_HISTORY_COUNT < 20 {
@@ -39,7 +39,7 @@ impl TerminalApp {
             }
             COMMAND_HISTORY_INDEX = COMMAND_HISTORY_COUNT;
         }
-        
+
         // Show command in output (echo)
         let mut prompt_line = [0u8; 120];
         prompt_line[0] = b'$';
@@ -48,7 +48,7 @@ impl TerminalApp {
             prompt_line[i + 2] = self.command_buffer[i];
         }
         self.add_output_line(&prompt_line);
-        
+
         // Convert command to lowercase for case-insensitive matching
         let mut cmd_lower = [0u8; 512];
         for i in 0..self.command_length {
@@ -57,7 +57,7 @@ impl TerminalApp {
                 _ => self.command_buffer[i],
             };
         }
-        
+
         // Process the command
         if self.command_length == 2 && &cmd_lower[0..2] == b"ls" {
             self.handle_ls_command();
@@ -138,37 +138,56 @@ impl TerminalApp {
         let hours = uptime_seconds / 3600;
         let minutes = (uptime_seconds % 3600) / 60;
         let seconds = uptime_seconds % 60;
-        
+
         // Format uptime string manually (no std format!)
         let mut uptime_line = [0u8; 80];
         let mut pos = 0;
-        
+
         // "up "
-        uptime_line[pos] = b'u'; pos += 1;
-        uptime_line[pos] = b'p'; pos += 1;
-        uptime_line[pos] = b' '; pos += 1;
-        
+        uptime_line[pos] = b'u';
+        pos += 1;
+        uptime_line[pos] = b'p';
+        pos += 1;
+        uptime_line[pos] = b' ';
+        pos += 1;
+
         // hours
         if hours > 0 {
-            if hours >= 10 { uptime_line[pos] = b'0' + (hours / 10) as u8; pos += 1; }
-            uptime_line[pos] = b'0' + (hours % 10) as u8; pos += 1;
-            uptime_line[pos] = b'h'; pos += 1;
-            uptime_line[pos] = b' '; pos += 1;
+            if hours >= 10 {
+                uptime_line[pos] = b'0' + (hours / 10) as u8;
+                pos += 1;
+            }
+            uptime_line[pos] = b'0' + (hours % 10) as u8;
+            pos += 1;
+            uptime_line[pos] = b'h';
+            pos += 1;
+            uptime_line[pos] = b' ';
+            pos += 1;
         }
-        
+
         // minutes
         if minutes > 0 || hours > 0 {
-            if minutes >= 10 { uptime_line[pos] = b'0' + (minutes / 10) as u8; pos += 1; }
-            uptime_line[pos] = b'0' + (minutes % 10) as u8; pos += 1;
-            uptime_line[pos] = b'm'; pos += 1;
-            uptime_line[pos] = b' '; pos += 1;
+            if minutes >= 10 {
+                uptime_line[pos] = b'0' + (minutes / 10) as u8;
+                pos += 1;
+            }
+            uptime_line[pos] = b'0' + (minutes % 10) as u8;
+            pos += 1;
+            uptime_line[pos] = b'm';
+            pos += 1;
+            uptime_line[pos] = b' ';
+            pos += 1;
         }
-        
+
         // seconds
-        if seconds >= 10 { uptime_line[pos] = b'0' + (seconds / 10) as u8; pos += 1; }
-        uptime_line[pos] = b'0' + (seconds % 10) as u8; pos += 1;
+        if seconds >= 10 {
+            uptime_line[pos] = b'0' + (seconds / 10) as u8;
+            pos += 1;
+        }
+        uptime_line[pos] = b'0' + (seconds % 10) as u8;
+        pos += 1;
         uptime_line[pos] = b's';
-        
+
         self.add_output_line(&uptime_line);
     }
 
@@ -278,113 +297,138 @@ impl TerminalApp {
             // Just "theme" - show current theme
             let current_name = self.current_theme.name();
             let mut response = [0u8; 120];
-            
+
             // Build response string manually
             let prefix = b"Current theme: ";
             let desc_text = get_theme_description(self.current_theme);
-            
+
             let mut pos = 0;
             // Copy prefix
             for &byte in prefix {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
             // Copy theme name
             for &byte in current_name.as_bytes() {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
-            
+
             self.add_output_line(&response);
-            
+
             // Add description
             let mut desc_line = [0u8; 120];
             let desc_bytes = desc_text.as_bytes();
             let desc_len = desc_bytes.len().min(119);
             desc_line[..desc_len].copy_from_slice(&desc_bytes[..desc_len]);
             self.add_output_line(&desc_line);
-            
+
             self.add_output_line(b"Use 'theme list' to see all themes");
             self.add_output_line(b"Use 'theme <name>' to switch themes");
             self.add_output_line(b"Use 'theme next' or 'theme prev' to cycle");
-            
         } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"list" {
             // "theme list" - show all available themes
             self.add_output_line(b"Available themes:");
             self.add_output_line(b"");
-            
+
             for theme in Theme::all_themes().iter() {
                 let mut line = [0u8; 120];
                 let name = theme.name();
                 let desc = get_theme_description(*theme);
-                
+
                 let mut pos = 0;
                 // Add indicator for current theme
                 if *theme == self.current_theme {
-                    line[pos] = b'*'; pos += 1;
-                    line[pos] = b' '; pos += 1;
+                    line[pos] = b'*';
+                    pos += 1;
+                    line[pos] = b' ';
+                    pos += 1;
                 } else {
-                    line[pos] = b' '; pos += 1;
-                    line[pos] = b' '; pos += 1;
+                    line[pos] = b' ';
+                    pos += 1;
+                    line[pos] = b' ';
+                    pos += 1;
                 }
-                
+
                 // Add theme name
                 for &byte in name.as_bytes() {
-                    if pos < 119 { line[pos] = byte; pos += 1; }
+                    if pos < 119 {
+                        line[pos] = byte;
+                        pos += 1;
+                    }
                 }
-                
+
                 // Add spacing
                 while pos < 20 && pos < 119 {
-                    line[pos] = b' '; pos += 1;
+                    line[pos] = b' ';
+                    pos += 1;
                 }
-                
+
                 // Add description
                 for &byte in desc.as_bytes() {
-                    if pos < 119 { line[pos] = byte; pos += 1; }
+                    if pos < 119 {
+                        line[pos] = byte;
+                        pos += 1;
+                    }
                 }
-                
+
                 self.add_output_line(&line);
             }
-            
         } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"next" {
             // "theme next" - switch to next theme
             self.current_theme = self.current_theme.next_theme();
             let new_name = self.current_theme.name();
-            
+
             let mut response = [0u8; 120];
             let prefix = b"Switched to theme: ";
             let mut pos = 0;
-            
+
             for &byte in prefix {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
             for &byte in new_name.as_bytes() {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
-            
+
             self.add_output_line(&response);
-            
         } else if self.command_length >= 10 && &self.command_buffer[6..10] == b"prev" {
             // "theme prev" - switch to previous theme
             self.current_theme = self.current_theme.prev_theme();
             let new_name = self.current_theme.name();
-            
+
             let mut response = [0u8; 120];
             let prefix = b"Switched to theme: ";
             let mut pos = 0;
-            
+
             for &byte in prefix {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
             for &byte in new_name.as_bytes() {
-                if pos < 119 { response[pos] = byte; pos += 1; }
+                if pos < 119 {
+                    response[pos] = byte;
+                    pos += 1;
+                }
             }
-            
+
             self.add_output_line(&response);
-            
         } else if self.command_length > 6 {
             // "theme <name>" - switch to specific theme
             let theme_name_start = 6;
             let theme_name_len = self.command_length - theme_name_start;
-            
+
             // Extract theme name and convert to lowercase for comparison
             let mut theme_name = [0u8; 64];
             for i in 0..theme_name_len.min(63) {
@@ -394,35 +438,42 @@ impl TerminalApp {
                     _ => ch,
                 };
             }
-            
+
             // Try to match theme name
             let mut found_theme = None;
             for theme in Theme::all_themes().iter() {
                 let theme_name_bytes = theme.name().to_lowercase();
                 let theme_name_lower = theme_name_bytes.as_bytes();
-                
-                if theme_name_len == theme_name_lower.len() &&
-                   &theme_name[..theme_name_len] == theme_name_lower {
+
+                if theme_name_len == theme_name_lower.len()
+                    && &theme_name[..theme_name_len] == theme_name_lower
+                {
                     found_theme = Some(*theme);
                     break;
                 }
             }
-            
+
             if let Some(new_theme) = found_theme {
                 self.current_theme = new_theme;
                 let new_name = new_theme.name();
-                
+
                 let mut response = [0u8; 120];
                 let prefix = b"Switched to theme: ";
                 let mut pos = 0;
-                
+
                 for &byte in prefix {
-                    if pos < 119 { response[pos] = byte; pos += 1; }
+                    if pos < 119 {
+                        response[pos] = byte;
+                        pos += 1;
+                    }
                 }
                 for &byte in new_name.as_bytes() {
-                    if pos < 119 { response[pos] = byte; pos += 1; }
+                    if pos < 119 {
+                        response[pos] = byte;
+                        pos += 1;
+                    }
                 }
-                
+
                 self.add_output_line(&response);
             } else {
                 self.add_output_line(b"Unknown theme. Use 'theme list' to see available themes.");
@@ -504,647 +555,5 @@ impl TerminalApp {
         self.add_output_line(b"- Unix-like directory structure");
         self.add_output_line(b"- File permissions");
         self.add_output_line(b"- Symbolic links");
-    }
-
-    // ...existing code...
-}
-
-// Enhanced command processing with filesystem and network integration
-pub fn process_command(cmd: &str) -> bool {
-    let parts: Vec<&str> = cmd.trim().split_whitespace().collect();
-    if parts.is_empty() {
-        return false;
-    }
-
-    let command = parts[0];
-    let args = &parts[1..];
-
-    match command {
-        // File system commands
-        "ls" | "dir" => {
-            list_directory(args);
-            true
-        }
-        "cat" => {
-            if args.is_empty() {
-                add_output("cat: missing file operand");
-            } else {
-                cat_file(args[0]);
-            }
-            true
-        }
-        "mkdir" => {
-            if args.is_empty() {
-                add_output("mkdir: missing directory name");
-            } else {
-                make_directory(args[0]);
-            }
-            true
-        }
-        "rm" | "del" => {
-            if args.is_empty() {
-                add_output("rm: missing file operand");
-            } else {
-                remove_file(args[0]);
-            }
-            true
-        }
-        "pwd" => {
-            show_working_directory();
-            true
-        }
-        "cd" => {
-            if args.is_empty() {
-                change_directory("/home/user");
-            } else {
-                change_directory(args[0]);
-            }
-            true
-        }
-        "touch" => {
-            if args.is_empty() {
-                add_output("touch: missing file operand");
-            } else {
-                create_file(args[0]);
-            }
-            true
-        }
-        "echo" => {
-            if args.is_empty() {
-                add_output("");
-            } else {
-                let text = args.join(" ");
-                add_output(&text);
-            }
-            true
-        }
-        "find" => {
-            if args.is_empty() {
-                add_output("find: missing path");
-            } else {
-                find_files(args[0], args.get(1).map(|s| *s));
-            }
-            true
-        }
-
-        // System information commands
-        "ps" => {
-            show_processes();
-            true
-        }
-        "top" => {
-            show_system_monitor();
-            true
-        }
-        "free" => {
-            show_memory_info();
-            true
-        }
-        "df" => {
-            show_disk_usage();
-            true
-        }
-        "uptime" => {
-            show_uptime();
-            true
-        }
-        "uname" => {
-            if args.contains(&"-a") {
-                add_output("Agave OS 1.0.0 x86_64 GNU/Linux");
-            } else {
-                add_output("Agave OS");
-            }
-            true
-        }
-        "whoami" => {
-            add_output("user");
-            true
-        }
-        "date" => {
-            show_date();
-            true
-        }
-        "env" => {
-            show_environment();
-            true
-        }
-
-        // Network commands
-        "ping" => {
-            if args.is_empty() {
-                add_output("ping: missing destination");
-            } else {
-                ping_host(args[0]);
-            }
-            true
-        }
-        "wget" | "curl" => {
-            if args.is_empty() {
-                add_output(&format!("{}: missing URL", command));
-            } else {
-                download_url(args[0]);
-            }
-            true
-        }
-        "netstat" => {
-            show_network_status();
-            true
-        }
-        "ifconfig" => {
-            show_network_interfaces();
-            true
-        }
-
-        // Text processing commands
-        "grep" => {
-            if args.len() < 2 {
-                add_output("grep: missing pattern or file");
-            } else {
-                grep_file(args[0], args[1]);
-            }
-            true
-        }
-        "wc" => {
-            if args.is_empty() {
-                add_output("wc: missing file operand");
-            } else {
-                word_count(args[0]);
-            }
-            true
-        }
-        "head" => {
-            if args.is_empty() {
-                add_output("head: missing file operand");
-            } else {
-                head_file(args[0], args.get(1).map(|s| *s));
-            }
-            true
-        }
-        "tail" => {
-            if args.is_empty() {
-                add_output("tail: missing file operand");
-            } else {
-                tail_file(args[0], args.get(1).map(|s| *s));
-            }
-            true
-        }
-
-        // System control commands
-        "mount" => {
-            show_mounts();
-            true
-        }
-        "lsmod" => {
-            show_modules();
-            true
-        }
-        "dmesg" => {
-            show_kernel_messages();
-            true
-        }
-        "systemctl" => {
-            if args.is_empty() {
-                add_output("systemctl: missing command");
-            } else {
-                system_control(args);
-            }
-            true
-        }
-
-        // Help and information
-        "help" | "man" => {
-            if args.is_empty() {
-                show_command_help();
-            } else {
-                show_command_manual(args[0]);
-            }
-            true
-        }
-        "history" => {
-            show_command_history();
-            true
-        }
-        "alias" => {
-            show_aliases();
-            true
-        }
-
-        // Terminal control
-        "clear" | "cls" => {
-            clear_terminal();
-            true
-        }
-        "reset" => {
-            reset_terminal();
-            true
-        }
-        "exit" | "quit" => {
-            add_output("Goodbye!");
-            // In a real system, this would exit the terminal
-            true
-        }
-
-        // Screen navigation shortcuts (when command line is empty)
-        "l" if unsafe { TERMINAL.command_length == 0 } => {
-            process_command("ls");
-            true
-        }
-        "h" if unsafe { TERMINAL.command_length == 0 } => {
-            process_command("help");
-            true
-        }
-        "s" if unsafe { TERMINAL.command_length == 0 } => {
-            unsafe { TERMINAL.current_screen = Screen::System; }
-            true
-        }
-        "p" if unsafe { TERMINAL.command_length == 0 } => {
-            unsafe { TERMINAL.current_screen = Screen::Processes; }
-            true
-        }
-        "m" if unsafe { TERMINAL.command_length == 0 } => {
-            unsafe { TERMINAL.current_screen = Screen::Main; }
-            true
-        }
-
-        _ => {
-            add_output(&format!("{}: command not found", command));
-            add_output("Type 'help' for available commands");
-            true
-        }
-    }
-}
-
-// File system command implementations
-fn list_directory(args: &[&str]) {
-    let path = if args.is_empty() { 
-        unsafe { TERMINAL.current_directory }
-    } else { 
-        args[0] 
-    };
-    
-    add_output(&format!("Directory listing for {}", path));
-    add_output("drwxr-xr-x  2 user user    4096 Jan  1 12:00 .");
-    add_output("drwxr-xr-x  3 user user    4096 Jan  1 12:00 ..");
-    add_output("-rw-r--r--  1 user user     256 Jan  1 12:00 .bashrc");
-    add_output("drwxr-xr-x  2 user user    4096 Jan  1 12:00 documents");
-    add_output("-rw-r--r--  1 user user    1024 Jan  1 12:00 readme.md");
-    add_output("-rwxr-xr-x  1 user user   70221 Jan  1 12:00 hello.wasm");
-}
-
-fn cat_file(filename: &str) {
-    add_output(&format!("Contents of {}:", filename));
-    match filename {
-        "readme.md" => {
-            add_output("# Welcome to Agave OS");
-            add_output("This is a modern operating system written in Rust.");
-            add_output("Features:");
-            add_output("- WASM application support");
-            add_output("- Advanced memory management");
-            add_output("- Real-time system monitoring");
-        }
-        ".bashrc" => {
-            add_output("# Agave OS bash configuration");
-            add_output("echo 'Welcome to Agave OS!'");
-            add_output("alias ll='ls -la'");
-            add_output("export PATH=$PATH:/usr/local/bin");
-        }
-        "config.json" => {
-            add_output("{");
-            add_output("  \"system\": \"agave-os\",");
-            add_output("  \"version\": \"1.0.0\",");
-            add_output("  \"kernel\": \"rust-kernel\"");
-            add_output("}");
-        }
-        _ => {
-            add_output(&format!("cat: {}: No such file or directory", filename));
-        }
-    }
-}
-
-fn make_directory(dirname: &str) {
-    add_output(&format!("Created directory: {}", dirname));
-}
-
-fn remove_file(filename: &str) {
-    add_output(&format!("Removed: {}", filename));
-}
-
-fn show_working_directory() {
-    unsafe {
-        add_output(TERMINAL.current_directory);
-    }
-}
-
-fn change_directory(path: &str) {
-    add_output(&format!("Changed directory to: {}", path));
-    // In real implementation, would update TERMINAL.current_directory
-}
-
-fn create_file(filename: &str) {
-    add_output(&format!("Created file: {}", filename));
-}
-
-fn find_files(path: &str, pattern: Option<&str>) {
-    let search_pattern = pattern.unwrap_or("*");
-    add_output(&format!("Searching {} for {}", path, search_pattern));
-    add_output("./documents/report.txt");
-    add_output("./config.json");
-    add_output("./readme.md");
-}
-
-// System information command implementations
-fn show_processes() {
-    unsafe { TERMINAL.current_screen = Screen::Processes; }
-}
-
-fn show_system_monitor() {
-    add_output("System Monitor:");
-    add_output("CPU Usage: 15.2%");
-    add_output("Memory: 45.8MB / 100MB (45.8%)");
-    add_output("Load Average: 0.23, 0.18, 0.12");
-    add_output("Processes: 8 total, 7 running, 1 sleeping");
-    add_output("Uptime: 0 days, 0:12:34");
-}
-
-fn show_memory_info() {
-    add_output("Memory Information:");
-    add_output("              total        used        free      shared");
-    add_output("Mem:       104857600    48234496    56623104           0");
-    add_output("Heap:      104857600    48234496    56623104");
-    add_output("Fragmentation: 12.3%");
-}
-
-fn show_disk_usage() {
-    add_output("Filesystem     Size  Used Avail Use% Mounted on");
-    add_output("virtual        100M   45M   55M  45% /");
-    add_output("tmpfs           10M  512K  9.5M   5% /tmp");
-    add_output("devfs          1.0M    0K  1.0M   0% /dev");
-}
-
-fn show_uptime() {
-    unsafe {
-        let uptime_seconds = TERMINAL.uptime / 1000;
-        let minutes = uptime_seconds / 60;
-        let seconds = uptime_seconds % 60;
-        add_output(&format!("up 0:{:02}:{:02}, load average: 0.23", minutes, seconds));
-    }
-}
-
-fn show_date() {
-    add_output("Mon Jan  1 12:00:00 UTC 2024");
-}
-
-fn show_environment() {
-    add_output("PATH=/bin:/usr/bin:/usr/local/bin");
-    add_output("HOME=/home/user");
-    add_output("USER=user");
-    add_output("SHELL=/bin/sh");
-    add_output("TERM=agave-terminal");
-    add_output("LANG=en_US.UTF-8");
-}
-
-// Network command implementations
-fn ping_host(host: &str) {
-    add_output(&format!("PING {} (10.0.2.2)", host));
-    add_output("64 bytes from 10.0.2.2: icmp_seq=1 ttl=64 time=0.123 ms");
-    add_output("64 bytes from 10.0.2.2: icmp_seq=2 ttl=64 time=0.098 ms");
-    add_output("64 bytes from 10.0.2.2: icmp_seq=3 ttl=64 time=0.156 ms");
-    add_output("--- ping statistics ---");
-    add_output("3 packets transmitted, 3 received, 0% packet loss");
-}
-
-fn download_url(url: &str) {
-    add_output(&format!("Downloading {}...", url));
-    add_output("Network not yet available");
-    add_output("Saved to: index.html");
-}
-
-fn show_network_status() {
-    add_output("Active Internet connections:");
-    add_output("Proto Recv-Q Send-Q Local Address           Foreign Address         State");
-    add_output("tcp        0      0 10.0.2.15:22           10.0.2.2:54321          ESTABLISHED");
-    add_output("udp        0      0 10.0.2.15:68           10.0.2.2:67             ESTABLISHED");
-}
-
-fn show_network_interfaces() {
-    add_output("eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500");
-    add_output("        inet 10.0.2.15  netmask 255.255.255.0  broadcast 10.0.2.255");
-    add_output("        ether 52:54:00:12:34:56  txqueuelen 1000  (Ethernet)");
-    add_output("        RX packets 156  bytes 23456 (22.9 KiB)");
-    add_output("        TX packets 98   bytes 12345 (12.0 KiB)");
-    add_output("");
-    add_output("lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536");
-    add_output("        inet 127.0.0.1  netmask 255.0.0.0");
-    add_output("        loop  txqueuelen 1000  (Local Loopback)");
-}
-
-// Text processing command implementations  
-fn grep_file(pattern: &str, filename: &str) {
-    add_output(&format!("Searching for '{}' in {}", pattern, filename));
-    add_output("Line 1: This line contains the pattern");
-    add_output("Line 5: Another matching line with pattern");
-}
-
-fn word_count(filename: &str) {
-    add_output(&format!("Word count for {}:", filename));
-    add_output("  12   45  256 filename");
-    add_output("lines words bytes filename");
-}
-
-fn head_file(filename: &str, lines: Option<&str>) {
-    let num_lines = lines.and_then(|s| s.parse().ok()).unwrap_or(10);
-    add_output(&format!("First {} lines of {}:", num_lines, filename));
-    for i in 1..=num_lines {
-        add_output(&format!("Line {}: Sample content", i));
-    }
-}
-
-fn tail_file(filename: &str, lines: Option<&str>) {
-    let num_lines = lines.and_then(|s| s.parse().ok()).unwrap_or(10);
-    add_output(&format!("Last {} lines of {}:", num_lines, filename));
-    for i in 1..=num_lines {
-        add_output(&format!("Line {}: End content", i));
-    }
-}
-
-// System control command implementations
-fn show_mounts() {
-    add_output("Mounted filesystems:");
-    add_output("virtual on / type virtual (rw,relatime)");
-    add_output("tmpfs on /tmp type tmpfs (rw,nosuid,nodev)");
-    add_output("devfs on /dev type devfs (rw,nosuid)");
-}
-
-fn show_modules() {
-    add_output("Loaded kernel modules:");
-    add_output("virtio_gpu        32768  1");
-    add_output("virtio_input      16384  1");
-    add_output("virtio_net        24576  1");
-    add_output("wasm_runtime      65536  8");
-}
-
-fn show_kernel_messages() {
-    add_output("Kernel messages:");
-    add_output("[    0.000000] Agave OS starting...");
-    add_output("[    0.123456] Memory: 100MB available");
-    add_output("[    0.234567] VirtIO devices detected");
-    add_output("[    0.345678] Network interface eth0 up");
-    add_output("[    0.456789] WASM runtime initialized");
-}
-
-fn system_control(args: &[&str]) {
-    if args.is_empty() {
-        add_output("systemctl: missing command");
-        return;
-    }
-    
-    match args[0] {
-        "status" => {
-            if args.len() > 1 {
-                add_output(&format!("● {}.service - Active", args[1]));
-                add_output("   Loaded: loaded");
-                add_output("   Active: active (running)");
-            } else {
-                add_output("System status: operational");
-            }
-        }
-        "list-units" => {
-            add_output("UNIT                     LOAD   ACTIVE SUB     DESCRIPTION");
-            add_output("kernel.service           loaded active running Kernel");
-            add_output("memory.service           loaded active running Memory Manager");
-            add_output("network.service          loaded active running Network Stack");
-        }
-        _ => {
-            add_output(&format!("systemctl: unknown command '{}'", args[0]));
-        }
-    }
-}
-
-// Help and information command implementations
-fn show_command_help() {
-    add_output("Available commands:");
-    add_output("");
-    add_output("File Operations:");
-    add_output("  ls, dir          - List directory contents");
-    add_output("  cat              - Display file contents");
-    add_output("  mkdir            - Create directory");
-    add_output("  rm, del          - Remove file/directory");
-    add_output("  pwd              - Show current directory");
-    add_output("  cd               - Change directory");
-    add_output("  touch            - Create empty file");
-    add_output("  find             - Find files");
-    add_output("");
-    add_output("System Information:");
-    add_output("  ps               - List processes");
-    add_output("  top              - System monitor");
-    add_output("  free             - Memory information");
-    add_output("  df               - Disk usage");
-    add_output("  uptime           - System uptime");
-    add_output("  uname            - System information");
-    add_output("");
-    add_output("Network:");
-    add_output("  ping             - Ping host");
-    add_output("  wget, curl       - Download files");
-    add_output("  netstat          - Network connections");
-    add_output("  ifconfig         - Network interfaces");
-    add_output("");
-    add_output("Text Processing:");
-    add_output("  grep             - Search text patterns");
-    add_output("  wc               - Word count");
-    add_output("  head, tail       - Show file beginning/end");
-    add_output("");
-    add_output("Other:");
-    add_output("  help, man        - Show help");
-    add_output("  clear, cls       - Clear screen");
-    add_output("  history          - Command history");
-    add_output("  exit, quit       - Exit terminal");
-}
-
-fn show_command_manual(command: &str) {
-    match command {
-        "ls" => {
-            add_output("ls - list directory contents");
-            add_output("SYNOPSIS: ls [directory]");
-            add_output("Lists the contents of the specified directory");
-            add_output("or current directory if none specified.");
-        }
-        "cat" => {
-            add_output("cat - concatenate and display files");
-            add_output("SYNOPSIS: cat <filename>");
-            add_output("Displays the contents of the specified file.");
-        }
-        "ps" => {
-            add_output("ps - display running processes");
-            add_output("Shows information about currently running processes");
-            add_output("including PID, name, status, and memory usage.");
-        }
-        _ => {
-            add_output(&format!("No manual entry for '{}'", command));
-            add_output("Use 'help' to see available commands");
-        }
-    }
-}
-
-fn show_command_history() {
-    add_output("Command history:");
-    add_output("  1  ls");
-    add_output("  2  cat readme.md");
-    add_output("  3  ps");
-    add_output("  4  help");
-    add_output("  5  history");
-}
-
-fn show_aliases() {
-    add_output("Command aliases:");
-    add_output("ll='ls -la'");
-    add_output("la='ls -A'");
-    add_output("l='ls -CF'");
-    add_output("dir='ls'");
-    add_output("cls='clear'");
-}
-
-// Terminal control functions
-fn clear_terminal() {
-    unsafe {
-        TERMINAL.output_line_count = 0;
-        // Clear output buffer
-        for i in 0..TERMINAL.output_lines.len() {
-            TERMINAL.output_lines[i] = [0; 120];
-        }
-    }
-}
-
-fn reset_terminal() {
-    clear_terminal();
-    add_output("Terminal reset");
-    add_output("Agave OS Terminal v1.0");
-    add_output("Type 'help' for available commands");
-}
-
-// Utility function to add output to terminal
-fn add_output(text: &str) {
-    unsafe {
-        if TERMINAL.output_line_count < TERMINAL.output_lines.len() {
-            let bytes = text.as_bytes();
-            let len = bytes.len().min(127); // Leave space for null terminator
-            
-            TERMINAL.output_lines[TERMINAL.output_line_count][..len].copy_from_slice(&bytes[..len]);
-            TERMINAL.output_lines[TERMINAL.output_line_count][len] = 0; // Null terminator
-            TERMINAL.output_line_count += 1;
-        } else {
-            // Scroll up by moving all lines up one position
-            for i in 0..TERMINAL.output_lines.len() - 1 {
-                TERMINAL.output_lines[i] = TERMINAL.output_lines[i + 1];
-            }
-            
-            // Add new line at the bottom
-            let bytes = text.as_bytes();
-            let len = bytes.len().min(119);
-            let last_idx = TERMINAL.output_lines.len() - 1;
-            
-            TERMINAL.output_lines[last_idx] = [0; 120];
-            TERMINAL.output_lines[last_idx][..len].copy_from_slice(&bytes[..len]);
-            TERMINAL.output_lines[last_idx][len] = 0;
-        }
     }
 }

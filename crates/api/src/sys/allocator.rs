@@ -1,5 +1,4 @@
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::alloc::GlobalAlloc;
 use linked_list_allocator::LockedHeap;
 use spin::Mutex;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -73,11 +72,11 @@ static MEMORY_STATS: Mutex<MemoryStats> = Mutex::new(MemoryStats {
 });
 
 /// Memory pool for specific allocation sizes
-struct MemoryPool {
-    block_size: usize,
-    blocks: linked_list_allocator::Heap,
-    allocated_blocks: usize,
-    total_blocks: usize,
+pub struct MemoryPool {
+    pub block_size: usize,
+    pub blocks: linked_list_allocator::Heap,
+    pub allocated_blocks: usize,
+    pub total_blocks: usize,
 }
 
 impl MemoryPool {

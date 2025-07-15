@@ -13,6 +13,7 @@ use x86_64::{
 };
 
 // VirtIO Constants
+#[allow(dead_code)]
 const MAX_NUM_QUEUE: usize = 256;
 const DEVICE_ID_INPUT: isize = 18;
 const DEVICE_ID_GPU: isize = 16;
@@ -32,6 +33,7 @@ const VIRTIO_PCI_CAP_PCI_CFG: u8 = 5;
 // VirtIO Queue Descriptor Flags
 const VIRTQ_DESC_F_NEXT: u16 = 1;
 const VIRTQ_DESC_F_WRITE: u16 = 2;
+#[allow(dead_code)]
 const VIRTQ_DESC_F_INDIRECT: u16 = 4;
 
 // VirtIO Device Status
@@ -46,15 +48,19 @@ const VIRTIO_STATUS_FAILED: u8 = 128;
 const VIRTIO_F_RING_INDIRECT_DESC: u64 = 1 << 28;
 const VIRTIO_F_RING_EVENT_IDX: u64 = 1 << 29;
 const VIRTIO_F_VERSION_1: u64 = 1 << 32;
+#[allow(dead_code)]
 const VIRTIO_F_ACCESS_PLATFORM: u64 = 1 << 33;
 const VIRTIO_F_RING_PACKED: u64 = 1 << 34;
 
 // Enhanced error handling constants
 const VIRTIO_MAX_RETRIES: u32 = 3;
+#[allow(dead_code)]
 const VIRTIO_TIMEOUT_MS: u64 = 5000;
 
 // MSI-X constants
+#[allow(dead_code)]
 const MSIX_TABLE_ENTRY_SIZE: usize = 16;
+#[allow(dead_code)]
 const MSIX_PBA_ENTRY_SIZE: usize = 8;
 
 /// VirtIO device state tracking

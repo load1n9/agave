@@ -1,17 +1,18 @@
 /// VirtIO Memory Balloon Device Driver for Agave OS
 /// Provides dynamic memory management between guest and host
 use crate::sys::{
-    create_identity_virt_from_phys_n,
+    // create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
-    memory::BootInfoFrameAllocator,
+    // memory::BootInfoFrameAllocator,
     task::executor::yield_once,
     virtio::{Desc, Virtio},
-    FRAME_ALLOCATOR, MAPPER,
+    FRAME_ALLOCATOR,
+    // MAPPER,
 };
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use core::{
-    ptr::{read_volatile, write_volatile},
-    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+    // ptr::{read_volatile, write_volatile},
+    sync::atomic::{AtomicU64, Ordering},
 };
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -25,7 +26,9 @@ use x86_64::{
 const VIRTIO_BALLOON_F_MUST_TELL_HOST: u64 = 1 << 0;
 const VIRTIO_BALLOON_F_STATS_VQ: u64 = 1 << 1;
 const VIRTIO_BALLOON_F_DEFLATE_ON_OOM: u64 = 1 << 2;
+#[allow(dead_code)]
 const VIRTIO_BALLOON_F_FREE_PAGE_HINT: u64 = 1 << 3;
+#[allow(dead_code)]
 const VIRTIO_BALLOON_F_PAGE_POISON: u64 = 1 << 4;
 const VIRTIO_BALLOON_F_PAGE_REPORTING: u64 = 1 << 5;
 
@@ -33,7 +36,9 @@ const VIRTIO_BALLOON_F_PAGE_REPORTING: u64 = 1 << 5;
 const BALLOON_INFLATE_QUEUE: u16 = 0;
 const BALLOON_DEFLATE_QUEUE: u16 = 1;
 const BALLOON_STATS_QUEUE: u16 = 2;
+#[allow(dead_code)]
 const BALLOON_FREE_PAGE_HINT_QUEUE: u16 = 3;
+#[allow(dead_code)]
 const BALLOON_REPORTING_QUEUE: u16 = 4;
 
 /// Page size for balloon operations (4KB)
@@ -56,15 +61,20 @@ struct VirtioBalloonConfig {
 #[repr(u16)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum BalloonStatTag {
+    #[allow(dead_code)]
     SwapIn = 0,
+    #[allow(dead_code)]
     SwapOut = 1,
     MajorFaults = 2,
     MinorFaults = 3,
     FreeMemory = 4,
     TotalMemory = 5,
     AvailableMemory = 6,
+    #[allow(dead_code)]
     DiskCaches = 7,
+    #[allow(dead_code)]
     HugetlbAllocations = 8,
+    #[allow(dead_code)]
     HugetlbFailures = 9,
 }
 
@@ -101,6 +111,7 @@ struct BalloonPage {
 pub struct VirtioBalloon {
     virtio: Virtio,
     config: VirtioBalloonConfig,
+    #[allow(dead_code)]
     features: u64,
     stats: BalloonStats,
     inflated_pages: Vec<BalloonPage>,

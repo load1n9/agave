@@ -24,7 +24,7 @@ pub async fn drive(mut virtio: Virtio) {
                     0 => { /*no op */ }
                     1 => input.handle_incoming_state(evt.code as usize, evt.value != 0),
                     2 => {
-                        let d: i32 = core::intrinsics::transmute(evt.value);
+                        let d: i32 = u32::cast_signed(evt.value);
                         match evt.code {
                             0 => input.mouse_x = (input.mouse_x as i32 + d).max(0) as usize,
                             1 => input.mouse_y = (input.mouse_y as i32 + d).max(0) as usize,

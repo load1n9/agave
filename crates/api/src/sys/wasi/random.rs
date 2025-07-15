@@ -1,7 +1,5 @@
 // WASI Random implementation for Agave OS
-use super::super::random;
 use super::error::*;
-use super::types::*;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -57,6 +55,7 @@ pub fn init_random() {
 // WASI Preview 1 API
 pub fn random_get(buf: &mut [u8]) -> WasiResult<()> {
     unsafe {
+        #[allow(static_mut_refs)]
         RNG.fill_bytes(buf);
     }
     Ok(())
@@ -83,15 +82,24 @@ pub fn get_random_u64() -> WasiResult<u64> {
 }
 
 pub fn get_random_u32() -> WasiResult<u32> {
-    unsafe { Ok(RNG.next_u32()) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok(RNG.next_u32())
+    }
 }
 
 pub fn get_random_u16() -> WasiResult<u16> {
-    unsafe { Ok((RNG.next_u64() >> 48) as u16) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok((RNG.next_u64() >> 48) as u16)
+    }
 }
 
 pub fn get_random_u8() -> WasiResult<u8> {
-    unsafe { Ok(RNG.next_u8()) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok(RNG.next_u8())
+    }
 }
 
 // Cryptographically secure random numbers (simulated)
@@ -111,6 +119,7 @@ pub fn get_secure_random_bytes(len: u64) -> WasiResult<Vec<u8>> {
     unsafe {
         let original_state = RNG.state;
         RNG.state = current_time.wrapping_mul(0x5DEECE66D).wrapping_add(0xB);
+        #[allow(static_mut_refs)]
         RNG.fill_bytes(&mut buf);
         RNG.state = original_state; // Restore original state
     }
@@ -124,7 +133,10 @@ pub fn random_uniform_u64(max: u64) -> WasiResult<u64> {
         return Err(WasiError::inval());
     }
 
-    unsafe { Ok(RNG.next_u64() % max) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok(RNG.next_u64() % max)
+    }
 }
 
 pub fn random_uniform_u32(max: u32) -> WasiResult<u32> {
@@ -132,7 +144,10 @@ pub fn random_uniform_u32(max: u32) -> WasiResult<u32> {
         return Err(WasiError::inval());
     }
 
-    unsafe { Ok(RNG.next_u32() % max) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok(RNG.next_u32() % max)
+    }
 }
 
 pub fn random_range_u64(min: u64, max: u64) -> WasiResult<u64> {
@@ -157,12 +172,16 @@ pub fn random_range_u32(min: u32, max: u32) -> WasiResult<u32> {
 
 // Random boolean
 pub fn random_bool() -> WasiResult<bool> {
-    unsafe { Ok((RNG.next_u64() & 1) == 1) }
+    #[allow(static_mut_refs)]
+    unsafe {
+        Ok((RNG.next_u64() & 1) == 1)
+    }
 }
 
 // Random float between 0.0 and 1.0
 pub fn random_f64() -> WasiResult<f64> {
     unsafe {
+        #[allow(static_mut_refs)]
         let random_bits = RNG.next_u64();
         // Convert to float in range [0, 1)
         let float_val = (random_bits >> 11) as f64 / (1u64 << 53) as f64;
@@ -172,6 +191,7 @@ pub fn random_f64() -> WasiResult<f64> {
 
 pub fn random_f32() -> WasiResult<f32> {
     unsafe {
+        #[allow(static_mut_refs)]
         let random_bits = RNG.next_u32();
         // Convert to float in range [0, 1)
         let float_val = (random_bits >> 8) as f32 / (1u32 << 24) as f32;

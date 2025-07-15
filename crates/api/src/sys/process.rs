@@ -3,8 +3,6 @@
 use crate::sys::{
     diagnostics::{add_diagnostic, DiagnosticCategory, DiagnosticLevel},
     error::{AgaveError, AgaveResult},
-    memory,
-    task::{Task, TaskId},
 };
 use alloc::{
     boxed::Box,
@@ -124,10 +122,12 @@ impl IpcChannel {
         self.messages.pop_front()
     }
 
+    #[allow(dead_code)]
     fn peek(&self) -> Option<&IpcMessage> {
         self.messages.front()
     }
 
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.messages.len()
     }
@@ -189,6 +189,7 @@ pub struct ProcessScheduler {
 }
 
 impl ProcessScheduler {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             processes: BTreeMap::new(),

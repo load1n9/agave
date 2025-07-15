@@ -258,6 +258,7 @@ extern "x86-interrupt" fn alignment_check_handler(
     panic!("");
 }
 
+#[allow(dead_code)]
 fn double_fault_handler_impl(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     panic!(
         "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",
@@ -265,6 +266,7 @@ fn double_fault_handler_impl(stack_frame: InterruptStackFrame, error_code: u64) 
     );
 }
 
+#[allow(dead_code)]
 extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     panic!(
         "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",

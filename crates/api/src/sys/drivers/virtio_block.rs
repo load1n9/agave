@@ -4,13 +4,10 @@ use crate::sys::{
     create_identity_virt_from_phys_n,
     error::{AgaveError, AgaveResult},
     task::executor::yield_once,
-    virtio::{Desc, VirtQueue, Virtio},
+    virtio::Virtio,
 };
-use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
-use core::{
-    ptr::{read_volatile, write_volatile},
-    sync::atomic::{AtomicU64, Ordering},
-};
+use alloc::{vec, vec::Vec};
+use core::{ptr::read_volatile, sync::atomic::AtomicU64};
 use futures::task::AtomicWaker;
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -22,6 +19,7 @@ const VIRTIO_BLK_F_GEOMETRY: u64 = 1 << 4;
 const VIRTIO_BLK_F_RO: u64 = 1 << 5;
 const VIRTIO_BLK_F_BLK_SIZE: u64 = 1 << 6;
 const VIRTIO_BLK_F_TOPOLOGY: u64 = 1 << 10;
+#[allow(dead_code)]
 const VIRTIO_BLK_F_MQ: u64 = 1 << 12;
 const VIRTIO_BLK_F_DISCARD: u64 = 1 << 13;
 const VIRTIO_BLK_F_WRITE_ZEROES: u64 = 1 << 14;
@@ -45,48 +43,48 @@ const MAX_SECTORS_PER_REQUEST: u32 = 256;
 /// Block device configuration
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-struct VirtioBlkConfig {
-    capacity: u64, // Device capacity in 512-byte sectors
-    size_max: u32, // Maximum segment size
-    seg_max: u32,  // Maximum number of segments
-    geometry: VirtioBlkGeometry,
-    blk_size: u32, // Block size in bytes
-    topology: VirtioBlkTopology,
-    writeback: u8, // Writeback mode
-    unused0: [u8; 3],
-    max_discard_sectors: u32,      // Maximum discard sectors
-    max_discard_seg: u32,          // Maximum discard segments
-    discard_sector_alignment: u32, // Discard sector alignment
-    max_write_zeroes_sectors: u32, // Maximum write zeroes sectors
-    max_write_zeroes_seg: u32,     // Maximum write zeroes segments
-    write_zeroes_may_unmap: u8,    // Write zeroes may unmap
-    unused1: [u8; 3],
+pub struct VirtioBlkConfig {
+    pub capacity: u64, // Device capacity in 512-byte sectors
+    pub size_max: u32, // Maximum segment size
+    pub seg_max: u32,  // Maximum number of segments
+    pub geometry: VirtioBlkGeometry,
+    pub blk_size: u32, // Block size in bytes
+    pub topology: VirtioBlkTopology,
+    pub writeback: u8, // Writeback mode
+    pub unused0: [u8; 3],
+    pub max_discard_sectors: u32,      // Maximum discard sectors
+    pub max_discard_seg: u32,          // Maximum discard segments
+    pub discard_sector_alignment: u32, // Discard sector alignment
+    pub max_write_zeroes_sectors: u32, // Maximum write zeroes sectors
+    pub max_write_zeroes_seg: u32,     // Maximum write zeroes segments
+    pub write_zeroes_may_unmap: u8,    // Write zeroes may unmap
+    pub unused1: [u8; 3],
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-struct VirtioBlkGeometry {
-    cylinders: u16,
-    heads: u8,
-    sectors: u8,
+pub struct VirtioBlkGeometry {
+    pub cylinders: u16,
+    pub heads: u8,
+    pub sectors: u8,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-struct VirtioBlkTopology {
-    physical_block_exp: u8, // Physical block size = 2^(physical_block_exp + 9)
-    alignment_offset: u8,   // Alignment offset
-    min_io_size: u16,       // Minimum I/O size
-    opt_io_size: u32,       // Optimal I/O size
+pub struct VirtioBlkTopology {
+    pub physical_block_exp: u8, // Physical block size = 2^(physical_block_exp + 9)
+    pub alignment_offset: u8,   // Alignment offset
+    pub min_io_size: u16,       // Minimum I/O size
+    pub opt_io_size: u32,       // Optimal I/O size
 }
 
 /// VirtIO Block request header
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-struct VirtioBlkReqHeader {
-    type_: u32, // Request type (read/write/flush)
-    reserved: u32,
-    sector: u64, // Starting sector number
+pub struct VirtioBlkReqHeader {
+    pub type_: u32, // Request type (read/write/flush)
+    pub reserved: u32,
+    pub sector: u64, // Starting sector number
 }
 
 /// Block I/O request
@@ -97,6 +95,7 @@ pub struct BlockRequest {
     pub sector: u64,
     pub data: Vec<u8>,
     pub status: BlockRequestStatus,
+    #[allow(dead_code)]
     waker: Option<AtomicWaker>,
 }
 
@@ -135,7 +134,9 @@ pub struct VirtioBlockDevice {
     config: VirtioBlkConfig,
     features: u64,
     stats: BlockStats,
+    #[allow(dead_code)]
     request_counter: AtomicU64,
+    #[allow(dead_code)]
     pending_requests: Vec<BlockRequest>,
     read_only: bool,
 }
@@ -405,7 +406,7 @@ impl VirtioBlockDevice {
     /// Set up the descriptor chain for a block request
     fn setup_descriptor_chain(
         &mut self,
-        desc_ids: &[u16],
+        _desc_ids: &[u16],
         header: &VirtioBlkReqHeader,
         buffer: &mut [u8],
         operation: BlockOperation,
@@ -439,7 +440,7 @@ impl VirtioBlockDevice {
         buffers.push((status_addr, 1, 2u16)); // VIRTQ_DESC_F_WRITE
 
         // Create the descriptor chain
-        if let Some(head_desc) = self.virtio.create_descriptor_chain(&buffers) {
+        if let Some(_head_desc) = self.virtio.create_descriptor_chain(&buffers) {
             Ok(())
         } else {
             Err(AgaveError::ResourceExhausted)
@@ -453,6 +454,7 @@ impl VirtioBlockDevice {
         loop {
             if self.virtio.has_used_descriptors() {
                 let mut completion_found = false;
+                #[allow(unused_assignments)]
                 let mut block_status = VIRTIO_BLK_S_OK;
 
                 // First pass: check if our descriptor is complete
@@ -546,7 +548,7 @@ impl VirtioBlockDevice {
 pub async fn drive(virtio: Virtio) {
     log::info!("Starting VirtIO block device driver");
 
-    let mut block_device = match VirtioBlockDevice::new(virtio) {
+    let block_device = match VirtioBlockDevice::new(virtio) {
         Ok(device) => device,
         Err(e) => {
             log::error!("Failed to initialize VirtIO block device: {:?}", e);
@@ -587,7 +589,7 @@ impl BlockDevice for VirtioBlockDevice {
 
         // Convert block number to sector number
         let sectors_per_block = self.block_size() / SECTOR_SIZE as u32;
-        let start_sector = block_num * sectors_per_block as u64;
+        let _start_sector = block_num * sectors_per_block as u64;
 
         // This would need to be made async in a real implementation
         // For now, return an error indicating async operation needed
@@ -605,7 +607,7 @@ impl BlockDevice for VirtioBlockDevice {
 
         // Convert block number to sector number
         let sectors_per_block = self.block_size() / SECTOR_SIZE as u32;
-        let start_sector = block_num * sectors_per_block as u64;
+        let _start_sector = block_num * sectors_per_block as u64;
 
         // This would need to be made async in a real implementation
         // For now, return an error indicating async operation needed

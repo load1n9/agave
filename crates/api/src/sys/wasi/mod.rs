@@ -16,5 +16,4 @@ pub mod types;
 
 pub use error::*;
 pub use preview1::*;
-pub use preview2::*;
 pub use types::*;

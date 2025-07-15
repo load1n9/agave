@@ -1,7 +1,7 @@
 /// Socket abstraction for network communication
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::{string::String, vec::Vec};
-use core::net::{Ipv4Addr, SocketAddr};
+use alloc::vec::Vec;
+use core::net::SocketAddr;
 
 /// Socket types
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -145,6 +145,7 @@ pub fn init_sockets() -> AgaveResult<()> {
 /// Create a socket
 pub fn socket(socket_type: SocketType, local_addr: SocketAddr) -> AgaveResult<u64> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             manager.create_socket(socket_type, local_addr)
         } else {
@@ -156,6 +157,7 @@ pub fn socket(socket_type: SocketType, local_addr: SocketAddr) -> AgaveResult<u6
 /// Close a socket
 pub fn close(socket_id: u64) -> AgaveResult<()> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             manager.close_socket(socket_id)
         } else {
@@ -167,6 +169,7 @@ pub fn close(socket_id: u64) -> AgaveResult<()> {
 /// Send data on TCP socket
 pub fn tcp_send(socket_id: u64, data: &[u8]) -> AgaveResult<usize> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             if let Some(socket) = manager.get_tcp_socket(socket_id) {
                 socket.send(data)
@@ -182,6 +185,7 @@ pub fn tcp_send(socket_id: u64, data: &[u8]) -> AgaveResult<usize> {
 /// Receive data from TCP socket
 pub fn tcp_recv(socket_id: u64, buffer: &mut [u8]) -> AgaveResult<usize> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             if let Some(socket) = manager.get_tcp_socket(socket_id) {
                 socket.receive(buffer)
@@ -197,6 +201,7 @@ pub fn tcp_recv(socket_id: u64, buffer: &mut [u8]) -> AgaveResult<usize> {
 /// Send UDP packet
 pub fn udp_send_to(socket_id: u64, data: &[u8], remote_addr: SocketAddr) -> AgaveResult<usize> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             if let Some(socket) = manager.get_udp_socket(socket_id) {
                 socket.send_to(data, remote_addr)
@@ -212,6 +217,7 @@ pub fn udp_send_to(socket_id: u64, data: &[u8], remote_addr: SocketAddr) -> Agav
 /// Receive UDP packet
 pub fn udp_recv_from(socket_id: u64, buffer: &mut [u8]) -> AgaveResult<(usize, SocketAddr)> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &mut SOCKET_MANAGER {
             if let Some(socket) = manager.get_udp_socket(socket_id) {
                 socket.recv_from(buffer)
@@ -227,6 +233,7 @@ pub fn udp_recv_from(socket_id: u64, buffer: &mut [u8]) -> AgaveResult<(usize, S
 /// List all sockets
 pub fn list_sockets() -> Vec<(u64, SocketType, SocketState)> {
     unsafe {
+        #[allow(static_mut_refs)]
         if let Some(manager) = &SOCKET_MANAGER {
             manager.list_sockets()
         } else {

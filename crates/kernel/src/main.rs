@@ -185,9 +185,9 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     // .expect("no acpi table");
 
     let proc_info = pi.processor_info.expect("processor_info");
-    // log::info!("{:?}", pi.power_profile);
+    log::info!("{:?}", pi.power_profile);
     // log::info!("{:#?}", pi.interrupt_model);
-    // log::info!("{:?}", proc_info.boot_processor);
+    log::info!("{:?}", proc_info.boot_processor);
     for proc in proc_info.application_processors.iter() {
         log::info!("{:?}", proc);
     }

@@ -1,5 +1,5 @@
-use agave_lib::RGBA;
 use crate::types::Theme;
+use agave_lib::RGBA;
 
 /// Theme color scheme structure
 #[derive(Clone, Copy)]
@@ -128,19 +128,19 @@ pub fn get_theme_colors(theme: Theme) -> ThemeColors {
             accent_cyan: RGBA::new(0, 255, 255, 255),
         },
         Theme::Retro => ThemeColors {
-            bg_primary: RGBA::new(33, 37, 41, 255),    // Classic terminal green background
+            bg_primary: RGBA::new(33, 37, 41, 255),
             bg_secondary: RGBA::new(40, 44, 52, 255),
             bg_accent: RGBA::new(52, 58, 64, 255),
             border_color: RGBA::new(108, 117, 125, 255),
-            text_primary: RGBA::new(0, 255, 65, 255),   // Classic terminal green
-            text_secondary: RGBA::new(0, 200, 50, 255), // Dimmer green
-            text_muted: RGBA::new(0, 150, 35, 255),     // Even dimmer green
-            accent_green: RGBA::new(0, 255, 65, 255),   // Same as primary text
-            accent_blue: RGBA::new(0, 200, 255, 255),   // Cyan-ish blue
-            accent_yellow: RGBA::new(255, 255, 0, 255), // Bright yellow
-            accent_red: RGBA::new(255, 65, 65, 255),    // Bright red
-            accent_purple: RGBA::new(255, 0, 255, 255), // Magenta
-            accent_cyan: RGBA::new(0, 255, 255, 255),   // Cyan
+            text_primary: RGBA::new(0, 255, 65, 255),
+            text_secondary: RGBA::new(0, 200, 50, 255),
+            text_muted: RGBA::new(0, 150, 35, 255),
+            accent_green: RGBA::new(0, 255, 65, 255),
+            accent_blue: RGBA::new(0, 200, 255, 255),
+            accent_yellow: RGBA::new(255, 255, 0, 255),
+            accent_red: RGBA::new(255, 65, 65, 255),
+            accent_purple: RGBA::new(255, 0, 255, 255),
+            accent_cyan: RGBA::new(0, 255, 255, 255),
         },
     }
 }
@@ -150,7 +150,7 @@ pub fn get_theme_description(theme: Theme) -> &'static str {
     match theme {
         Theme::Default => "Modern dark blue-gray theme with balanced contrast",
         Theme::Dark => "Pure black background with bright accent colors",
-        Theme::Light => "Clean light theme optimized for bright environments", 
+        Theme::Light => "Clean light theme optimized for bright environments",
         Theme::Ocean => "Deep blue oceanic theme with aqua accents",
         Theme::Forest => "Natural green forest theme for reduced eye strain",
         Theme::Sunset => "Warm orange-red sunset theme for evening use",

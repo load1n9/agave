@@ -108,7 +108,7 @@ pub fn create_identity_virt_from_phys(
 
 pub fn with_mapper_framealloc<FUNC, R>(f: FUNC) -> R
 where
-    FUNC: FnOnce(&mut OffsetPageTable, &mut BootInfoFrameAllocator) -> R,
+    FUNC: FnOnce(&mut OffsetPageTable<'static>, &mut BootInfoFrameAllocator) -> R,
 {
     let mut mapper = MAPPER.get().unwrap().lock();
     let mut frame_allocator = FRAME_ALLOCATOR.get().unwrap().lock();
@@ -125,7 +125,6 @@ pub fn create_identity_virt_from_phys_n(pages: usize) -> Result<Page, MapToError
             let frame = frame_allocator.allocate_frame().unwrap();
             let frame_start = frame.start_address().as_u64();
 
-            // log::info!("{} : {}", i, frame_start);
             if first_frame.start_address().as_u64() + (i as u64) * 4096 != frame_start {
                 panic!("create_identity_virt_from_phys_n NON CONTIGUOUS, {}", i)
             }

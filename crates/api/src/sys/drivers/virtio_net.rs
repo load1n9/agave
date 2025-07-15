@@ -140,10 +140,30 @@ impl VirtioNet {
     pub fn process_received_packets(&mut self) -> AgaveResult<usize> {
         let mut packets_processed = 0;
 
-        // For now, simulate packet reception
-        // TODO: Implement actual VirtIO packet reception
-        log::trace!("Processing received packets (simulated)");
+        while let Some(buffer) = self.rx_queue.get_buffer() {
+            // Simulate packet processing
+            log::trace!("Received packet: {:?}", buffer);
 
+            // Parse the packet (example: Ethernet frame parsing)
+            if buffer.len() >= 14 {
+                let destination_mac = &buffer[0..6];
+                let source_mac = &buffer[6..12];
+                let ethertype = u16::from_be_bytes([buffer[12], buffer[13]]);
+
+                log::debug!("Packet details: Destination MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}, Source MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}, Ethertype: 0x{:04x}",
+                    destination_mac[0], destination_mac[1], destination_mac[2], destination_mac[3], destination_mac[4], destination_mac[5],
+                    source_mac[0], source_mac[1], source_mac[2], source_mac[3], source_mac[4], source_mac[5],
+                    ethertype);
+            } else {
+                log::warn!("Received packet is too small to parse");
+            }
+
+            // TODO: Add actual packet processing logic here
+
+            packets_processed += 1;
+        }
+
+        log::trace!("Processed {} packets", packets_processed);
         Ok(packets_processed)
     }
 

@@ -122,8 +122,21 @@ where
         "fd_write",
         |_caller: Caller<'_, T>, fd: i32, iovs: i32, iovs_len: i32, nwritten_ptr: i32| -> i32 {
             log::debug!("fd_write({}, {}, {}, {})", fd, iovs, iovs_len, nwritten_ptr);
-            // In a real implementation, write iovs to file
-            ERRNO_SUCCESS as i32
+            let iovec = IOVec {
+                buf: iovs as u32,
+                buf_len: iovs_len as u32,
+            };
+            match filesystem::fd_write(fd as Fd, &[iovec]) {
+                Ok(nwritten) => {
+                    // Write nwritten to nwritten_ptr in WebAssembly memory
+                    unsafe {
+                        let nwritten_ptr = nwritten_ptr as *mut u32;
+                        *nwritten_ptr = nwritten;
+                    }
+                    ERRNO_SUCCESS as i32
+                },
+                Err(e) => e.errno as i32,
+            }
         },
     )?;
 
@@ -132,8 +145,21 @@ where
         "fd_read",
         |_caller: Caller<'_, T>, fd: i32, iovs: i32, iovs_len: i32, nread_ptr: i32| -> i32 {
             log::debug!("fd_read({}, {}, {}, {})", fd, iovs, iovs_len, nread_ptr);
-            // In a real implementation, read from file and write to iovs
-            ERRNO_SUCCESS as i32
+            let iovec = IOVec {
+                buf: iovs as u32,
+                buf_len: iovs_len as u32,
+            };
+            match filesystem::fd_read(fd as Fd, &[iovec]) {
+                Ok(nread) => {
+                    // Write nread to nread_ptr in WebAssembly memory
+                    unsafe {
+                        let nread_ptr = nread_ptr as *mut u32;
+                        *nread_ptr = nread;
+                    }
+                    ERRNO_SUCCESS as i32
+                },
+                Err(e) => e.errno as i32,
+            }
         },
     )?;
 
@@ -152,7 +178,17 @@ where
         "fd_fdstat_get",
         |_caller: Caller<'_, T>, fd: i32, stat_ptr: i32| -> i32 {
             log::debug!("fd_fdstat_get({}, {})", fd, stat_ptr);
-            ERRNO_SUCCESS as i32
+            match filesystem::fd_fdstat_get(fd as Fd) {
+                Ok(fdstat) => {
+                    // Write fdstat to stat_ptr in WebAssembly memory
+                    unsafe {
+                        let stat_ptr = stat_ptr as *mut FdStat;
+                        *stat_ptr = fdstat;
+                    }
+                    ERRNO_SUCCESS as i32
+                },
+                Err(e) => e.errno as i32,
+            }
         },
     )?;
 
@@ -161,7 +197,17 @@ where
         "fd_prestat_get",
         |_caller: Caller<'_, T>, fd: i32, prestat_ptr: i32| -> i32 {
             log::debug!("fd_prestat_get({}, {})", fd, prestat_ptr);
-            ERRNO_SUCCESS as i32
+            match filesystem::fd_prestat_get(fd as Fd) {
+                Ok(prestat) => {
+                    // Write prestat to prestat_ptr in WebAssembly memory
+                    unsafe {
+                        let prestat_ptr = prestat_ptr as *mut Prestat;
+                        *prestat_ptr = prestat;
+                    }
+                    ERRNO_SUCCESS as i32
+                },
+                Err(e) => e.errno as i32,
+            }
         },
     )?;
 
@@ -170,7 +216,10 @@ where
         "fd_prestat_dir_name",
         |_caller: Caller<'_, T>, fd: i32, path: i32, path_len: i32| -> i32 {
             log::debug!("fd_prestat_dir_name({}, {}, {})", fd, path, path_len);
-            ERRNO_SUCCESS as i32
+            match filesystem::fd_prestat_dir_name(fd as Fd, path as u32, path_len as Size) {
+                Ok(()) => ERRNO_SUCCESS as i32,
+                Err(e) => e.errno as i32,
+            }
         },
     )?;
 

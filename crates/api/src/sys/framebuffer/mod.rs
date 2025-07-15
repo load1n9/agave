@@ -1,3 +1,7 @@
+pub mod display;
+pub mod font;
+pub mod shapes;
+
 use crate::sys::interrupts::global_time_ms;
 use alloc::vec;
 use alloc::{slice, vec::Vec};
@@ -930,8 +934,8 @@ impl FB {
         }
     }
 
-    /// Draw text with enhanced rendering options
-    pub fn draw_text_enhanced(
+    /// Draw text
+    pub fn draw_text(
         &mut self,
         coordinate: Coordinate,
         text: &str,
@@ -1022,8 +1026,7 @@ impl FB {
         }
     }
 
-    /// Performance optimized fill for large areas
-    pub fn fill_fast(&mut self, coordinate: Coordinate, width: usize, height: usize, color: RGBA) {
+    pub fn fill(&mut self, coordinate: Coordinate, width: usize, height: usize, color: RGBA) {
         if !self.overlaps_with(coordinate, width, height) {
             return;
         }
@@ -1047,10 +1050,6 @@ impl FB {
 fn get_bit(char_font: u8, i: isize) -> u8 {
     char_font & (0x80 >> i)
 }
-
-pub mod display;
-pub mod font;
-pub mod shapes;
 
 /// Animation and transition utilities for smooth UI effects
 pub struct Animator {

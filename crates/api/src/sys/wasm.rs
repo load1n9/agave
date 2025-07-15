@@ -88,6 +88,51 @@ impl WasmApp {
 
         linker.define("agave", "fill_circle", fill_circle).unwrap();
 
+        // Add fill_gradient function
+        let fill_gradient = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x0: i32,
+             y0: i32,
+             x1: i32,
+             y1: i32,
+             r1: i32,
+             g1: i32,
+             b1: i32,
+             a1: i32,
+             r2: i32,
+             g2: i32,
+             b2: i32,
+             a2: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.fill_gradient(
+                    Coordinate {
+                        x: x0 as isize,
+                        y: y0 as isize,
+                    },
+                    Coordinate {
+                        x: x1 as isize,
+                        y: y1 as isize,
+                    },
+                    RGBA {
+                        r: r1 as u8,
+                        g: g1 as u8,
+                        b: b1 as u8,
+                        a: a1 as u8,
+                    },
+                    RGBA {
+                        r: r2 as u8,
+                        g: g2 as u8,
+                        b: b2 as u8,
+                        a: a2 as u8,
+                    },
+                );
+            },
+        );
+        linker
+            .define("agave", "fill_gradient", fill_gradient)
+            .unwrap();
+
         // Add draw_triangle function
         let draw_triangle = Func::wrap(
             &mut store,
@@ -215,6 +260,40 @@ impl WasmApp {
 
         linker
             .define("agave", "draw_rectangle", draw_rectangle)
+            .unwrap();
+
+        let draw_rounded_rectangle = Func::wrap(
+            &mut store,
+            |caller: Caller<'_, *mut FB>,
+             x: i32,
+             y: i32,
+             width: i32,
+             height: i32,
+             radius: i32,
+             r: i32,
+             g: i32,
+             b: i32,
+             a: i32| {
+                let fb = unsafe { caller.data().as_mut().unwrap() };
+                fb.draw_rounded_rectangle(
+                    Coordinate {
+                        x: x as isize,
+                        y: y as isize,
+                    },
+                    width as usize,
+                    height as usize,
+                    radius as usize,
+                    RGBA {
+                        r: r as u8,
+                        g: g as u8,
+                        b: b as u8,
+                        a: a as u8,
+                    },
+                );
+            },
+        );
+        linker
+            .define("agave", "draw_rounded_rectangle", draw_rounded_rectangle)
             .unwrap();
 
         let draw_line = Func::wrap(

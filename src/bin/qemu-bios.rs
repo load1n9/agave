@@ -28,7 +28,7 @@ fn main() {
     
     // Convert to string and normalize path separators for QEMU
     let ovmf_path_str = ovmf_code_path.to_string_lossy().replace('\\', "/");
-    println!("OVMF path for QEMU: {}", ovmf_path_str);
+    println!("OVMF path for QEMU: {ovmf_path_str}");
 
     let mut qemu = Command::new("qemu-system-x86_64");
     qemu.arg("-nodefaults");
@@ -44,7 +44,7 @@ fn main() {
     qemu.arg(format!("format=raw,file={}", env!("UEFI_PATH")));
     // Use pflash for UEFI firmware instead of -bios
     qemu.arg("-drive");
-    qemu.arg(format!("if=pflash,format=raw,file={},readonly=on", ovmf_path_str));
+    qemu.arg(format!("if=pflash,format=raw,file={ovmf_path_str},readonly=on"));
     let exit_status = qemu.status().unwrap();
     process::exit(exit_status.code().unwrap_or(-1));
 }

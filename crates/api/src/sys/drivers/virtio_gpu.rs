@@ -42,6 +42,34 @@ impl IdWaker {
 
 pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
     unsafe {
+        // Perform proper VirtIO GPU feature negotiation
+        log::info!("Starting VirtIO GPU driver with feature negotiation");
+        
+        // VirtIO GPU specific features
+        const VIRTIO_GPU_F_VIRGL: u64 = 0;
+        const VIRTIO_GPU_F_EDID: u64 = 1;
+        const VIRTIO_GPU_F_RESOURCE_UUID: u64 = 2;
+        const VIRTIO_GPU_F_RESOURCE_BLOB: u64 = 3;
+        const VIRTIO_GPU_F_CONTEXT_INIT: u64 = 4;
+        
+        // VirtIO Device Status constants
+        const VIRTIO_STATUS_DRIVER: u8 = 2;
+        const VIRTIO_STATUS_DRIVER_OK: u8 = 4;
+        
+        // Negotiate features - request basic GPU features
+        let desired_features = (1 << VIRTIO_GPU_F_VIRGL) | // Enable 3D/virgl support
+                              (1 << VIRTIO_GPU_F_EDID);    // Enable EDID support
+        
+        let negotiated_features = virtio.negotiate_features(desired_features);
+        log::info!("VirtIO GPU negotiated features: 0x{:016x}", negotiated_features);
+        
+        // Check if virgl (3D) is available
+        let virgl_enabled = (negotiated_features & (1 << VIRTIO_GPU_F_VIRGL)) != 0;
+        log::info!("VirtIO GPU 3D/virgl support: {}", if virgl_enabled { "enabled" } else { "disabled" });
+        
+        // Initialize driver status
+        virtio.set_device_status(VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_DRIVER_OK);
+        
         let q = 0;
         virtio.queue_select(q);
         let _queue = read_volatile(virtio.common.cap);
@@ -268,56 +296,54 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
         // log::info!("VirtioGpuCmdCtxCreate {:?}", nodata.type_);
 
-        //FIRST 3D SUBMIT
-        {
+        //FIRST 3D SUBMIT - Only if virgl is enabled
+        if virgl_enabled {
+            log::info!("Setting up 3D rendering context");
             let mut buffer: Vec<u32> = Vec::with_capacity(512);
 
             fn cmd_clear(
                 buffer: &mut Vec<u32>,
                 buffers: u32,
-                rgba: [u8; 4],
-                _depth: f64,
-                _stencil: u32,
+                rgba: [f32; 4],
+                depth: f64,
+                stencil: u32,
             ) {
                 let len = 8;
-                buffer.push((len << 16) + (0 << 8) + Cmd3d::VirglCcmdClear as u32);
-                //Buffer select
+                buffer.push((len << 16) | (Cmd3d::VirglCcmdClear as u32));
                 buffer.push(buffers);
-                buffer.push(rgba[0] as u32);
-                buffer.push(rgba[1] as u32);
-                buffer.push(rgba[2] as u32);
-                buffer.push(rgba[3] as u32);
-                //Depth
-                buffer.push(0);
-                buffer.push(0);
-                //stencil
-                buffer.push(0);
+                buffer.push(rgba[0].to_bits());
+                buffer.push(rgba[1].to_bits());
+                buffer.push(rgba[2].to_bits());
+                buffer.push(rgba[3].to_bits());
+                // Depth as double (8 bytes = 2 u32s)
+                let depth_bits = depth.to_bits();
+                buffer.push((depth_bits & 0xFFFFFFFF) as u32);
+                buffer.push((depth_bits >> 32) as u32);
+                buffer.push(stencil);
             }
 
             fn cmd_set_framebuffer_state(buffer: &mut Vec<u32>, handles: &[u32]) {
                 let len = handles.len() as u32 + 2;
-                buffer.push((len << 16) + (0 << 8) + Cmd3d::VirglCcmdSetFramebufferState as u32);
-                //Buffer select
+                buffer.push((len << 16) | (Cmd3d::VirglCcmdSetFramebufferState as u32));
                 buffer.push(handles.len() as u32);
-                buffer.push(0);
+                buffer.push(0); // z buffer handle (none)
                 for handle in handles.iter() {
                     buffer.push(*handle);
                 }
             }
 
-            fn cmd_create_surface(buffer: &mut Vec<u32>, handle: u32, format: VirglFormats) {
+            fn cmd_create_surface(buffer: &mut Vec<u32>, handle: u32, res_handle: u32, format: VirglFormats) {
                 let len = 5;
                 buffer.push(
                     (len << 16)
                         | ((VirglObjectType::VirglObjectSurface as u32) << 8)
-                        | Cmd3d::VirglCcmdCreateObject as u32,
+                        | (Cmd3d::VirglCcmdCreateObject as u32),
                 );
-                //Buffer select
                 buffer.push(handle);
-                buffer.push(handle);
+                buffer.push(res_handle); // Resource handle that this surface is created from
                 buffer.push(format as u32);
-                buffer.push(0);
-                buffer.push(0);
+                buffer.push(0); // first_layer
+                buffer.push(0); // last_layer
             }
 
             let res_handle = 2;
@@ -393,31 +419,48 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
             // log::info!("{:?}", nodata.type_);
 
-            cmd_create_surface(&mut buffer, res_handle, args.format);
+            cmd_create_surface(&mut buffer, res_handle, res_handle, args.format);
             cmd_set_framebuffer_state(&mut buffer, &[res_handle]);
-            cmd_clear(&mut buffer, PIPE_CLEAR_COLOR, [255, 0, 0, 255], 0.0, 0);
+            cmd_clear(&mut buffer, PIPE_CLEAR_COLOR, [1.0, 0.0, 0.0, 1.0], 1.0, 0);
 
             let len = buffer.len() as u32;
-            // pad to 512
-            while buffer.len() < 512 {
-                buffer.push(0);
-            }
-            let buffer: [u32; 512] = buffer.try_into().unwrap();
-            let response_desc = request(
-                Arc::clone(&virtio),
-                VirtioGpuCmdSubmit3d {
-                    header: VirtioGpuCtrlHdr {
-                        type_: VirtioGpuCtrlType::VirtioGpuCmdSubmit3d,
-                        ctx_id: 1,
-                        ..Default::default()
+            
+            // Validate buffer length
+            if len == 0 {
+                log::error!("Empty command buffer - skipping 3D submit");
+            } else if len > 512 {
+                log::error!("Command buffer too large: {} > 512 - truncating", len);
+            } else {
+                log::debug!("Submitting 3D command buffer with {} words", len);
+                
+                // pad to 512
+                while buffer.len() < 512 {
+                    buffer.push(0);
+                }
+                let buffer: [u32; 512] = buffer.try_into().unwrap();
+                let response_desc = request(
+                    Arc::clone(&virtio),
+                    VirtioGpuCmdSubmit3d {
+                        header: VirtioGpuCtrlHdr {
+                            type_: VirtioGpuCtrlType::VirtioGpuCmdSubmit3d,
+                            ctx_id: 1,
+                            ..Default::default()
+                        },
+                        len,
+                        buffer,
                     },
-                    len,
-                    buffer,
-                },
-            )
-            .await;
-            let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-            // log::info!("VirtioGpuCmdSubmit3d {:?}", nodata.type_);
+                )
+                .await;
+                let response = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
+                
+                if !matches!(response.type_, VirtioGpuCtrlType::VirtioGpuRespOkNoData) {
+                    log::error!("3D command submission failed with response: {:?}", response.type_);
+                } else {
+                    log::info!("3D command submission successful");
+                }
+            }
+        } else {
+            log::info!("Skipping 3D commands - virgl not available");
         }
 
         // test fb manipulation

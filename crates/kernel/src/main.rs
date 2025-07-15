@@ -361,6 +361,25 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                     log::info!("Spawning VirtIO network driver task");
                     spawner.run(drivers::virtio_net::drive(virtio));
                 }
+                DeviceType::Block => {
+                    log::info!("VirtIO block device detected - driver not yet implemented");
+                    // TODO: Implement VirtIO block driver
+                }
+                DeviceType::Console => {
+                    log::info!("VirtIO console device detected - driver not yet implemented");
+                    // TODO: Implement VirtIO console driver
+                }
+                DeviceType::Balloon => {
+                    log::info!("VirtIO balloon device detected - driver not yet implemented");
+                    // TODO: Implement VirtIO balloon driver
+                }
+                DeviceType::Scsi => {
+                    log::info!("VirtIO SCSI device detected - driver not yet implemented");
+                    // TODO: Implement VirtIO SCSI driver
+                }
+                DeviceType::Unknown(id) => {
+                    log::warn!("Unknown VirtIO device type {} detected - no driver available", id);
+                }
             }
         }
         log::info!("VirtIO drivers spawned");

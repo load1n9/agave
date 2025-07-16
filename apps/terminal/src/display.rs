@@ -362,7 +362,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.text_secondary,
         );
         draw_text(
-            Position::new(margin + 150, 345),
+            Position::new(margin + 120, 345),
             #[allow(static_mut_refs)]
             TerminalApp::version(),
             colors.accent_purple,
@@ -580,10 +580,14 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
 
         // File listing with alternating backgrounds and scrolling support
         let max_visible_files = 15; // Limit visible files to fit on screen
-        let files_to_show = TERMINAL.file_count.min(max_visible_files);
+        let total_files = TERMINAL.file_count;
+        let scroll_offset = TERMINAL.files_scroll_offset.min(total_files.saturating_sub(max_visible_files));
+        let files_to_show = total_files.min(max_visible_files);
 
         for i in 0..files_to_show {
-            let file = &TERMINAL.file_system[i];
+            let file_idx = i + scroll_offset;
+            if file_idx >= total_files { break; }
+            let file = &TERMINAL.file_system[file_idx];
             let y = 190 + i as i32 * 30;
 
             // Alternating row backgrounds
@@ -638,18 +642,33 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         }
 
         // Show file count and scroll indicator if needed
-        if TERMINAL.file_count > max_visible_files {
+        if total_files > max_visible_files {
             let count_y = 190 + max_visible_files as i32 * 30 + 20;
-            let count_text = if TERMINAL.file_count == 80 {
-                "... and more files (80 total entries)"
-            } else {
-                "... and more files"
-            };
+            let count_text = format!(
+                "Showing {}-{} of {} files",
+                scroll_offset + 1,
+                (scroll_offset + files_to_show).min(total_files),
+                total_files
+            );
             draw_text(
                 Position::new(margin + 25, count_y),
-                count_text,
+                &count_text,
                 colors.text_muted,
             );
+
+            // Draw scroll bar for file list
+            let bar_x = margin + content_width - 30;
+            let bar_y = 190;
+            let bar_height = max_visible_files as i32 * 30;
+            draw_rectangle(Position::new(bar_x, bar_y), 8, bar_height, colors.border_color);
+            let track_height = bar_height - 20;
+            let scroll_progress = if total_files > max_visible_files {
+                scroll_offset as f32 / (total_files - max_visible_files) as f32
+            } else {
+                0.0
+            };
+            let thumb_y = bar_y + 10 + (track_height as f32 * scroll_progress) as i32;
+            fill_rectangle(Position::new(bar_x + 1, thumb_y), 6, 10, colors.accent_blue);
         }
 
         // Instructions

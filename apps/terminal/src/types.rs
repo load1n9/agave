@@ -94,9 +94,39 @@ pub struct TerminalApp {
     pub current_directory: &'static str,
     pub file_system: [FileEntry; 80], // Increased from 16 to 80 file entries to accommodate all entries
     pub file_count: usize,
+    pub files_scroll_offset: usize, // Scroll offset for file browser
 }
 
 impl TerminalApp {
+    /// Scroll up in the file list
+    pub fn files_scroll_up(&mut self, lines: usize) {
+        let max_scroll = if self.file_count > 15 {
+            self.file_count - 15
+        } else {
+            0
+        };
+        self.files_scroll_offset = (self.files_scroll_offset + lines).min(max_scroll);
+    }
+
+    /// Scroll down in the file list
+    pub fn files_scroll_down(&mut self, lines: usize) {
+        self.files_scroll_offset = self.files_scroll_offset.saturating_sub(lines);
+    }
+
+    /// Jump to top of file list
+    pub fn files_scroll_to_top(&mut self) {
+        let max_scroll = if self.file_count > 15 {
+            self.file_count - 15
+        } else {
+            0
+        };
+        self.files_scroll_offset = max_scroll;
+    }
+
+    /// Jump to bottom of file list
+    pub fn files_scroll_to_bottom(&mut self) {
+        self.files_scroll_offset = 0;
+    }
     pub const fn new() -> Self {
         Self {
             current_screen: Screen::Main,
@@ -706,6 +736,7 @@ impl TerminalApp {
                 },
             ],
             file_count: 80,
+            files_scroll_offset: 0,
         }
     }
 

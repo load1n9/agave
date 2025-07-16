@@ -121,18 +121,19 @@ impl TerminalApp {
     }
 
     fn handle_ls_command(&mut self) {
-        self.add_output_line(b"Files and directories:");
-        self.add_output_line(b"drwxr-xr-x  bin/");
-        self.add_output_line(b"drwxr-xr-x  etc/");
-        self.add_output_line(b"drwxr-xr-x  home/");
-        self.add_output_line(b"drwxr-xr-x  usr/");
-        self.add_output_line(b"drwxr-xr-x  var/");
-        self.add_output_line(b"drwxr-xr-x  tmp/");
-        self.add_output_line(b"-rw-r--r--  hello.wasm");
-        self.add_output_line(b"-rw-r--r--  config.json");
-        self.add_output_line(b"-rw-r--r--  readme.md");
-        self.add_output_line(b"-rw-r--r--  system.log");
-        self.current_screen = Screen::Files;
+    self.add_output_line(b"Files and directories:");
+    self.add_output_line(b"drwxr-xr-x  bin/");
+    self.add_output_line(b"drwxr-xr-x  etc/");
+    self.add_output_line(b"drwxr-xr-x  home/");
+    self.add_output_line(b"drwxr-xr-x  usr/");
+    self.add_output_line(b"drwxr-xr-x  var/");
+    self.add_output_line(b"drwxr-xr-x  tmp/");
+    self.add_output_line(b"-rw-r--r--  hello.wasm");
+    self.add_output_line(b"-rw-r--r--  config.json");
+    self.add_output_line(b"-rw-r--r--  readme.md");
+    self.add_output_line(b"-rw-r--r--  system.log");
+    self.files_scroll_offset = 0;
+    self.current_screen = Screen::Files;
     }
 
     fn handle_ps_command(&mut self) {

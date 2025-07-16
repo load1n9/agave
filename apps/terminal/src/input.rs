@@ -67,14 +67,14 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
                 true
             }
             KEY_UP => {
-                if TERMINAL.command_length == 0 {
-                    // No command typed, scroll up in output history
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_up(3);
+                } else if TERMINAL.command_length == 0 {
                     #[allow(static_mut_refs)]
                     TERMINAL.scroll_up(3);
                 } else if COMMAND_HISTORY_INDEX > 0 {
-                    // Command typed, navigate command history
                     COMMAND_HISTORY_INDEX -= 1;
-                    // Load command from history
                     TERMINAL.command_length = 0;
                     for j in 0..2048 {
                         if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
@@ -87,21 +87,21 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
                 true
             }
             KEY_DOWN => {
-                if TERMINAL.command_length == 0 {
-                    // No command typed, scroll down in output history
+                #[allow(static_mut_refs)]
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_down(3);
+                } else if TERMINAL.command_length == 0 {
                     #[allow(static_mut_refs)]
                     TERMINAL.scroll_down(3);
                 } else if COMMAND_HISTORY_INDEX < COMMAND_HISTORY_COUNT {
-                    // Command typed, navigate command history
                     COMMAND_HISTORY_INDEX += 1;
                     if COMMAND_HISTORY_INDEX >= COMMAND_HISTORY_COUNT {
-                        // Clear command line
                         TERMINAL.command_length = 0;
                         for j in 0..2048 {
                             TERMINAL.command_buffer[j] = 0;
                         }
                     } else {
-                        // Load command from history
                         TERMINAL.command_length = 0;
                         for j in 0..2048 {
                             if COMMAND_HISTORY[COMMAND_HISTORY_INDEX][j] == 0 {
@@ -116,23 +116,42 @@ fn handle_special_key(key_code: i32, _shift_pressed: bool) -> bool {
             }
             KEY_PAGEUP => {
                 #[allow(static_mut_refs)]
-                TERMINAL.scroll_up(10);
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_up(10);
+                } else {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.scroll_up(10);
+                }
                 true
             }
             KEY_PAGEDOWN => {
                 #[allow(static_mut_refs)]
-                TERMINAL.scroll_down(10);
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_down(10);
+                } else {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.scroll_down(10);
+                }
                 true
             }
             KEY_HOME => {
-                if TERMINAL.command_length == 0 {
+                #[allow(static_mut_refs)]
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_to_top();
+                } else if TERMINAL.command_length == 0 {
                     #[allow(static_mut_refs)]
                     TERMINAL.scroll_to_top();
                 }
                 true
             }
             KEY_END => {
-                if TERMINAL.command_length == 0 {
+                if TERMINAL.current_screen == crate::types::Screen::Files {
+                    #[allow(static_mut_refs)]
+                    TERMINAL.files_scroll_to_bottom();
+                } else if TERMINAL.command_length == 0 {
                     #[allow(static_mut_refs)]
                     TERMINAL.scroll_to_bottom();
                 }

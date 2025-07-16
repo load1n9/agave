@@ -1,6 +1,6 @@
 use agave_lib::{
-    clear_screen, draw_line, draw_rectangle, draw_text, fill_rectangle, get_dimensions, Position,
-    RGBA,
+    clear_screen, draw_line, draw_rectangle, draw_text, fill_circle, fill_rectangle,
+    get_dimensions, Position, RGBA,
 };
 
 use crate::state::{ANIMATION_FRAME, CURSOR_BLINK, TERMINAL};
@@ -58,7 +58,6 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let content_width = dim.width - (margin * 2);
 
     unsafe {
-        // Draw main content card with subtle background
         draw_card(
             Position::new(margin - 20, 40),
             content_width + 40,
@@ -66,7 +65,6 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors,
         );
 
-        // ASCII Art Header with better spacing
         let header_lines = [
             "     ___       _______      ___   ____    ____  _______ ",
             "    /   \\     /  _____|    /   \\  \\   \\  /   / |   ____|",
@@ -85,126 +83,251 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             );
         }
 
-        // Welcome text with better typography
         draw_text(
             Position::new(margin + 20, 210),
-            "Welcome to Agave OS Terminal",
+            "Welcome to Agave OS",
             colors.text_primary,
         );
+        const FUN_FACTS: &[&str] = &[
+            "Honey never spoils - archaeologists have found edible honey in ancient Egyptian tombs!",
+            "A group of flamingos is called a 'flamboyance'.",
+            "Octopuses have three hearts and blue blood.",
+            "Bananas are berries, but strawberries aren't.",
+            "All Pandas in the world are owned by China, even those in other countries.",
+            "Bananas are curved because they grow towards the sun.",
+            "The first bug in a computer was an actual moth found in 1947.",
+            "A day on Venus is longer than a year on Venus due to its slow rotation.",
+            "Wombat poop is cube-shaped to prevent it from rolling away.",
+            "A jiffy is an actual unit of time - 1/100th of a second.",
+            "The Eiffel Tower can be 15 cm taller during the summer due to thermal expansion.",
+            "Platypuses get the most REM sleep of any mammal, averaging 5-8 hours a day.",
+            "The human brain uses about 20% of your total energy despite being only 2% of your body weight.",
+            "Sharks have been around longer than trees - about 400 million years!",
+            "A single cloud can weigh more than a million pounds.",
+            "You can't hum while holding your nose closed.",
+            "Bubble wrap was originally invented as wallpaper.",
+            "The shortest war in history lasted only 38-45 minutes.",
+            "Dolphins have names for each other - they respond to unique whistle signatures.",
+            "There are more possible games of chess than atoms in the observable universe.",
+            "A group of ravens is called a 'conspiracy'.",
+            "Your footprint is the only part of your body that creates a unique print.",
+            "Pineapples take about 2 years to grow.",
+            "The first computer programmer was Ada Lovelace in 1843.",
+            "A single teaspoon of neutron star would weigh 6 billion tons.",
+            "The world's largest desert is Antarctica, not the Sahara.",
+            "A snail can sleep for three years at a time.",
+            "The shortest war in history lasted only 38-45 minutes.",
+            "The average person walks the equivalent of five times around the world in their lifetime.",
+        ];
+
+        let fact_index = ((TERMINAL.uptime / 30000) as usize) % FUN_FACTS.len();
+        let fun_fact = FUN_FACTS[fact_index];
+
         draw_text(
             Position::new(margin + 20, 235),
-            "A WASM-based operating system",
+            fun_fact,
             colors.text_secondary,
         );
 
-        let logo_x = margin + content_width - 180;
-        let logo_y = 70;
-        let logo_width = 120.0;
-        let logo_height = 120.0;
+    // let logo_x = margin + content_width - 320;
+    // let logo_y = 70;
+    // let logo_width = 120.0;
+    // let logo_height = 120.0;
 
-        let svg_x = |x: f32| -> i32 {
-            let min_x = 152.0;
-            let max_x = 152.0 + 579.0;
-            let scale = logo_width / (max_x - min_x);
-            (logo_x as f32 + (x - min_x) * scale) as i32
+    let clock_radius = 60;
+    let clock_center_x = margin + content_width - 60;
+    let clock_center_y = 120;
+
+        fill_circle(
+            Position::new(clock_center_x + 3, clock_center_y + 4),
+            clock_radius,
+            colors.bg_primary,
+        );
+
+        fill_circle(
+            Position::new(clock_center_x, clock_center_y),
+            clock_radius,
+            colors.bg_accent,
+        );
+        fill_circle(
+            Position::new(clock_center_x, clock_center_y),
+            clock_radius - 3,
+            colors.bg_secondary,
+        );
+
+        for i in 0..12 {
+            let angle = (i as f32) * 30.0 - 90.0;
+            let rad = angle * core::f32::consts::PI / 180.0;
+            let outer = (
+                (clock_center_x as f32 + (clock_radius as f32 - 4.0) * rad.cos()) as i32,
+                (clock_center_y as f32 + (clock_radius as f32 - 4.0) * rad.sin()) as i32,
+            );
+            let inner = (
+                (clock_center_x as f32 + (clock_radius as f32 - 10.0) * rad.cos()) as i32,
+                (clock_center_y as f32 + (clock_radius as f32 - 10.0) * rad.sin()) as i32,
+            );
+            draw_line(
+                Position::new(inner.0, inner.1),
+                Position::new(outer.0, outer.1),
+                if i % 3 == 0 { colors.accent_blue } else { colors.border_color },
+            );
+        }
+
+        // Draw clock hands based on uptime (as system time)
+        let total_seconds = TERMINAL.uptime / 1000;
+        let seconds = (total_seconds % 60) as f32;
+        let minutes = ((total_seconds / 60) % 60) as f32;
+        let hours = ((total_seconds / 3600) % 12) as f32;
+
+        let to_rad = |deg: f32| deg * core::f32::consts::PI / 180.0;
+        let hand = |len: f32, angle_deg: f32| {
+            let angle = to_rad(angle_deg - 90.0);
+            (
+                (clock_center_x as f32 + len * angle.cos()) as i32,
+                (clock_center_y as f32 + len * angle.sin()) as i32,
+            )
         };
-        let svg_y = |y: f32| -> i32 {
-            let min_y = -20.0;
-            let max_y = -20.0 + 606.0;
-            let scale = logo_height / (max_y - min_y);
-            (logo_y as f32 + (y - min_y) * scale) as i32
-        };
 
-        let svg_paths: &[&[(f32, f32)]] = &[
-            &[
-                (480.0, 345.0),
-                (484.0, 423.0),
-                (536.0, 353.0),
-                (629.0, 119.0),
-                (480.0, 345.0),
-            ],
-            &[
-                (480.0, 308.0),
-                (472.0, 224.0),
-                (558.0, 56.0),
-                (531.0, 208.0),
-                (480.0, 308.0),
-            ],
-            &[
-                (363.0, 581.0),
-                (585.0, 341.0),
-                (714.0, 224.0),
-                (426.0, 586.0),
-                (363.0, 581.0),
-            ],
-            &[
-                (507.0, 506.0),
-                (589.0, 408.0),
-                (731.0, 324.0),
-                (602.0, 456.0),
-                (507.0, 506.0),
-            ],
-            &[
-                (452.0, 585.0),
-                (482.0, 538.0),
-                (712.0, 421.0),
-                (532.0, 584.0),
-                (452.0, 585.0),
-            ],
-            &[
-                (340.0, 578.0),
-                (372.0, 532.0),
-                (174.0, 435.0),
-                (340.0, 578.0),
-            ],
-            &[
-                (375.0, 515.0),
-                (171.0, 351.0),
-                (281.0, 476.0),
-                (375.0, 515.0),
-            ],
-            &[
-                (397.0, 518.0),
-                (413.0, 500.0),
-                (303.0, 369.0),
-                (152.0, 221.0),
-                (397.0, 518.0),
-            ],
-            &[
-                (381.0, 432.0),
-                (391.0, 360.0),
-                (251.0, 120.0),
-                (311.0, 349.0),
-                (381.0, 432.0),
-            ],
-            &[
-                (400.0, 455.0),
-                (424.0, 486.0),
-                (471.0, 430.0),
-                (439.0, -20.0),
-                (400.0, 455.0),
-            ],
-            &[
-                (397.0, 332.0),
-                (403.0, 203.0),
-                (320.0, 52.0),
-                (360.0, 235.0),
-                (397.0, 332.0),
-            ],
-        ];
-
-        for path in svg_paths {
-            for pair in path.windows(2) {
-                let (x1, y1) = pair[0];
-                let (x2, y2) = pair[1];
+        // Hour hand (thicker, shorter, accent color)
+        let hour_angle = (hours + minutes / 60.0) * 30.0;
+        let (hx, hy) = hand(clock_radius as f32 * 0.45, hour_angle);
+        for dx in -1..=1 {
+            for dy in -1..=1 {
                 draw_line(
-                    Position::new(svg_x(x1), svg_y(y1)),
-                    Position::new(svg_x(x2), svg_y(y2)),
-                    colors.border_color,
+                    Position::new(clock_center_x + dx, clock_center_y + dy),
+                    Position::new(hx + dx, hy + dy),
+                    colors.accent_purple,
                 );
             }
         }
-        
+
+        let min_angle = (minutes + seconds / 60.0) * 6.0;
+        let (mx, my) = hand(clock_radius as f32 * 0.7, min_angle);
+        for dx in -1..=1 {
+            draw_line(
+                Position::new(clock_center_x + dx, clock_center_y + dx),
+                Position::new(mx + dx, my + dx),
+                colors.accent_blue,
+            );
+        }
+
+        let sec_angle = seconds * 6.0;
+        let (sx, sy) = hand(clock_radius as f32 * 0.82, sec_angle);
+        draw_line(
+            Position::new(clock_center_x, clock_center_y),
+            Position::new(sx, sy),
+            colors.accent_red,
+        );
+
+        fill_circle(
+            Position::new(clock_center_x, clock_center_y),
+            4,
+            colors.accent_green,
+        );
+
+        // let svg_x = |x: f32| -> i32 {
+        //     let min_x = 152.0;
+        //     let max_x = 152.0 + 579.0;
+        //     let scale = logo_width / (max_x - min_x);
+        //     (logo_x as f32 + (x - min_x) * scale) as i32
+        // };
+        // let svg_y = |y: f32| -> i32 {
+        //     let min_y = -20.0;
+        //     let max_y = -20.0 + 606.0;
+        //     let scale = logo_height / (max_y - min_y);
+        //     (logo_y as f32 + (y - min_y) * scale) as i32
+        // };
+
+        // let svg_paths: &[&[(f32, f32)]] = &[
+        //     &[
+        //         (480.0, 345.0),
+        //         (484.0, 423.0),
+        //         (536.0, 353.0),
+        //         (629.0, 119.0),
+        //         (480.0, 345.0),
+        //     ],
+        //     &[
+        //         (480.0, 308.0),
+        //         (472.0, 224.0),
+        //         (558.0, 56.0),
+        //         (531.0, 208.0),
+        //         (480.0, 308.0),
+        //     ],
+        //     &[
+        //         (363.0, 581.0),
+        //         (585.0, 341.0),
+        //         (714.0, 224.0),
+        //         (426.0, 586.0),
+        //         (363.0, 581.0),
+        //     ],
+        //     &[
+        //         (507.0, 506.0),
+        //         (589.0, 408.0),
+        //         (731.0, 324.0),
+        //         (602.0, 456.0),
+        //         (507.0, 506.0),
+        //     ],
+        //     &[
+        //         (452.0, 585.0),
+        //         (482.0, 538.0),
+        //         (712.0, 421.0),
+        //         (532.0, 584.0),
+        //         (452.0, 585.0),
+        //     ],
+        //     &[
+        //         (340.0, 578.0),
+        //         (372.0, 532.0),
+        //         (174.0, 435.0),
+        //         (340.0, 578.0),
+        //     ],
+        //     &[
+        //         (375.0, 515.0),
+        //         (171.0, 351.0),
+        //         (281.0, 476.0),
+        //         (375.0, 515.0),
+        //     ],
+        //     &[
+        //         (397.0, 518.0),
+        //         (413.0, 500.0),
+        //         (303.0, 369.0),
+        //         (152.0, 221.0),
+        //         (397.0, 518.0),
+        //     ],
+        //     &[
+        //         (381.0, 432.0),
+        //         (391.0, 360.0),
+        //         (251.0, 120.0),
+        //         (311.0, 349.0),
+        //         (381.0, 432.0),
+        //     ],
+        //     &[
+        //         (400.0, 455.0),
+        //         (424.0, 486.0),
+        //         (471.0, 430.0),
+        //         (439.0, -20.0),
+        //         (400.0, 455.0),
+        //     ],
+        //     &[
+        //         (397.0, 332.0),
+        //         (403.0, 203.0),
+        //         (320.0, 52.0),
+        //         (360.0, 235.0),
+        //         (397.0, 332.0),
+        //     ],
+        // ];
+
+        // for path in svg_paths {
+        //     for pair in path.windows(2) {
+        //         let (x1, y1) = pair[0];
+        //         let (x2, y2) = pair[1];
+        //         draw_line(
+        //             Position::new(svg_x(x1), svg_y(y1)),
+        //             Position::new(svg_x(x2), svg_y(y2)),
+        //             colors.border_color,
+        //         );
+        //     }
+        // }
+
         // Status section with visual separation
         draw_section_divider(Position::new(margin, 270), content_width, colors);
 
@@ -895,7 +1018,7 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     // Header with icon
     draw_text(
         Position::new(margin + 20, 70),
-        "❓ Agave OS Terminal - Help",
+        "❓ Agave OS - Help",
         colors.accent_yellow,
     );
 
@@ -1100,7 +1223,7 @@ fn draw_status_bar(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         // Application title
         draw_text(
             Position::new(180, status_y + 12),
-            "Agave OS Terminal v1.0",
+            "Agave OS",
             colors.text_primary,
         );
 

@@ -431,3 +431,8 @@ pub fn key_code_to_char(key_code: i32, shift_pressed: bool) -> Option<char> {
 pub fn get_time_ms() -> u64 {
     unsafe { raw::get_time_ms() }
 }
+
+/// Grow the WebAssembly memory by the given number of pages (64KB each)
+pub fn grow_memory(pages: u64) -> i32 {
+    unsafe { raw::grow_memory(pages) }
+}

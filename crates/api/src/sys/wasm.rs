@@ -1,6 +1,6 @@
 #![allow(unused_mut)]
 use alloc::vec::Vec;
-use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store};
+use wasmi::{Caller, Engine, Func, Instance, Linker, Module, Store, Memory, Extern};
 
 use super::{
     framebuffer::{shapes::Coordinate, FB, RGBA},
@@ -11,6 +11,7 @@ use super::{
 pub struct WasmApp {
     store: Store<*mut FB>,
     instance: Instance,
+    memory: Option<Memory>,
 }
 
 impl WasmApp {
@@ -24,6 +25,20 @@ impl WasmApp {
         let mut linker = <Linker<*mut FB>>::new(&engine);
 
         log::info!("WASM: Setting up function bindings...");
+
+        // Host function to grow memory from WASM
+        let grow_memory = Func::wrap(&mut store, |mut caller: Caller<'_, *mut FB>, pages: u64| -> i32 {
+            // Try to get the exported memory
+            if let Some(Extern::Memory(mem)) = caller.get_export("memory") {
+                match mem.grow(&mut caller, pages) {
+                    Ok(_) => 1,
+                    Err(_) => 0,
+                }
+            } else {
+                0
+            }
+        });
+        linker.define("agave", "grow_memory", grow_memory).unwrap();
         let draw_circle = Func::wrap(
             &mut store,
             |caller: Caller<'_, *mut FB>,
@@ -495,7 +510,25 @@ impl WasmApp {
             .unwrap()
             .start(&mut store)
             .unwrap();
-        Self { store, instance }
+
+        // Try to get the exported memory after instantiation
+        let memory = instance
+            .exports(&store)
+            .find_map(|e| match e.into_extern() {
+                Extern::Memory(mem) => Some(mem),
+                _ => None,
+            });
+
+        Self { store, instance, memory }
+    }
+
+    /// Grow the WASM memory by the given number of pages (64KiB each). Returns true if successful.
+    pub fn grow_memory(&mut self, pages: u64) -> bool {
+        if let Some(mem) = &self.memory {
+            mem.grow(&mut self.store, pages).is_ok()
+        } else {
+            false
+        }
     }
 
     pub fn call(&mut self) {

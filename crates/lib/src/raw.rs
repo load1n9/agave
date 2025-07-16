@@ -53,4 +53,7 @@ unsafe extern "C" {
     pub fn is_key_released(key_code: i32) -> bool;
     pub fn get_key_history_count() -> i32;
     pub fn get_key_history_event(index: i32) -> i64;
+
+    // memory
+    pub fn grow_memory(pages: u64) -> i32;
 }

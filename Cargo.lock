@@ -30,7 +30,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agave-api"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aarch64-cpu",
  "acpi",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "agave-kernel"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "acpi",
  "agave-api",
@@ -88,11 +88,11 @@ dependencies = [
 
 [[package]]
 name = "agave-lib"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "agave-os"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "agave-kernel",
  "bootloader",

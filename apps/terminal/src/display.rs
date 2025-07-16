@@ -5,7 +5,7 @@ use agave_lib::{
 
 use crate::state::{ANIMATION_FRAME, CURSOR_BLINK, TERMINAL};
 use crate::themes::{get_theme_colors, ThemeColors};
-use crate::types::Screen;
+use crate::types::{Screen, TerminalApp};
 
 pub fn draw_terminal() {
     let dim = get_dimensions();
@@ -352,6 +352,19 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             Position::new(margin + 100, 320),
             #[allow(static_mut_refs)]
             TERMINAL.current_theme.name(),
+            colors.accent_purple,
+        );
+
+        // show version
+        draw_text(
+            Position::new(margin + 20, 345),
+            "● Version:",
+            colors.text_secondary,
+        );
+        draw_text(
+            Position::new(margin + 150, 345),
+            #[allow(static_mut_refs)]
+            TerminalApp::version(),
             colors.accent_purple,
         );
 

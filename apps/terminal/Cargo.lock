@@ -4,11 +4,11 @@ version = 4
 
 [[package]]
 name = "agave-lib"
-version = "0.1.2"
+version = "0.1.3"
 
 [[package]]
 name = "terminal-app"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "agave-lib",
 ]

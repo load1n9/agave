@@ -709,6 +709,10 @@ impl TerminalApp {
         }
     }
 
+    pub fn version() -> &'static str {
+        "Agave v0.1.3"
+    }
+
     pub fn add_output_line(&mut self, text: &[u8]) {
         // When adding new content, reset scroll to bottom to show latest
         self.scroll_offset = 0;

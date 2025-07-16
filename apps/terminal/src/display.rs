@@ -103,8 +103,8 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         let logo_height = 120.0;
 
         let svg_x = |x: f32| -> i32 {
-            let min_x = 168.0;
-            let max_x = 168.0 + 563.0;
+            let min_x = 152.0;
+            let max_x = 152.0 + 579.0;
             let scale = logo_width / (max_x - min_x);
             (logo_x as f32 + (x - min_x) * scale) as i32
         };
@@ -131,25 +131,25 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 (480.0, 308.0),
             ],
             &[
-                (364.0, 584.0),
-                (552.4641, 390.15118),
+                (363.0, 581.0),
+                (585.0, 341.0),
                 (714.0, 224.0),
                 (426.0, 586.0),
-                (364.0, 584.0),
+                (363.0, 581.0),
             ],
             &[
-                (509.0, 508.0),
-                (588.0, 408.0),
+                (507.0, 506.0),
+                (589.0, 408.0),
                 (731.0, 324.0),
                 (602.0, 456.0),
-                (509.0, 508.0),
+                (507.0, 506.0),
             ],
             &[
-                (456.0, 580.0),
+                (452.0, 585.0),
                 (482.0, 538.0),
                 (712.0, 421.0),
                 (532.0, 584.0),
-                (456.0, 580.0),
+                (452.0, 585.0),
             ],
             &[
                 (340.0, 578.0),
@@ -164,16 +164,17 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 (375.0, 515.0),
             ],
             &[
-                (400.0, 516.0),
+                (397.0, 518.0),
                 (413.0, 500.0),
-                (168.0, 234.0),
-                (400.0, 516.0),
+                (303.0, 369.0),
+                (152.0, 221.0),
+                (397.0, 518.0),
             ],
             &[
                 (381.0, 432.0),
                 (391.0, 360.0),
                 (251.0, 120.0),
-                (312.0, 356.0),
+                (311.0, 349.0),
                 (381.0, 432.0),
             ],
             &[
@@ -184,11 +185,11 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 (400.0, 455.0),
             ],
             &[
-                (398.0, 319.0),
+                (397.0, 332.0),
                 (403.0, 203.0),
                 (320.0, 52.0),
                 (360.0, 235.0),
-                (398.0, 319.0),
+                (397.0, 332.0),
             ],
         ];
 
@@ -199,11 +200,11 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 draw_line(
                     Position::new(svg_x(x1), svg_y(y1)),
                     Position::new(svg_x(x2), svg_y(y2)),
-                    colors.accent_green,
+                    colors.border_color,
                 );
             }
         }
-
+        
         // Status section with visual separation
         draw_section_divider(Position::new(margin, 270), content_width, colors);
 
@@ -218,29 +219,14 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.accent_green,
         );
 
-        let uptime_seconds = TERMINAL.uptime / 1000;
-        let uptime_text = if uptime_seconds < 60 {
-            "● Uptime: < 1 minute"
-        } else if uptime_seconds < 3600 {
-            "● Uptime: < 1 hour"
-        } else {
-            "● Uptime: > 1 hour"
-        };
-
-        draw_text(
-            Position::new(margin + 20, 320),
-            uptime_text,
-            colors.text_secondary,
-        );
-
         // Show current theme
         draw_text(
-            Position::new(margin + 20, 345),
+            Position::new(margin + 20, 320),
             "● Theme:",
             colors.text_secondary,
         );
         draw_text(
-            Position::new(margin + 100, 345),
+            Position::new(margin + 100, 320),
             #[allow(static_mut_refs)]
             TERMINAL.current_theme.name(),
             colors.accent_purple,
@@ -1148,27 +1134,30 @@ fn draw_status_bar(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         );
 
         // Right side indicators
-        let right_x = dim.width - 200;
+        let right_x = dim.width - 320;
 
-        // Uptime indicator
-        let uptime_seconds = TERMINAL.uptime / 1000;
-        let uptime_str = if uptime_seconds < 60 {
-            "⏱️ < 1m"
-        } else if uptime_seconds < 3600 {
-            "⏱️ < 1h"
-        } else {
-            "⏱️ > 1h"
-        };
-
+        // Separator
         draw_text(
-            Position::new(right_x, status_y + 12),
-            uptime_str,
-            colors.text_secondary,
+            Position::new(right_x + 70, status_y + 12),
+            "│",
+            colors.border_color,
+        );
+
+        // Real-time clock (HH:MM:SS)
+        let total_seconds = TERMINAL.uptime / 1000;
+        let seconds = total_seconds % 60;
+        let minutes = (total_seconds / 60) % 60;
+        let hours = (total_seconds / 3600) % 24;
+        let clock_str = format!("{:02}:{:02}:{:02}", hours, minutes, seconds);
+        draw_text(
+            Position::new(right_x + 90, status_y + 12),
+            &clock_str,
+            colors.accent_blue,
         );
 
         // Separator
         draw_text(
-            Position::new(right_x + 80, status_y + 12),
+            Position::new(right_x + 160, status_y + 12),
             "│",
             colors.border_color,
         );
@@ -1193,14 +1182,14 @@ fn draw_status_bar(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         };
 
         draw_text(
-            Position::new(right_x + 100, status_y + 12),
+            Position::new(right_x + 180, status_y + 12),
             "♥",
             heartbeat_color,
         );
 
         // System status
         draw_text(
-            Position::new(right_x + 125, status_y + 12),
+            Position::new(right_x + 205, status_y + 12),
             "Online",
             colors.accent_green,
         );

@@ -64,7 +64,7 @@ impl TerminalApp {
         } else if self.command_length == 2 && &cmd_lower[0..2] == b"ps" {
             self.handle_ps_command();
         } else if self.command_length == 5 && &cmd_lower[0..5] == b"uname" {
-            self.add_output_line(b"Agave OS 0.1.0 x86_64");
+            self.add_output_line(b"Agave OS 0.1.3 x86_64");
         } else if self.command_length == 6 && &cmd_lower[0..6] == b"uptime" {
             self.handle_uptime_command();
         } else if self.command_length == 4 && &cmd_lower[0..4] == b"help" {

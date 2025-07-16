@@ -269,8 +269,7 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-
 initWasm();
 if (startFn !== null) {
-  startFn();
+  (startFn as () => void)();
 }

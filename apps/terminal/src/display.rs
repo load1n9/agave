@@ -973,7 +973,7 @@ fn draw_system_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     draw_section_header(Position::new(margin + 20, 110), "Operating System", colors);
 
     let os_info = [
-        ("OS:", "Agave OS v1.0.0", colors.accent_cyan),
+        ("OS:", "Agave OS v0.1.3", colors.accent_cyan),
         ("Architecture:", "x86_64", colors.text_primary),
         ("Kernel:", "Custom Rust Kernel", colors.accent_purple),
         ("Runtime:", "WASM + Native", colors.accent_green),

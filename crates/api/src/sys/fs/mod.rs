@@ -257,14 +257,14 @@ impl VirtualFileSystem {
         // Demo files for the terminal
         let files: &[(&str, &[u8])] = &[
             ("/etc/hostname", b"agave-os\n"),
-            ("/etc/version", b"Agave OS v1.0.0\n"),
+            ("/etc/version", b"Agave OS v0.1.3\n"),
             (
                 "/home/user/.bashrc",
                 b"# Agave OS bash configuration\necho 'Welcome to Agave OS!'\n",
             ),
             ("/var/log/system.log", b"System log initialized\n"),
             ("/tmp/readme.txt", b"This is a temporary file\n"),
-            ("/proc/version", b"Agave OS 1.0.0 (x86_64)\n"),
+            ("/proc/version", b"Agave OS v0.1.3 (x86_64)\n"),
             ("/proc/meminfo", b"MemTotal: 104857600\nMemFree: 52428800\n"),
             ("/proc/cpuinfo", b"processor: 0\nmodel name: Virtual CPU\n"),
         ];

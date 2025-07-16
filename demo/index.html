@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agave OS Demo</title>
+</head>
+
+<body>
+  <div id="app">
+    <div
+      style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#232428;display:flex;justify-content:center;align-items:flex-start;overflow:hidden;">
+      <div style="height:96px;"></div>
+      <canvas id="terminal-canvas" width="1491" height="900"
+        style="background:#232428;box-shadow:0 4px 32px #000a;border-radius:16px;padding:24px;width:clamp(600px,80vw,1100px);height:auto;display:block;margin:0 auto;aspect-ratio:1491/900;"></canvas>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>

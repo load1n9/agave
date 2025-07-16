@@ -118,22 +118,23 @@ impl TerminalApp {
         for i in 0..2048 {
             self.command_buffer[i] = 0;
         }
+        agave_lib::grow_memory(1);
     }
 
     fn handle_ls_command(&mut self) {
-    self.add_output_line(b"Files and directories:");
-    self.add_output_line(b"drwxr-xr-x  bin/");
-    self.add_output_line(b"drwxr-xr-x  etc/");
-    self.add_output_line(b"drwxr-xr-x  home/");
-    self.add_output_line(b"drwxr-xr-x  usr/");
-    self.add_output_line(b"drwxr-xr-x  var/");
-    self.add_output_line(b"drwxr-xr-x  tmp/");
-    self.add_output_line(b"-rw-r--r--  hello.wasm");
-    self.add_output_line(b"-rw-r--r--  config.json");
-    self.add_output_line(b"-rw-r--r--  readme.md");
-    self.add_output_line(b"-rw-r--r--  system.log");
-    self.files_scroll_offset = 0;
-    self.current_screen = Screen::Files;
+        self.add_output_line(b"Files and directories:");
+        self.add_output_line(b"drwxr-xr-x  bin/");
+        self.add_output_line(b"drwxr-xr-x  etc/");
+        self.add_output_line(b"drwxr-xr-x  home/");
+        self.add_output_line(b"drwxr-xr-x  usr/");
+        self.add_output_line(b"drwxr-xr-x  var/");
+        self.add_output_line(b"drwxr-xr-x  tmp/");
+        self.add_output_line(b"-rw-r--r--  hello.wasm");
+        self.add_output_line(b"-rw-r--r--  config.json");
+        self.add_output_line(b"-rw-r--r--  readme.md");
+        self.add_output_line(b"-rw-r--r--  system.log");
+        self.files_scroll_offset = 0;
+        self.current_screen = Screen::Files;
     }
 
     fn handle_ps_command(&mut self) {
@@ -611,8 +612,9 @@ impl TerminalApp {
     }
 
     fn handle_ipc_subcommand(&mut self) {
-        let cmd_str = core::str::from_utf8(&self.command_buffer[4..self.command_length]).unwrap_or("");
-        
+        let cmd_str =
+            core::str::from_utf8(&self.command_buffer[4..self.command_length]).unwrap_or("");
+
         match cmd_str {
             "stats" => {
                 self.add_output_line(b"IPC Resource Statistics:");
@@ -620,7 +622,7 @@ impl TerminalApp {
                 self.add_output_line(b"  Shared Memory: 0 segments");
                 self.add_output_line(b"  Message Queues: 0 active");
                 self.add_output_line(b"  Signals: Available (31 types)");
-            },
+            }
             "test" => {
                 self.add_output_line(b"Running IPC demonstration...");
                 self.add_output_line(b"+ Pipe creation test");
@@ -628,19 +630,19 @@ impl TerminalApp {
                 self.add_output_line(b"+ Message queue test");
                 self.add_output_line(b"+ Signal handling test");
                 self.add_output_line(b"All IPC systems operational!");
-            },
+            }
             "pipes" => {
                 self.add_output_line(b"Active Pipes:");
                 self.add_output_line(b"  No active pipes");
-            },
+            }
             "shmem" => {
                 self.add_output_line(b"Shared Memory Segments:");
                 self.add_output_line(b"  No active segments");
-            },
+            }
             "queues" => {
                 self.add_output_line(b"Message Queues:");
                 self.add_output_line(b"  No active queues");
-            },
+            }
             _ => {
                 self.add_output_line(b"Unknown IPC command. Type 'ipc' for help.");
             }
@@ -675,8 +677,9 @@ impl TerminalApp {
     }
 
     fn handle_fs_subcommand(&mut self) {
-        let cmd_str = core::str::from_utf8(&self.command_buffer[3..self.command_length]).unwrap_or("");
-        
+        let cmd_str =
+            core::str::from_utf8(&self.command_buffer[3..self.command_length]).unwrap_or("");
+
         match cmd_str {
             "status" => {
                 self.add_output_line(b"Filesystem Status:");
@@ -684,7 +687,7 @@ impl TerminalApp {
                 self.add_output_line(b"  Type: Simple FS");
                 self.add_output_line(b"  Version: 1.0");
                 self.add_output_line(b"  Read-Write: Yes");
-            },
+            }
             "format" => {
                 self.add_output_line(b"Formatting filesystem...");
                 self.add_output_line(b"! This will destroy all data!");
@@ -692,15 +695,15 @@ impl TerminalApp {
                 self.add_output_line(b"+ Inode table initialized");
                 self.add_output_line(b"+ Free block bitmap created");
                 self.add_output_line(b"Format complete");
-            },
+            }
             "switch ram" => {
                 self.add_output_line(b"Switching to RAM disk backend...");
                 self.add_output_line(b"+ Backend switched to RAM Disk");
-            },
+            }
             "switch file" => {
                 self.add_output_line(b"Switching to file-based backend...");
                 self.add_output_line(b"+ Backend switched to File Disk");
-            },
+            }
             "info" => {
                 self.add_output_line(b"Filesystem Information:");
                 self.add_output_line(b"Available backends:");
@@ -708,7 +711,7 @@ impl TerminalApp {
                 self.add_output_line(b"  - VirtIO Disk (hardware)");
                 self.add_output_line(b"  - File Disk (file-based)");
                 self.add_output_line(b"  - Compound Disk (multi-tier)");
-            },
+            }
             _ => {
                 self.add_output_line(b"Filesystem commands:");
                 self.add_output_line(b"  fs status     - Show filesystem status");

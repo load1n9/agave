@@ -1,26 +1,34 @@
-# <img src="assets/Agave.png" width="70rem" /> Agave OS
+# Agave OS
 
 ![Desktop Environment](assets/terminal.png)
 Agave OS is a simple operating system written in Rust with WASI support. It is designed to be lightweight, fast, and easy to use. It is also designed to be easy to customize and extend. Started from [Fomos](https://github.com/Ruddle/Fomos) and the second edition of
-[Writing an OS in Rust](https://os.phil-opp.com/) by Philipp Oppermann. Also contains code from [Theseus OS](https://github.com/theseus-os/Theseus)
+[Writing an OS in Rust](https://os.phil-opp.com/) by Philipp Oppermann. Also contains code from [Theseus OS](https://github.com/theseus-os/Theseus).
 
-## 🚀 Enhanced Features
+## 🚀 Try the Web Demo
 
-### Core Features
+Experience Agave OS' desktop environment directly in your browser—no installation required!  
+[Launch the Web Demo](https://agave.load1n9.deno.net/)
+
+- Explore the desktop environment
+- Test graphics, animations, and system features interactively
+- Works on most modern browsers
+- Contributions and bug reports are welcome! (barely works so far keyboard input needs fixing)
+
+## Core Features
 
 - **Lightweight and fast** - Minimal overhead with efficient memory management
 - **Hardware support** - Supports a wide range of x86_64 hardware platforms
 - **Easy to customize** - Modular architecture for easy extension
 - **Built with Rust** - Memory safety and performance with zero-cost abstractions
 
-### 🎨 Enhanced Graphics & WASM
+## 🎨 Enhanced Graphics & WASM
 
 - **Rich Graphics API** - Circles, rectangles, lines, triangles with color support
 - **Animation Support** - Time-based animations and smooth transitions
 - **Interactive Applications** - Mouse input and real-time interaction
 - **WASM Runtime** - Execute WebAssembly applications with comprehensive API
 
-### ⚡ Advanced System Features
+## ⚡ Advanced System Features
 
 - **Priority Task Scheduling** - Multi-level priority queues with fair scheduling
 - **Memory Management** - Advanced allocator with statistics and leak detection
@@ -28,7 +36,7 @@ Agave OS is a simple operating system written in Rust with WASI support. It is d
 - **System Monitoring** - Real-time performance metrics and health monitoring
 - **Profiling Tools** - Built-in profiler for performance analysis
 
-### 🛠️ Development Tools
+## 🛠️ Development Tools
 
 - **Enhanced Diagnostics** - Detailed panic information with system state
 - **Memory Tracking** - Allocation statistics and pressure monitoring

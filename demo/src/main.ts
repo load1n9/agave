@@ -2,6 +2,7 @@ import "./style.css";
 
 let consumeKeyFlags: () => void;
 let updateFn: ((x: number, y: number) => void) | null = null;
+let startFn: (() => void) | null = null;
 const canvas = document.getElementById("terminal-canvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 let mouseX = 0;
@@ -249,8 +250,11 @@ async function initWasm() {
     },
   };
   const { instance } = await WebAssembly.instantiate(bytes, imports);
-  // update should be exported as 'update' and take (i32, i32)
+  const startExport = instance.exports.start;
   const updateExport = instance.exports.update;
+  if (typeof startExport === "function") {
+    startFn = startExport as () => void;
+  }
   if (typeof updateExport === "function") {
     updateFn = updateExport as (x: number, y: number) => void;
   }
@@ -265,4 +269,8 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+
 initWasm();
+if (startFn !== null) {
+  startFn();
+}

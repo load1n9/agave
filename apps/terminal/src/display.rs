@@ -334,7 +334,7 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         draw_text(
             Position::new(margin + 20, 295),
             "● System Status:",
-            colors.accent_green,
+            colors.text_secondary,
         );
         draw_text(
             Position::new(margin + 160, 295),
@@ -362,10 +362,10 @@ fn draw_main_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.text_secondary,
         );
         draw_text(
-            Position::new(margin + 120, 345),
+            Position::new(margin + 110, 345),
             #[allow(static_mut_refs)]
             TerminalApp::version(),
-            colors.accent_purple,
+            colors.accent_cyan
         );
 
         // Terminal output section with scroll support

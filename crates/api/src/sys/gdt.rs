@@ -62,7 +62,6 @@ lazy_static! {
 pub fn init() {
     GDT.0.load();
     unsafe {
-        // CS::set_reg(code_selector);
         DS::set_reg(GDT.1.data_selector);
         ES::set_reg(GDT.1.data_selector);
         SS::set_reg(GDT.1.data_selector);

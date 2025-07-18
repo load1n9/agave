@@ -237,10 +237,6 @@ impl TerminalApp {
         self.add_output_line(b"  theme <n>  - Switch to specific theme");
         self.add_output_line(b"  theme next    - Switch to next theme");
         self.add_output_line(b"  theme prev    - Switch to previous theme");
-        self.add_output_line(b"");
-        self.add_output_line(b"Quick shortcuts (when command line is empty):");
-        self.add_output_line(b"  L-ls  H-help  S-system  P-ps");
-        self.add_output_line(b"  U-uname  C-clear  M-main  T-theme next");
         self.current_screen = Screen::Help;
     }
 

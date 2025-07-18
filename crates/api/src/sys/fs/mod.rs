@@ -216,6 +216,50 @@ pub struct VirtualFileSystem {
 }
 
 impl VirtualFileSystem {
+    /// Remove a directory and all its contents recursively
+    pub fn remove_dir_all(&mut self, path: &str) -> AgaveResult<()> {
+        if path == "/" {
+            return Err(AgaveError::PermissionDenied);
+        }
+        let parent_path = get_parent_path(path);
+        let filename = get_filename(path);
+        let parent = self.get_node_mut(&parent_path)?;
+        match parent {
+            VfsNode::Directory { children, .. } => {
+                let node = children.get(filename).ok_or(AgaveError::NotFound)?;
+                if let VfsNode::Directory { .. } = node {
+                    // Remove recursively by dropping the node
+                    children.remove(filename);
+                    Ok(())
+                } else {
+                    Err(AgaveError::FileSystemError(FsError::NotDirectory))
+                }
+            }
+            _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
+        }
+    }
+/// Remove a directory and all its contents recursively (public API)
+    /// Create a symbolic link
+    pub fn symlink(&mut self, link_path: &str, target: &str) -> AgaveResult<()> {
+        if self.get_node(link_path).is_ok() {
+            return Err(AgaveError::AlreadyExists);
+        }
+        let parent_path = get_parent_path(link_path);
+        let filename = get_filename(link_path);
+        // Ensure parent directory exists
+        if self.get_node(&parent_path).is_err() {
+            self.create_dir_all(&parent_path)?;
+        }
+        let parent = self.get_node_mut(&parent_path)?;
+        match parent {
+            VfsNode::Directory { children, .. } => {
+                children.insert(filename.to_string(), VfsNode::new_symlink(target.to_string()));
+                Ok(())
+            }
+            _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
+        }
+    }
+/// Create a symbolic link (public API)
     pub fn new() -> Self {
         let mut vfs = Self {
             root: VfsNode::new_directory(),
@@ -325,6 +369,48 @@ impl VirtualFileSystem {
 
         self.open_files.insert(fd, handle);
         Ok(fd)
+    }
+    
+    /// Rename or move a file or directory
+    pub fn rename(&mut self, old_path: &str, new_path: &str) -> AgaveResult<()> {
+        if old_path == "/" || new_path == "/" {
+            return Err(AgaveError::PermissionDenied);
+        }
+
+        // Get parent and filename for old and new paths
+        let old_parent_path = get_parent_path(old_path);
+        let old_filename = get_filename(old_path);
+        let new_parent_path = get_parent_path(new_path);
+        let new_filename = get_filename(new_path);
+
+        // Remove from old parent
+        let node = {
+            let old_parent = self.get_node_mut(&old_parent_path)?;
+            match old_parent {
+                VfsNode::Directory { children, .. } => {
+                    children.remove(old_filename).ok_or(AgaveError::NotFound)?
+                }
+                _ => return Err(AgaveError::FileSystemError(FsError::NotDirectory)),
+            }
+        };
+
+        // Ensure new parent exists
+        if self.get_node(&new_parent_path).is_err() {
+            self.create_dir_all(&new_parent_path)?;
+        }
+
+        // Insert into new parent
+        let new_parent = self.get_node_mut(&new_parent_path)?;
+        match new_parent {
+            VfsNode::Directory { children, .. } => {
+                if children.contains_key(new_filename) {
+                    return Err(AgaveError::AlreadyExists);
+                }
+                children.insert(new_filename.to_string(), node);
+                Ok(())
+            }
+            _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
+        }
     }
 
     /// Close a file descriptor
@@ -560,6 +646,7 @@ impl VirtualFileSystem {
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
         }
     }
+    
 
     /// Read entire file content
     pub fn read_file(&self, path: &str) -> AgaveResult<Vec<u8>> {

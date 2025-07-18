@@ -1,6 +1,7 @@
 /// Disk backend for persistent storage
 use crate::sys::error::{AgaveError, AgaveResult};
 use alloc::{boxed::Box, vec::Vec};
+use alloc::collections::BTreeMap;
 use spin::Mutex;
 
 /// Block size for disk operations (4KB)
@@ -36,14 +37,95 @@ pub trait DiskBackend: Send + Sync {
     fn backend_type(&self) -> &'static str;
 }
 
+/// Configuration for error injection in RamDisk
+#[derive(Debug, Clone, Default)]
+pub struct RamDiskErrorConfig {
+    pub fail_reads: bool,
+    pub fail_writes: bool,
+    pub fail_block: Option<BlockNumber>, // Only fail for a specific block if set
+}
+
 /// RAM-based disk backend (for testing and virtual disks)
 pub struct RamDisk {
     blocks: Mutex<Vec<Block>>,
     block_count: u64,
     read_only: bool,
+    inject_error: Option<RamDiskErrorConfig>,
+    read_count: core::sync::atomic::AtomicU64,
+    write_count: core::sync::atomic::AtomicU64,
+    cache: Mutex<BTreeMap<BlockNumber, Block>>, // LRU cache
 }
 
+const CACHE_SIZE: usize = 32;
+
 impl RamDisk {
+    /// Zero/wipe all blocks in the RAM disk
+    pub fn wipe(&mut self) -> AgaveResult<()> {
+        if self.read_only {
+            return Err(AgaveError::PermissionDenied);
+        }
+        let mut blocks = self.blocks.lock();
+        for block in blocks.iter_mut() {
+            block.fill(0);
+        }
+        Ok(())
+    }
+    /// Export the entire RAM disk contents as a Vec<u8>
+    pub fn export(&self) -> Vec<u8> {
+        let blocks = self.blocks.lock();
+        let mut data = Vec::with_capacity(self.block_count as usize * BLOCK_SIZE);
+        for block in blocks.iter() {
+            data.extend_from_slice(block);
+        }
+        data
+    }
+
+    /// Import data into the RAM disk, resizing as needed (overwrites all contents)
+    pub fn import(&mut self, data: &[u8]) -> AgaveResult<()> {
+        if self.read_only {
+            return Err(AgaveError::PermissionDenied);
+        }
+        let new_block_count = (data.len() + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        if new_block_count == 0 || new_block_count > MAX_BLOCKS as usize {
+            return Err(AgaveError::InvalidParameter);
+        }
+        let mut blocks = self.blocks.lock();
+        blocks.clear();
+        let mut offset = 0;
+        for _ in 0..new_block_count {
+            let mut block = [0u8; BLOCK_SIZE];
+            let end = (offset + BLOCK_SIZE).min(data.len());
+            if offset < data.len() {
+                block[..end - offset].copy_from_slice(&data[offset..end]);
+            }
+            blocks.push(block);
+            offset += BLOCK_SIZE;
+        }
+        self.block_count = new_block_count as u64;
+        Ok(())
+    }
+    /// Resize the RAM disk to a new block count (can grow or shrink)
+    pub fn resize(&mut self, new_block_count: u64) -> AgaveResult<()> {
+        if self.read_only {
+            return Err(AgaveError::PermissionDenied);
+        }
+        if new_block_count == 0 || new_block_count > MAX_BLOCKS {
+            return Err(AgaveError::InvalidParameter);
+        }
+        let mut blocks = self.blocks.lock();
+        let current = self.block_count;
+        if new_block_count > current {
+            let to_add = (new_block_count - current) as usize;
+            blocks.reserve(to_add);
+            for _ in 0..to_add {
+                blocks.push([0u8; BLOCK_SIZE]);
+            }
+        } else if new_block_count < current {
+            blocks.truncate(new_block_count as usize);
+        }
+        self.block_count = new_block_count;
+        Ok(())
+    }
     /// Create a new RAM disk with specified number of blocks
     pub fn new(block_count: u64) -> AgaveResult<Self> {
         if block_count == 0 || block_count > MAX_BLOCKS {
@@ -70,7 +152,15 @@ impl RamDisk {
             blocks: Mutex::new(blocks),
             block_count,
             read_only: false,
+            inject_error: None,
+            read_count: core::sync::atomic::AtomicU64::new(0),
+            write_count: core::sync::atomic::AtomicU64::new(0),
+            cache: Mutex::new(BTreeMap::new()),
         })
+    }
+    /// Set error injection configuration
+    pub fn set_error_injection(&mut self, config: RamDiskErrorConfig) {
+        self.inject_error = Some(config);
     }
 
     /// Create a read-only RAM disk from existing data
@@ -101,6 +191,10 @@ impl RamDisk {
             blocks: Mutex::new(blocks),
             block_count: block_count as u64,
             read_only: true,
+            inject_error: None,
+            read_count: core::sync::atomic::AtomicU64::new(0),
+            write_count: core::sync::atomic::AtomicU64::new(0),
+            cache: Mutex::new(BTreeMap::new()),
         })
     }
 
@@ -124,6 +218,60 @@ impl RamDisk {
             read_only: self.read_only,
         }
     }
+
+    /// Get the number of read operations performed
+    pub fn get_read_count(&self) -> u64 {
+        self.read_count.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Get the number of write operations performed
+    pub fn get_write_count(&self) -> u64 {
+        self.write_count.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Read a block with cache support
+    pub fn cached_read_block(&self, block_num: BlockNumber, buffer: &mut Block) -> AgaveResult<()> {
+        if block_num >= self.block_count {
+            return Err(AgaveError::InvalidParameter);
+        }
+        // Check cache first
+        let mut cache = self.cache.lock();
+        if let Some(cached) = cache.get(&block_num) {
+            buffer.copy_from_slice(cached);
+            return Ok(());
+        }
+        // Not in cache, read from disk
+        let blocks = self.blocks.lock();
+        buffer.copy_from_slice(&blocks[block_num as usize]);
+        // Insert into cache
+        cache.insert(block_num, buffer.clone());
+        // Enforce cache size
+        if cache.len() > CACHE_SIZE {
+            let first_key = *cache.keys().next().unwrap();
+            cache.remove(&first_key);
+        }
+        Ok(())
+    }
+
+    /// Write a block with cache support
+    pub fn cached_write_block(&self, block_num: BlockNumber, buffer: &Block) -> AgaveResult<()> {
+        if self.read_only {
+            return Err(AgaveError::PermissionDenied);
+        }
+        if block_num >= self.block_count {
+            return Err(AgaveError::InvalidParameter);
+        }
+        let mut blocks = self.blocks.lock();
+        blocks[block_num as usize].copy_from_slice(buffer);
+        // Update cache
+        let mut cache = self.cache.lock();
+        cache.insert(block_num, buffer.clone());
+        if cache.len() > CACHE_SIZE {
+            let first_key = *cache.keys().next().unwrap();
+            cache.remove(&first_key);
+        }
+        Ok(())
+    }
 }
 
 impl DiskBackend for RamDisk {
@@ -131,9 +279,14 @@ impl DiskBackend for RamDisk {
         if block_num >= self.block_count {
             return Err(AgaveError::InvalidParameter);
         }
-
+        if let Some(cfg) = &self.inject_error {
+            if cfg.fail_reads && (cfg.fail_block.is_none() || cfg.fail_block == Some(block_num)) {
+                return Err(AgaveError::IoError);
+            }
+        }
         let blocks = self.blocks.lock();
         buffer.copy_from_slice(&blocks[block_num as usize]);
+    self.read_count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 
@@ -141,13 +294,17 @@ impl DiskBackend for RamDisk {
         if self.read_only {
             return Err(AgaveError::PermissionDenied);
         }
-
         if block_num >= self.block_count {
             return Err(AgaveError::InvalidParameter);
         }
-
+        if let Some(cfg) = &self.inject_error {
+            if cfg.fail_writes && (cfg.fail_block.is_none() || cfg.fail_block == Some(block_num)) {
+                return Err(AgaveError::IoError);
+            }
+        }
         let mut blocks = self.blocks.lock();
         blocks[block_num as usize].copy_from_slice(buffer);
+    self.write_count.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         Ok(())
     }
 
@@ -390,6 +547,23 @@ impl CompoundDisk {
             self.backends.last().unwrap().total_blocks(),
             self.total_blocks
         );
+    }
+
+    /// Remove a backend by index (recalculates offsets and total_blocks)
+    pub fn remove_backend(&mut self, index: usize) -> AgaveResult<()> {
+        if index >= self.backends.len() {
+            return Err(AgaveError::InvalidParameter);
+        }
+        self.backends.remove(index);
+        self.block_offsets.remove(index);
+        // Recalculate offsets and total_blocks
+        self.total_blocks = 0;
+        self.block_offsets.clear();
+        for backend in &self.backends {
+            self.block_offsets.push(self.total_blocks);
+            self.total_blocks += backend.total_blocks();
+        }
+        Ok(())
     }
 
     /// Find which backend handles a given block number

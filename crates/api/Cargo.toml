@@ -12,6 +12,7 @@ bench = false
 
 [dependencies]
 object = { workspace = true }
+once_cell = { workspace = true }
 unix_str = { workspace = true }
 vek = { workspace = true }
 arrayvec = { workspace = true }

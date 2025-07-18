@@ -57,6 +57,7 @@ noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features 
     "unicode-specials",
 ] }
 object = { version = "0.37.1", default-features = false, features = ["read"] }
+once_cell = { version = "1.21.3", default-features = false, features = ["alloc"] }
 pic8259 = "0.11.0"
 rand = { version = "0.9.1", default-features = false }
 rand_hc = "0.4.0"

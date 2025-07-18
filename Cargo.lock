@@ -55,6 +55,7 @@ dependencies = [
  "log",
  "noto-sans-mono-bitmap 0.3.1",
  "object",
+ "once_cell",
  "pic8259",
  "rand 0.9.1",
  "rand_hc 0.4.0",

@@ -1,5 +1,4 @@
-// WASI Filesystem implementation for Agave OS
-use super::super::fs;
+use super::super::fs::VirtualFileSystem;
 use super::error::*;
 use super::types::*;
 use alloc::collections::BTreeMap;
@@ -10,6 +9,7 @@ use spin::Mutex;
 
 // Global filesystem state
 static FILESYSTEM: Mutex<FilesystemState> = Mutex::new(FilesystemState::new());
+static mut VFS: Option<Mutex<VirtualFileSystem>> = None;
 
 #[derive(Debug)]
 pub struct FilesystemState {
@@ -167,52 +167,53 @@ pub fn path_open(
         format!("{}/{}", base_path, path)
     };
 
-    // Try to read the file using the actual filesystem
-    let file_data = match fs::read_file(&full_path) {
-        Ok(data) => data,
-        Err(_) => {
-            // If file doesn't exist and O_CREAT is set, create it
-            if (oflags & 0x1) != 0 {
-                // O_CREAT
-                Vec::new()
-            } else {
-                return Err(WasiError::noent());
-            }
+    // Use VFS for file open
+    let mut vfs = unsafe {
+        if VFS.is_none() {
+            VFS = Some(Mutex::new(VirtualFileSystem::new()));
         }
+        VFS.as_ref().unwrap().lock()
     };
-
+    let exists = vfs.exists(&full_path);
+    if !exists && (oflags & 0x1) == 0 {
+        return Err(WasiError::noent());
+    }
+    if !exists {
+        vfs.write_file(&full_path, Vec::new()).map_err(|_| WasiError::io())?;
+    }
     let new_fd = fs_state.allocate_fd();
-    let mut file_desc =
-        FileDescriptor::new(full_path, fdflags, fs_rights_base, fs_rights_inheriting);
-    file_desc.data = file_data;
+    let mut file_desc = FileDescriptor::new(full_path.clone(), fdflags, fs_rights_base, fs_rights_inheriting);
+    file_desc.data = vfs.read_file(&full_path).map_err(|_| WasiError::io())?;
     file_desc.size = file_desc.data.len() as FileSize;
-
     fs_state.open_files.insert(new_fd, file_desc);
     Ok(new_fd)
 }
 
 pub fn fd_read(fd: Fd, iovs: &[IOVec]) -> WasiResult<Size> {
     let mut fs_state = FILESYSTEM.lock();
-
+    let vfs = unsafe {
+        if VFS.is_none() {
+            VFS = Some(Mutex::new(VirtualFileSystem::new()));
+        }
+        VFS.as_ref().unwrap().lock()
+    };
     if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
         if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
             return Err(WasiError::notcapable());
         }
-
+        let file_data = vfs.read_file(&file_desc.path).map_err(|_| WasiError::io())?;
         let mut total_read = 0;
-
+        let mut offset = file_desc.offset as usize;
         for iov in iovs {
-            let bytes_to_read = iov.buf_len.min((file_desc.size - file_desc.offset) as u32);
+            let bytes_to_read = iov.buf_len.min((file_data.len() as u32).saturating_sub(offset as u32));
             if bytes_to_read == 0 {
                 break;
             }
-
-            // In a real implementation, we would write to WebAssembly memory at iov.buf
-            // For now, we'll just simulate the read
+            // Here you would copy file_data[offset..offset+bytes_to_read] to WASM memory at iov.buf
+            offset += bytes_to_read as usize;
             file_desc.offset += bytes_to_read as FileSize;
             total_read += bytes_to_read;
         }
-
         Ok(total_read)
     } else {
         Err(WasiError::badf())
@@ -221,32 +222,35 @@ pub fn fd_read(fd: Fd, iovs: &[IOVec]) -> WasiResult<Size> {
 
 pub fn fd_write(fd: Fd, iovs: &[CIOVec]) -> WasiResult<Size> {
     let mut fs_state = FILESYSTEM.lock();
-
+    let mut vfs = unsafe {
+        if VFS.is_none() {
+            VFS = Some(Mutex::new(VirtualFileSystem::new()));
+        }
+        VFS.as_ref().unwrap().lock()
+    };
     if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
         if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
             return Err(WasiError::notcapable());
         }
-
         let mut total_written = 0;
-
+        let mut offset = file_desc.offset as usize;
         for iov in iovs {
-            // In a real implementation, we would read from WebAssembly memory at iov.buf
-            // For now, we'll simulate writing zeros
             let bytes_to_write = iov.buf_len;
-
-            // Extend the file data if necessary
-            let new_end = file_desc.offset + bytes_to_write as FileSize;
-            if new_end > file_desc.size {
-                file_desc.data.resize(new_end as usize, 0);
-                file_desc.size = new_end;
+            // Here you would read bytes from WASM memory at iov.buf
+            let mut data = alloc::vec::Vec::with_capacity(bytes_to_write as usize);
+            data.resize(bytes_to_write as usize, 0u8); // Replace with real data from WASM
+            let mut file_data = vfs.read_file(&file_desc.path).unwrap_or_default();
+            let new_end = offset + bytes_to_write as usize;
+            if new_end > file_data.len() {
+                file_data.resize(new_end, 0);
             }
-
+            file_data[offset..new_end].copy_from_slice(&data);
+            vfs.write_file(&file_desc.path, file_data.clone()).map_err(|_| WasiError::io())?;
+            file_desc.data = file_data;
+            file_desc.size = file_desc.data.len() as FileSize;
             file_desc.offset += bytes_to_write as FileSize;
+            offset += bytes_to_write as usize;
             total_written += bytes_to_write;
-        }
-
-        if !file_desc.is_directory {
-            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(total_written)
     } else {
@@ -293,9 +297,9 @@ pub fn fd_close(fd: Fd) -> WasiResult<()> {
     let mut fs_state = FILESYSTEM.lock();
 
     if let Some(file_desc) = fs_state.open_files.remove(&fd) {
-        // Persist file data to disk if not a directory
         if !file_desc.is_directory {
-            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
     } else {
@@ -311,7 +315,8 @@ pub fn fd_sync(fd: Fd) -> WasiResult<()> {
             return Err(WasiError::notcapable());
         }
         if !file_desc.is_directory {
-            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
     } else {
@@ -327,7 +332,8 @@ pub fn fd_datasync(fd: Fd) -> WasiResult<()> {
             return Err(WasiError::notcapable());
         }
         if !file_desc.is_directory {
-            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
     } else {
@@ -455,7 +461,8 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
         }
 
         if !file_desc.is_directory {
-            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
     } else {
@@ -465,30 +472,12 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
 
 pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
-    log::debug!("WASI path_create_directory(fd={}, path={})", fd, path);
-
-    // Check directory permissions
-    if !fs_state.preopened_dirs.contains_key(&fd) {
-        if let Some(file_desc) = fs_state.open_files.get(&fd) {
-            if !file_desc.is_directory
-                || (file_desc.rights_base & RIGHTS_PATH_CREATE_DIRECTORY) == 0
-            {
-                log::error!("WASI path_create_directory: fd {} is not a directory or lacks rights", fd);
-                return Err(WasiError::notcapable());
-            }
-        } else {
-            log::error!("WASI path_create_directory: fd {} is not open", fd);
-            return Err(WasiError::badf());
-        }
-    }
-
-    // Actually create the directory in the real filesystem
+    let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
     let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
         preopen_path.clone()
     } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
         file_desc.path.clone()
     } else {
-        log::error!("WASI path_create_directory: could not resolve base path for fd {}", fd);
         return Err(WasiError::badf());
     };
     let full_path = if path.starts_with('/') {
@@ -498,32 +487,12 @@ pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
     } else {
         format!("{}/{}", base_path, path)
     };
-    log::debug!("WASI path_create_directory: creating full_path={}", full_path);
-    match fs::create_dir(&full_path) {
-        Ok(()) => {
-            log::debug!("WASI path_create_directory: successfully created {}", full_path);
-            Ok(())
-        }
-        Err(e) => {
-            log::error!("WASI path_create_directory: failed to create {}: {:?}", full_path, e);
-            Err(WasiError::io())
-        }
-    }
+    vfs.create_dir_all(&full_path).map_err(|_| WasiError::io())
 }
 
 pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
-    // Check directory permissions
-    if !fs_state.preopened_dirs.contains_key(&fd) {
-        if let Some(file_desc) = fs_state.open_files.get(&fd) {
-            if !file_desc.is_directory || (file_desc.rights_base & RIGHTS_PATH_UNLINK_FILE) == 0 {
-                return Err(WasiError::notcapable());
-            }
-        } else {
-            return Err(WasiError::badf());
-        }
-    }
-    // Actually remove the file in the real filesystem
+    let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
     let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
         preopen_path.clone()
     } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -538,8 +507,7 @@ pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
     } else {
         format!("{}/{}", base_path, path)
     };
-    fs::remove(&full_path).map_err(|_| WasiError::io())?;
-    Ok(())
+    vfs.remove(&full_path).map_err(|_| WasiError::io())
 }
 
 pub fn path_remove_directory(fd: Fd, _path: &str) -> WasiResult<()> {
@@ -565,18 +533,20 @@ pub fn path_remove_directory(fd: Fd, _path: &str) -> WasiResult<()> {
 
 pub fn fd_readdir(fd: Fd, _buf: &mut [u8], _cookie: DirCookie) -> WasiResult<Size> {
     let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
+    let vfs = unsafe { VFS.as_mut().unwrap().lock() };
+    let path = if let Some(file_desc) = fs_state.open_files.get(&fd) {
         if !file_desc.is_directory || (file_desc.rights_base & RIGHTS_FD_READDIR) == 0 {
             return Err(WasiError::notdir());
         }
-    } else if !fs_state.preopened_dirs.contains_key(&fd) {
+        file_desc.path.clone()
+    } else if let Some(path) = fs_state.preopened_dirs.get(&fd) {
+        path.clone()
+    } else {
         return Err(WasiError::badf());
-    }
-
-    // In a real implementation, this would read directory entries
-    // For now, we'll return empty directory
-    Ok(0)
+    };
+    let entries = vfs.read_dir(&path).map_err(|_| WasiError::io())?;
+    // Here you would serialize entries into WASM memory at _buf
+    Ok(entries.len() as Size)
 }
 
 // Preview 2 API extensions

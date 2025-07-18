@@ -216,6 +216,70 @@ pub struct VirtualFileSystem {
 }
 
 impl VirtualFileSystem {
+    /// Change permissions of a file or directory
+    pub fn set_permissions(&mut self, path: &str, perms: FilePermissions) -> AgaveResult<()> {
+        let node = self.get_node_mut(path)?;
+        let metadata = node.metadata_mut();
+        metadata.permissions = perms;
+        metadata.modified_time =
+            crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// Truncate a file to the given size (grow with zeros or shrink)
+    pub fn truncate(&mut self, path: &str, size: u64) -> AgaveResult<()> {
+        let node = self.get_node_mut(path)?;
+        match node {
+            VfsNode::File { content, metadata } => {
+                let new_size = size as usize;
+                let old_size = content.len();
+                if new_size < old_size {
+                    content.truncate(new_size);
+                } else if new_size > old_size {
+                    content.resize(new_size, 0);
+                }
+                metadata.size = size;
+                metadata.modified_time =
+                    crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed);
+                Ok(())
+            }
+            _ => Err(AgaveError::FileSystemError(FsError::InvalidPath)),
+        }
+    }
+    /// Copy a file from src to dst
+    pub fn copy(&mut self, src: &str, dst: &str) -> AgaveResult<()> {
+        // Get the file node and clone its content/metadata before any mutable borrow
+        let (content, metadata) = match self.get_node(src)? {
+            VfsNode::File { content, metadata } => (content.clone(), metadata.clone()),
+            _ => return Err(AgaveError::FileSystemError(FsError::InvalidPath)),
+        };
+
+        let parent_path = get_parent_path(dst);
+        let filename = get_filename(dst);
+
+        // Ensure parent directory exists
+        if self.get_node(&parent_path).is_err() {
+            self.create_dir_all(&parent_path)?;
+        }
+
+        let parent = self.get_node_mut(&parent_path)?;
+        match parent {
+            VfsNode::Directory { children, .. } => {
+                let mut new_metadata = metadata;
+                new_metadata.modified_time =
+                    crate::sys::interrupts::TIME_MS.load(core::sync::atomic::Ordering::Relaxed);
+                children.insert(
+                    filename.to_string(),
+                    VfsNode::File {
+                        metadata: new_metadata,
+                        content,
+                    },
+                );
+                Ok(())
+            }
+            _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
+        }
+    }
     /// Remove a directory and all its contents recursively
     pub fn remove_dir_all(&mut self, path: &str) -> AgaveResult<()> {
         if path == "/" {
@@ -238,7 +302,7 @@ impl VirtualFileSystem {
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
         }
     }
-/// Remove a directory and all its contents recursively (public API)
+    /// Remove a directory and all its contents recursively (public API)
     /// Create a symbolic link
     pub fn symlink(&mut self, link_path: &str, target: &str) -> AgaveResult<()> {
         if self.get_node(link_path).is_ok() {
@@ -253,13 +317,16 @@ impl VirtualFileSystem {
         let parent = self.get_node_mut(&parent_path)?;
         match parent {
             VfsNode::Directory { children, .. } => {
-                children.insert(filename.to_string(), VfsNode::new_symlink(target.to_string()));
+                children.insert(
+                    filename.to_string(),
+                    VfsNode::new_symlink(target.to_string()),
+                );
                 Ok(())
             }
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
         }
     }
-/// Create a symbolic link (public API)
+    /// Create a symbolic link (public API)
     pub fn new() -> Self {
         let mut vfs = Self {
             root: VfsNode::new_directory(),
@@ -370,7 +437,7 @@ impl VirtualFileSystem {
         self.open_files.insert(fd, handle);
         Ok(fd)
     }
-    
+
     /// Rename or move a file or directory
     pub fn rename(&mut self, old_path: &str, new_path: &str) -> AgaveResult<()> {
         if old_path == "/" || new_path == "/" {
@@ -646,7 +713,6 @@ impl VirtualFileSystem {
             _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
         }
     }
-    
 
     /// Read entire file content
     pub fn read_file(&self, path: &str) -> AgaveResult<Vec<u8>> {

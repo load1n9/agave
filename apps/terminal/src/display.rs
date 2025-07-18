@@ -1,3 +1,5 @@
+use std::fs;
+use std::path::Path;
 use agave_lib::{
     clear_screen, draw_line, draw_rectangle, draw_text, fill_circle, fill_rectangle,
     get_dimensions, Position, RGBA,
@@ -579,15 +581,20 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         );
 
         // File listing with alternating backgrounds and scrolling support
-        let max_visible_files = 15; // Limit visible files to fit on screen
-        let total_files = TERMINAL.file_count;
+        let max_visible_files = 15;
+        let path = Path::new(TERMINAL.current_directory);
+        let entries: Vec<_> = match fs::read_dir(path) {
+            Ok(read_dir) => read_dir.filter_map(|e| e.ok()).collect(),
+            Err(_) => Vec::new(),
+        };
+        let total_files = entries.len();
         let scroll_offset = TERMINAL.files_scroll_offset.min(total_files.saturating_sub(max_visible_files));
         let files_to_show = total_files.min(max_visible_files);
 
         for i in 0..files_to_show {
             let file_idx = i + scroll_offset;
             if file_idx >= total_files { break; }
-            let file = &TERMINAL.file_system[file_idx];
+            let entry = &entries[file_idx];
             let y = 190 + i as i32 * 30;
 
             // Alternating row backgrounds
@@ -605,19 +612,25 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
                 );
             }
 
-            let (icon, name_color) = if file.is_directory {
+            let metadata = entry.metadata().ok();
+            let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
+            let file_name = entry.file_name();
+            let name_str = file_name.to_string_lossy();
+
+            let (icon, name_color) = if is_dir {
                 ("📂", colors.accent_blue)
             } else {
                 ("📄", colors.text_primary)
             };
 
             draw_text(Position::new(margin + 25, y + 5), icon, colors.text_primary);
-            draw_text(Position::new(margin + 50, y + 5), file.name, name_color);
+            draw_text(Position::new(margin + 50, y + 5), &name_str, name_color);
 
-            if !file.is_directory {
-                let size_str = if file.size > 1024 * 1024 {
+            if !is_dir {
+                let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
+                let size_str = if size > 1024 * 1024 {
                     "Large"
-                } else if file.size > 1024 {
+                } else if size > 1024 {
                     "Medium"
                 } else {
                     "Small"

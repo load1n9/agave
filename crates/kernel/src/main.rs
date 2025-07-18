@@ -4,8 +4,10 @@
 use acpi::{AcpiTables, HpetInfo, InterruptModel};
 use agave_api::sys::{
     allocator, diagnostics, drivers,
+    drivers::virtio_block::BlockDevice,
     framebuffer::{FB, RGBA},
-    fs, gdt, globals, interrupts, ioapic, local_apic,
+    fs::{self, disk::BLOCK_SIZE},
+    gdt, globals, interrupts, ioapic, local_apic,
     logger::init_logger,
     memory::{self, BootInfoFrameAllocator},
     monitor, network, pci, power, process, security,
@@ -14,18 +16,24 @@ use agave_api::sys::{
     wasm::WasmApp,
     with_mapper_framealloc, ACPI_HANDLER, FRAME_ALLOCATOR, MAPPER, VIRTUAL_MAPPING_OFFSET,
 };
+use alloc::sync::Arc;
+use spin::Mutex;
+extern crate alloc;
+extern crate lazy_static;
 use alloc::{boxed::Box, vec::Vec};
 use bootloader_api::{config::Mapping, entry_point, BootInfo, BootloaderConfig};
 use bootloader_boot_config::LevelFilter;
 use core::panic::PanicInfo;
-use spin::Mutex;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::{
     structures::paging::{Mapper, Page, PageSize, PageTableFlags, PhysFrame, Size1GiB, Size2MiB},
     PhysAddr, VirtAddr,
 };
 extern crate agave_api;
-extern crate alloc;
+
+lazy_static::lazy_static! {
+    static ref BLOCK_DEVICES: Mutex<Vec<Arc<Mutex<agave_api::sys::drivers::virtio_block::VirtioBlockDevice>>>> = Mutex::new(Vec::new());
+}
 
 // Entry point configuration
 const CONFIG: BootloaderConfig = {
@@ -282,9 +290,27 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Power management enabled");
     show_loading_screen("Power management enabled...", 55, &mut *fb);
 
-    // Initialize filesystem
+    // Initialize filesystem with VirtIO block device if available
     log::info!("Initializing filesystem...");
-    if let Err(e) = fs::init_filesystem() {
+    // Find and remove the first Virtio block device for persistent filesystem
+    let virtio_block_index = virtio_devices
+        .iter()
+        .position(|v| v.device_type == DeviceType::Block);
+    let virtio_block_device = virtio_block_index.map(|idx| virtio_devices.remove(idx));
+    let fs_result = if let Some(virtio) = virtio_block_device {
+        match agave_api::sys::drivers::virtio_block::VirtioBlockDevice::new(virtio) {
+            Ok(block_dev) => {
+                fs::init_filesystem_with_type(fs::FileSystemType::Persistent, Some(block_dev))
+            }
+            Err(e) => {
+                log::error!("Failed to initialize VirtioBlockDevice: {:?}", e);
+                fs::init_filesystem_with_type(fs::FileSystemType::Virtual, None)
+            }
+        }
+    } else {
+        fs::init_filesystem_with_type(fs::FileSystemType::Virtual, None)
+    };
+    if let Err(e) = fs_result {
         log::error!("Failed to initialize filesystem: {:?}", e);
     } else {
         log::info!("Filesystem initialized successfully");
@@ -474,6 +500,55 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         });
         log::info!("WASM task spawned, starting executor...");
         executor.run();
+    }
+}
+
+// --- Kernel-side FFI for VirtioDisk ---
+#[no_mangle]
+pub extern "C" fn virtio_block_read(
+    device_id: u32,
+    block_num: u64,
+    buffer: *mut u8,
+    size: usize,
+) -> i32 {
+    let block_devices = BLOCK_DEVICES.lock();
+    let idx = device_id as usize;
+    if let Some(dev) = block_devices.get(idx) {
+        let mut dev = dev.lock();
+        let mut block = [0u8; BLOCK_SIZE];
+        if let Err(_) = BlockDevice::read_block(&mut *dev, block_num, &mut block) {
+            return -1;
+        }
+        unsafe {
+            core::ptr::copy_nonoverlapping(block.as_ptr(), buffer, size.min(BLOCK_SIZE));
+        }
+        0
+    } else {
+        -1
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn virtio_block_write(
+    device_id: u32,
+    block_num: u64,
+    buffer: *const u8,
+    size: usize,
+) -> i32 {
+    let block_devices = BLOCK_DEVICES.lock();
+    let idx = device_id as usize;
+    if let Some(dev) = block_devices.get(idx) {
+        let mut dev = dev.lock();
+        let mut block = [0u8; BLOCK_SIZE];
+        unsafe {
+            core::ptr::copy_nonoverlapping(buffer, block.as_mut_ptr(), size.min(BLOCK_SIZE));
+        }
+        if let Err(_) = BlockDevice::write_block(&mut *dev, block_num, &block) {
+            return -1;
+        }
+        0
+    } else {
+        -1
     }
 }
 

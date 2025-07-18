@@ -12,7 +12,7 @@ use spin::Mutex;
 pub mod disk;
 pub mod simple_fs;
 
-use disk::RamDisk;
+// use disk::RamDisk;
 use simple_fs::SimpleFileSystem;
 
 /// File system types
@@ -634,21 +634,32 @@ impl VirtualFileSystem {
 
     /// Create a directory
     pub fn create_dir(&mut self, path: &str) -> AgaveResult<()> {
+        log::debug!("FS create_dir: path={}", path);
         if self.get_node(path).is_ok() {
+            log::error!("FS create_dir: path already exists: {}", path);
             return Err(AgaveError::AlreadyExists);
         }
 
         let parent_path = get_parent_path(path);
         let filename = get_filename(path);
+        log::debug!("FS create_dir: parent_path={}, filename={}", parent_path, filename);
 
-        let parent = self.get_node_mut(&parent_path)?;
-
-        match parent {
-            VfsNode::Directory { children, .. } => {
-                children.insert(filename.to_string(), VfsNode::new_directory());
-                Ok(())
+        match self.get_node_mut(&parent_path) {
+            Ok(parent) => match parent {
+                VfsNode::Directory { children, .. } => {
+                    children.insert(filename.to_string(), VfsNode::new_directory());
+                    log::debug!("FS create_dir: directory created: {}", path);
+                    Ok(())
+                }
+                _ => {
+                    log::error!("FS create_dir: parent is not a directory: {}", parent_path);
+                    Err(AgaveError::FileSystemError(FsError::NotDirectory))
+                }
+            },
+            Err(e) => {
+                log::error!("FS create_dir: failed to get parent node: {}: {:?}", parent_path, e);
+                Err(e)
             }
-            _ => Err(AgaveError::FileSystemError(FsError::NotDirectory)),
         }
     }
 
@@ -798,17 +809,20 @@ impl VirtualFileSystem {
 static mut FILESYSTEM: Option<Mutex<VirtualFileSystem>> = None;
 
 /// Global persistent file system instance
-static mut PERSISTENT_FS: Option<Mutex<SimpleFileSystem<RamDisk>>> = None;
+use crate::sys::fs::disk::VirtioBlockDisk;
+use crate::sys::drivers::virtio_block::VirtioBlockDevice;
+static mut PERSISTENT_FS: Option<Mutex<SimpleFileSystem<VirtioBlockDisk>>> = None;
 
 static mut CURRENT_FS_TYPE: FileSystemType = FileSystemType::Virtual;
 
 /// Public API functions
 pub fn init_filesystem() -> AgaveResult<()> {
-    init_filesystem_with_type(FileSystemType::Virtual)
+    init_filesystem_with_type(FileSystemType::Virtual, None)
 }
 
 /// Initialize filesystem with specific type
-pub fn init_filesystem_with_type(fs_type: FileSystemType) -> AgaveResult<()> {
+/// Provide a VirtioBlockDevice to initialize persistent filesystem
+pub fn init_filesystem_with_type(fs_type: FileSystemType, virtio_block_device: Option<VirtioBlockDevice>) -> AgaveResult<()> {
     log::info!("Initializing file system (type: {:?})...", fs_type);
 
     unsafe {
@@ -820,14 +834,11 @@ pub fn init_filesystem_with_type(fs_type: FileSystemType) -> AgaveResult<()> {
                 log::info!("Virtual file system initialized");
             }
             FileSystemType::Persistent => {
-                // Create a RAM disk for demonstration (4MB)
-                let ram_disk = RamDisk::new(1024)?; // 1024 blocks = 4MB
-
-                // Format the disk with our simple filesystem
-                let persistent_fs = SimpleFileSystem::format(ram_disk)?;
-
+                let virtio_block_device = virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
+                let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
+                let persistent_fs = SimpleFileSystem::format(virtio_disk)?;
                 PERSISTENT_FS = Some(Mutex::new(persistent_fs));
-                log::info!("Persistent file system initialized and formatted");
+                log::info!("Persistent file system initialized and formatted (VirtioBlockDisk)");
             }
         }
     }
@@ -836,7 +847,8 @@ pub fn init_filesystem_with_type(fs_type: FileSystemType) -> AgaveResult<()> {
 }
 
 /// Switch between file system types
-pub fn switch_filesystem_type(fs_type: FileSystemType) -> AgaveResult<()> {
+/// Provide a VirtioBlockDevice to switch persistent filesystem type
+pub fn switch_filesystem_type(fs_type: FileSystemType, virtio_block_device: Option<VirtioBlockDevice>) -> AgaveResult<()> {
     unsafe {
         if CURRENT_FS_TYPE == fs_type {
             return Ok(()); // Already using this type
@@ -862,19 +874,18 @@ pub fn switch_filesystem_type(fs_type: FileSystemType) -> AgaveResult<()> {
 
         // Initialize new filesystem if not already done
         match fs_type {
-            FileSystemType::Virtual =>
-            {
+            FileSystemType::Virtual => {
                 #[allow(static_mut_refs)]
                 if FILESYSTEM.is_none() {
                     FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
                 }
             }
-            FileSystemType::Persistent =>
-            {
+            FileSystemType::Persistent => {
                 #[allow(static_mut_refs)]
                 if PERSISTENT_FS.is_none() {
-                    let ram_disk = RamDisk::new(1024)?;
-                    let persistent_fs = SimpleFileSystem::format(ram_disk)?;
+                    let virtio_block_device = virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
+                    let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
+                    let persistent_fs = SimpleFileSystem::format(virtio_disk)?;
                     PERSISTENT_FS = Some(Mutex::new(persistent_fs));
                 }
             }
@@ -886,18 +897,16 @@ pub fn switch_filesystem_type(fs_type: FileSystemType) -> AgaveResult<()> {
     Ok(())
 }
 
-/// Mount an existing persistent filesystem from disk
-pub fn mount_persistent_filesystem(disk: RamDisk) -> AgaveResult<()> {
-    log::info!("Mounting existing persistent file system...");
-
-    let persistent_fs = SimpleFileSystem::mount(disk)?;
-
+/// Mount an existing persistent filesystem from VirtioBlockDisk
+pub fn mount_persistent_filesystem(virtio_block_device: VirtioBlockDevice) -> AgaveResult<()> {
+    log::info!("Mounting existing persistent file system (VirtioBlockDisk)...");
+    let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
+    let persistent_fs = SimpleFileSystem::mount(virtio_disk)?;
     unsafe {
         PERSISTENT_FS = Some(Mutex::new(persistent_fs));
         CURRENT_FS_TYPE = FileSystemType::Persistent;
     }
-
-    log::info!("Persistent file system mounted successfully");
+    log::info!("Persistent file system mounted successfully (VirtioBlockDisk)");
     Ok(())
 }
 

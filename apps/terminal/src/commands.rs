@@ -63,6 +63,16 @@ impl TerminalApp {
             self.handle_ls_command();
         } else if self.command_length == 2 && &cmd_lower[0..2] == b"ps" {
             self.handle_ps_command();
+        } else if self.command_length == 3 && &cmd_lower[0..3] == b"cat" {
+            self.handle_cat_command();
+        } else if self.command_length >= 6 && &cmd_lower[0..5] == b"write" {
+            self.handle_write_command();
+        } else if self.command_length >= 5 && &cmd_lower[0..5] == b"mkdir" {
+            self.handle_mkdir_command();
+        } else if self.command_length >= 4 && &cmd_lower[0..4] == b"rm " {
+            self.handle_rm_command();
+        } else if self.command_length >= 6 && &cmd_lower[0..6] == b"rmdir " {
+            self.handle_rmdir_command();
         } else if self.command_length == 5 && &cmd_lower[0..5] == b"uname" {
             self.add_output_line(b"Agave OS 0.1.3 x86_64");
         } else if self.command_length == 6 && &cmd_lower[0..6] == b"uptime" {
@@ -122,17 +132,7 @@ impl TerminalApp {
     }
 
     fn handle_ls_command(&mut self) {
-        self.add_output_line(b"Files and directories:");
-        self.add_output_line(b"drwxr-xr-x  bin/");
-        self.add_output_line(b"drwxr-xr-x  etc/");
-        self.add_output_line(b"drwxr-xr-x  home/");
-        self.add_output_line(b"drwxr-xr-x  usr/");
-        self.add_output_line(b"drwxr-xr-x  var/");
-        self.add_output_line(b"drwxr-xr-x  tmp/");
-        self.add_output_line(b"-rw-r--r--  hello.wasm");
-        self.add_output_line(b"-rw-r--r--  config.json");
-        self.add_output_line(b"-rw-r--r--  readme.md");
-        self.add_output_line(b"-rw-r--r--  system.log");
+        self.list_files();
         self.files_scroll_offset = 0;
         self.current_screen = Screen::Files;
     }
@@ -220,6 +220,11 @@ impl TerminalApp {
         self.add_output_line(b"  echo      - Echo text");
         self.add_output_line(b"  theme     - Change color themes");
         self.add_output_line(b"  exit      - Exit the terminal");
+        self.add_output_line(b"  cat <file>      - Show file contents");
+        self.add_output_line(b"  write <file> <text> - Write text to file");
+        self.add_output_line(b"  rm <file>       - Remove file");
+        self.add_output_line(b"  mkdir <dir>     - Create directory");
+        self.add_output_line(b"  rmdir <dir>     - Remove directory");
         self.add_output_line(b"");
         self.add_output_line(b"IPC commands:");
         self.add_output_line(b"  ipc       - Inter-Process Communication help");
@@ -716,6 +721,89 @@ impl TerminalApp {
                 self.add_output_line(b"  fs switch file - Switch to file disk");
                 self.add_output_line(b"  fs info       - Show backend information");
             }
+        }
+    }
+
+    fn handle_cat_command(&mut self) {
+        // Usage: cat <filename>
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            self.add_output_line(b"Usage: cat <filename>");
+            return;
+        }
+        let filename = parts[1];
+        match std::fs::read(filename) {
+            Ok(data) => {
+                let mut line = [0u8; 200];
+                for chunk in data.chunks(200) {
+                    let len = chunk.len().min(200);
+                    line[..len].copy_from_slice(&chunk[..len]);
+                    self.add_output_line(&line[..len]);
+                }
+            }
+            Err(_) => self.add_output_line(b"Error: File not found or cannot be read"),
+        }
+    }
+
+    fn handle_write_command(&mut self) {
+        // Usage: write <filename> <text>
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
+        if parts.len() < 3 {
+            self.add_output_line(b"Usage: write <filename> <text>");
+            return;
+        }
+        let filename = parts[1];
+        let text = parts[2].as_bytes();
+        match std::fs::write(filename, text) {
+            Ok(_) => self.add_output_line(b"File written successfully"),
+            Err(_) => self.add_output_line(b"Error: Could not write file"),
+        }
+    }
+
+    fn handle_rm_command(&mut self) {
+        // Usage: rm <filename>
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            self.add_output_line(b"Usage: rm <filename>");
+            return;
+        }
+        let filename = parts[1];
+        match std::fs::remove_file(filename) {
+            Ok(_) => self.add_output_line(b"File removed successfully"),
+            Err(_) => self.add_output_line(b"Error: Could not remove file"),
+        }
+    }
+
+    fn handle_mkdir_command(&mut self) {
+        // Usage: mkdir <dirname>
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            self.add_output_line(b"Usage: mkdir <dirname>");
+            return;
+        }
+        let dirname = parts[1];
+        match std::fs::create_dir(dirname) {
+            Ok(_) => self.add_output_line(b"Directory created successfully"),
+            Err(_) => self.add_output_line(b"Error: Could not create directory"),
+        }
+    }
+
+    fn handle_rmdir_command(&mut self) {
+        // Usage: rmdir <dirname>
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.split_whitespace().collect();
+        if parts.len() < 2 {
+            self.add_output_line(b"Usage: rmdir <dirname>");
+            return;
+        }
+        let dirname = parts[1];
+        match std::fs::remove_dir(dirname) {
+            Ok(_) => self.add_output_line(b"Directory removed successfully"),
+            Err(_) => self.add_output_line(b"Error: Could not remove directory"),
         }
     }
 }

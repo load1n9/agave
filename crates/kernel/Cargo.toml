@@ -12,13 +12,14 @@ test = false
 bench = false
 
 [dependencies]
+agave-api = { path = "../api" }
+acpi = { workspace = true }
 bootloader_api = { workspace = true }
 bootloader-boot-config = { workspace = true }
-acpi = { workspace = true }
-spin =  { workspace = true }
 core2 =  { workspace = true }
 log = { workspace = true }
-agave-api = { path = "../api" }
+lazy_static = { workspace = true }
+spin =  { workspace = true }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 =  { workspace = true }

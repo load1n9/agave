@@ -245,6 +245,9 @@ pub fn fd_write(fd: Fd, iovs: &[CIOVec]) -> WasiResult<Size> {
             total_written += bytes_to_write;
         }
 
+        if !file_desc.is_directory {
+            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+        }
         Ok(total_written)
     } else {
         Err(WasiError::badf())
@@ -289,7 +292,11 @@ pub fn fd_tell(fd: Fd) -> WasiResult<FileSize> {
 pub fn fd_close(fd: Fd) -> WasiResult<()> {
     let mut fs_state = FILESYSTEM.lock();
 
-    if fs_state.open_files.remove(&fd).is_some() {
+    if let Some(file_desc) = fs_state.open_files.remove(&fd) {
+        // Persist file data to disk if not a directory
+        if !file_desc.is_directory {
+            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+        }
         Ok(())
     } else {
         Err(WasiError::badf())
@@ -303,7 +310,9 @@ pub fn fd_sync(fd: Fd) -> WasiResult<()> {
         if (file_desc.rights_base & RIGHTS_FD_SYNC) == 0 {
             return Err(WasiError::notcapable());
         }
-        // In a real implementation, this would flush to disk
+        if !file_desc.is_directory {
+            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+        }
         Ok(())
     } else {
         Err(WasiError::badf())
@@ -317,7 +326,9 @@ pub fn fd_datasync(fd: Fd) -> WasiResult<()> {
         if (file_desc.rights_base & RIGHTS_FD_DATASYNC) == 0 {
             return Err(WasiError::notcapable());
         }
-        // In a real implementation, this would flush data to disk
+        if !file_desc.is_directory {
+            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+        }
         Ok(())
     } else {
         Err(WasiError::badf())
@@ -443,14 +454,18 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
             file_desc.offset = size;
         }
 
+        if !file_desc.is_directory {
+            let _ = fs::write_file(&file_desc.path, file_desc.data.clone());
+        }
         Ok(())
     } else {
         Err(WasiError::badf())
     }
 }
 
-pub fn path_create_directory(fd: Fd, _path: &str) -> WasiResult<()> {
+pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
+    log::debug!("WASI path_create_directory(fd={}, path={})", fd, path);
 
     // Check directory permissions
     if !fs_state.preopened_dirs.contains_key(&fd) {
@@ -458,21 +473,46 @@ pub fn path_create_directory(fd: Fd, _path: &str) -> WasiResult<()> {
             if !file_desc.is_directory
                 || (file_desc.rights_base & RIGHTS_PATH_CREATE_DIRECTORY) == 0
             {
+                log::error!("WASI path_create_directory: fd {} is not a directory or lacks rights", fd);
                 return Err(WasiError::notcapable());
             }
         } else {
+            log::error!("WASI path_create_directory: fd {} is not open", fd);
             return Err(WasiError::badf());
         }
     }
 
-    // In a real implementation, this would create the directory
-    // For now, we'll just validate the operation
-    Ok(())
+    // Actually create the directory in the real filesystem
+    let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
+        preopen_path.clone()
+    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
+        file_desc.path.clone()
+    } else {
+        log::error!("WASI path_create_directory: could not resolve base path for fd {}", fd);
+        return Err(WasiError::badf());
+    };
+    let full_path = if path.starts_with('/') {
+        path.to_string()
+    } else if base_path == "/" {
+        format!("/{}", path)
+    } else {
+        format!("{}/{}", base_path, path)
+    };
+    log::debug!("WASI path_create_directory: creating full_path={}", full_path);
+    match fs::create_dir(&full_path) {
+        Ok(()) => {
+            log::debug!("WASI path_create_directory: successfully created {}", full_path);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("WASI path_create_directory: failed to create {}: {:?}", full_path, e);
+            Err(WasiError::io())
+        }
+    }
 }
 
-pub fn path_unlink_file(fd: Fd, _path: &str) -> WasiResult<()> {
+pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
-
     // Check directory permissions
     if !fs_state.preopened_dirs.contains_key(&fd) {
         if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -483,9 +523,22 @@ pub fn path_unlink_file(fd: Fd, _path: &str) -> WasiResult<()> {
             return Err(WasiError::badf());
         }
     }
-
-    // In a real implementation, this would delete the file
-    // For now, we'll just validate the operation
+    // Actually remove the file in the real filesystem
+    let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
+        preopen_path.clone()
+    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
+        file_desc.path.clone()
+    } else {
+        return Err(WasiError::badf());
+    };
+    let full_path = if path.starts_with('/') {
+        path.to_string()
+    } else if base_path == "/" {
+        format!("/{}", path)
+    } else {
+        format!("{}/{}", base_path, path)
+    };
+    fs::remove(&full_path).map_err(|_| WasiError::io())?;
     Ok(())
 }
 

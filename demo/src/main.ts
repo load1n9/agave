@@ -211,6 +211,207 @@ async function initWasm() {
     for (const code in keyReleased) keyReleased[code] = false;
   };
 
+  const ENVIRON = ["PATH=/usr/bin", "HOME=/root", "USER=agave"];
+  const ENVIRON_BUF = ENVIRON.map((e) => e + "\0").join("");
+  const encoder = new TextEncoder();
+
+  // deno-lint-ignore prefer-const
+  let instance: WebAssembly.Instance;
+  const wasi_snapshot_preview1 = {
+    fd_readdir: (
+      _fd: number,
+      _buf: number,
+      _buf_len: number,
+      _cookie: bigint,
+      bufused_ptr: number
+    ) => {
+      // Always return 0 bytes used, success
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setUint32(bufused_ptr, 0, true);
+      return 0;
+    },
+    fd_read: (
+      _fd: number,
+      _iovs: number,
+      _iovs_len: number,
+      nread_ptr: number
+    ) => {
+      // Always return 0 bytes read, success
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setUint32(nread_ptr, 0, true);
+      return 0;
+    },
+    fd_write: (
+      fd: number,
+      iovs: number,
+      iovs_len: number,
+      nwritten_ptr: number,
+    ) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      const view = new DataView(memory.buffer);
+      let written = 0;
+      for (let i = 0; i < iovs_len; i++) {
+        const ptr = view.getUint32(iovs + i * 8, true);
+        const len = view.getUint32(iovs + i * 8 + 4, true);
+        const bytes = new Uint8Array(memory.buffer, ptr, len);
+        const text = new TextDecoder().decode(bytes);
+        if (fd === 1 || fd === 2) console.log(text);
+        written += len;
+      }
+      view.setUint32(nwritten_ptr, written, true);
+      return 0;
+    },
+    environ_get: (environ: number, environ_buf: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      const view = new DataView(memory.buffer);
+      let buf_offset = 0;
+      for (let i = 0; i < ENVIRON.length; i++) {
+        view.setUint32(environ + i * 4, environ_buf + buf_offset, true);
+        const bytes = encoder.encode(ENVIRON[i] + "\0");
+        new Uint8Array(memory.buffer, environ_buf + buf_offset, bytes.length)
+          .set(bytes);
+        buf_offset += bytes.length;
+      }
+      return 0;
+    },
+    environ_sizes_get: (count_ptr: number, buf_size_ptr: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      const view = new DataView(memory.buffer);
+      view.setUint32(count_ptr, ENVIRON.length, true);
+      view.setUint32(buf_size_ptr, ENVIRON_BUF.length, true);
+      return 0;
+    },
+    proc_exit: (code: number) => {
+      throw new Error("WASM exit: " + code);
+    },
+    fd_close: (_fd: number) => 0,
+    fd_fdstat_get: (_fd: number, stat_ptr: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new Uint8Array(memory.buffer, stat_ptr, 24).fill(0);
+      return 0;
+    },
+    fd_prestat_get: (_fd: number, prestat_ptr: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new Uint8Array(memory.buffer, prestat_ptr, 8).fill(0);
+      return 0;
+    },
+    fd_prestat_dir_name: (_fd: number, path: number, path_len: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new Uint8Array(memory.buffer, path, path_len).fill(0);
+      return 0;
+    },
+    sched_yield: () => 0,
+    fd_filestat_get: (_fd: number, filestat_ptr: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new Uint8Array(memory.buffer, filestat_ptr, 56).fill(0);
+      return 0;
+    },
+    fd_filestat_set_size: (_fd: number, _size: bigint) => 0,
+    fd_fdstat_set_flags: (_fd: number, _flags: number) => 0,
+    fd_sync: (_fd: number) => 0,
+    fd_datasync: (_fd: number) => 0,
+    fd_allocate: (_fd: number, _offset: bigint, _len: bigint) => 0,
+    fd_advise: (_fd: number, _offset: bigint, _len: bigint, _advice: number) =>
+      0,
+    fd_tell: (_fd: number, offset_ptr: number) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setBigUint64(offset_ptr, BigInt(0), true);
+      return 0;
+    },
+    fd_seek: (
+      _fd: number,
+      _offset: bigint,
+      _whence: number,
+      new_offset_ptr: number,
+    ) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setBigUint64(new_offset_ptr, BigInt(0), true);
+      return 0;
+    },
+    path_create_directory: (
+      _fd: number,
+      _path_ptr: number,
+      _path_len: number,
+    ) => 0,
+    path_filestat_get: (
+      _fd: number,
+      _flags: number,
+      _path_ptr: number,
+      _path_len: number,
+      filestat_ptr: number,
+    ) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new Uint8Array(memory.buffer, filestat_ptr, 56).fill(0);
+      return 0;
+    },
+    path_filestat_set_times: (
+      _fd: number,
+      _flags: number,
+      _path_ptr: number,
+      _path_len: number,
+      _atim: bigint,
+      _mtim: bigint,
+      _fst_flags: number,
+    ) => 0,
+    path_link: (
+      _old_fd: number,
+      _old_flags: number,
+      _old_path_ptr: number,
+      _old_path_len: number,
+      _new_fd: number,
+      _new_path_ptr: number,
+      _new_path_len: number,
+    ) => 0,
+    path_open: (
+      _fd: number,
+      _dirflags: number,
+      _path_ptr: number,
+      _path_len: number,
+      _oflags: number,
+      _fs_rights_base: bigint,
+      _fs_rights_inheriting: bigint,
+      _fdflags: number,
+      opened_fd_ptr: number,
+    ) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setUint32(opened_fd_ptr, 3, true);
+      return 0;
+    },
+    path_readlink: (
+      _fd: number,
+      _path_ptr: number,
+      _path_len: number,
+      _buf_ptr: number,
+      _buf_len: number,
+      nread_ptr: number,
+    ) => {
+      const memory = instance.exports.memory as WebAssembly.Memory;
+      new DataView(memory.buffer).setUint32(nread_ptr, 0, true);
+      return 0;
+    },
+    path_remove_directory: (
+      _fd: number,
+      _path_ptr: number,
+      _path_len: number,
+    ) => 0,
+    path_rename: (
+      _fd: number,
+      _old_path_ptr: number,
+      _old_path_len: number,
+      _new_fd: number,
+      _new_path_ptr: number,
+      _new_path_len: number,
+    ) => 0,
+    path_symlink: (
+      _old_path_ptr: number,
+      _old_path_len: number,
+      _fd: number,
+      _new_path_ptr: number,
+      _new_path_len: number,
+    ) => 0,
+    path_unlink_file: (_fd: number, _path_ptr: number, _path_len: number) => 0,
+  };
+
   const imports = {
     agave: {
       fill_rectangle: framebuffer.fill_rectangle,
@@ -234,22 +435,15 @@ async function initWasm() {
       get_key_history_event: (index: number) => {
         if (index >= 0 && index < keyHistory.length) {
           const event = keyHistory[index];
-          // Pack key code in low 32 bits, pressed state in high 32 bits
           return BigInt((event.pressed ? (1 << 32) : 0) | event.key);
         }
         return BigInt(0);
       },
     },
-    wasi_snapshot_preview1: {
-      fd_write: () => 0,
-      environ_get: () => 0,
-      environ_sizes_get: () => 0,
-      proc_exit: () => {
-        throw new Error("WASM exit");
-      },
-    },
+    wasi_snapshot_preview1,
   };
-  const { instance } = await WebAssembly.instantiate(bytes, imports);
+  const wasmResult = await WebAssembly.instantiate(bytes, imports);
+  instance = wasmResult.instance;
   const startExport = instance.exports.start;
   const updateExport = instance.exports.update;
   if (typeof startExport === "function") {

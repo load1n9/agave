@@ -70,7 +70,8 @@ unix_str = { version = "1.0.0", default-features = false, features = [
     "alloc",
     "shrink_to"
 ] }
-vek = { version = "0.15.10", default-features = false, features = ["libm"] }
+vek = { version = "0.17.1", default-features = false, features = ["libm"] }
+volatile = "0.6.1"
 wasi = { version = "0.7.0", features = [], default-features = false }
 # wasi = { git = "https://github.com/bytecodealliance/wasi", rev = "45536ac956a6211e3cff047f36cf19d6da82fd95", default-features = false }
 # wasi-common = { git = "https://github.com/theseus-os/wasmtime", branch = "no_std_support"}

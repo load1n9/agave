@@ -6,10 +6,13 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use spin::Mutex;
+use lazy_static::lazy_static;
 
 // Global filesystem state
 static FILESYSTEM: Mutex<FilesystemState> = Mutex::new(FilesystemState::new());
-static mut VFS: Option<Mutex<VirtualFileSystem>> = None;
+lazy_static! {
+    static ref VFS: Mutex<VirtualFileSystem> = Mutex::new(VirtualFileSystem::new());
+}
 
 #[derive(Debug)]
 pub struct FilesystemState {
@@ -168,12 +171,7 @@ pub fn path_open(
     };
 
     // Use VFS for file open
-    let mut vfs = unsafe {
-        if VFS.is_none() {
-            VFS = Some(Mutex::new(VirtualFileSystem::new()));
-        }
-        VFS.as_ref().unwrap().lock()
-    };
+    let mut vfs = VFS.lock();
     let exists = vfs.exists(&full_path);
     if !exists && (oflags & 0x1) == 0 {
         return Err(WasiError::noent());
@@ -191,12 +189,7 @@ pub fn path_open(
 
 pub fn fd_read(fd: Fd, iovs: &[IOVec]) -> WasiResult<Size> {
     let mut fs_state = FILESYSTEM.lock();
-    let vfs = unsafe {
-        if VFS.is_none() {
-            VFS = Some(Mutex::new(VirtualFileSystem::new()));
-        }
-        VFS.as_ref().unwrap().lock()
-    };
+    let vfs = VFS.lock();
     if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
         if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
             return Err(WasiError::notcapable());
@@ -222,12 +215,7 @@ pub fn fd_read(fd: Fd, iovs: &[IOVec]) -> WasiResult<Size> {
 
 pub fn fd_write(fd: Fd, iovs: &[CIOVec]) -> WasiResult<Size> {
     let mut fs_state = FILESYSTEM.lock();
-    let mut vfs = unsafe {
-        if VFS.is_none() {
-            VFS = Some(Mutex::new(VirtualFileSystem::new()));
-        }
-        VFS.as_ref().unwrap().lock()
-    };
+    let mut vfs = VFS.lock();
     if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
         if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
             return Err(WasiError::notcapable());
@@ -298,7 +286,7 @@ pub fn fd_close(fd: Fd) -> WasiResult<()> {
 
     if let Some(file_desc) = fs_state.open_files.remove(&fd) {
         if !file_desc.is_directory {
-            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let mut vfs = VFS.lock();
             let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
@@ -315,7 +303,7 @@ pub fn fd_sync(fd: Fd) -> WasiResult<()> {
             return Err(WasiError::notcapable());
         }
         if !file_desc.is_directory {
-            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+            let mut vfs = VFS.lock();
             let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
@@ -332,7 +320,7 @@ pub fn fd_datasync(fd: Fd) -> WasiResult<()> {
             return Err(WasiError::notcapable());
         }
         if !file_desc.is_directory {
-            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+                let mut vfs = VFS.lock();
             let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
@@ -461,7 +449,7 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
         }
 
         if !file_desc.is_directory {
-            let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+                let mut vfs = VFS.lock();
             let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
         }
         Ok(())
@@ -472,7 +460,7 @@ pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
 
 pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
-    let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+    let mut vfs = VFS.lock();
     let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
         preopen_path.clone()
     } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -492,7 +480,7 @@ pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
 
 pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
     let fs_state = FILESYSTEM.lock();
-    let mut vfs = unsafe { VFS.as_mut().unwrap().lock() };
+    let mut vfs = VFS.lock();
     let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
         preopen_path.clone()
     } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
@@ -533,7 +521,7 @@ pub fn path_remove_directory(fd: Fd, _path: &str) -> WasiResult<()> {
 
 pub fn fd_readdir(fd: Fd, _buf: &mut [u8], _cookie: DirCookie) -> WasiResult<Size> {
     let fs_state = FILESYSTEM.lock();
-    let vfs = unsafe { VFS.as_mut().unwrap().lock() };
+    let vfs = VFS.lock();
     let path = if let Some(file_desc) = fs_state.open_files.get(&fd) {
         if !file_desc.is_directory || (file_desc.rights_base & RIGHTS_FD_READDIR) == 0 {
             return Err(WasiError::notdir());

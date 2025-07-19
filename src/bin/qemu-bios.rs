@@ -43,11 +43,11 @@ fn main() {
     qemu.arg("-device").arg("virtio-vga-gl");
     qemu.arg("-display").arg("sdl,gl=on");
     qemu.arg("-serial").arg("stdio");
-    qemu.arg("-drive");
-    qemu.arg(format!("format=raw,file={}", env!("UEFI_PATH")));
+    // Add VirtIO block device with increased queue size
+    qemu.arg("-device").arg("virtio-blk-pci,drive=hd0,num-queues=1,queue-size=256");
+    qemu.arg("-drive").arg(format!("id=hd0,if=none,format=raw,file={}", env!("UEFI_PATH")));
     // Use pflash for UEFI firmware instead of -bios
-    qemu.arg("-drive");
-    qemu.arg(format!(
+    qemu.arg("-drive").arg(format!(
         "if=pflash,format=raw,file={ovmf_path_str},readonly=on"
     ));
     let exit_status = qemu.status().unwrap();

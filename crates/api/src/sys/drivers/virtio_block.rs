@@ -38,7 +38,9 @@ const VIRTIO_BLK_S_UNSUPP: u8 = 2;
 
 /// Maximum sector size
 const SECTOR_SIZE: usize = 512;
-const MAX_SECTORS_PER_REQUEST: u32 = 256;
+// Reduce max sectors per request to avoid exhausting descriptor pool (e.g., for queue size 64)
+// Further reduce max sectors per request to avoid exhausting descriptor pool (for queue size 64)
+const MAX_SECTORS_PER_REQUEST: u32 = 2;
 
 /// Block device configuration
 #[repr(C)]
@@ -324,8 +326,8 @@ impl VirtioBlockDevice {
         // Select the first queue (assuming single queue for simplicity)
         self.virtio.queue_select(0);
 
-        // Get descriptors for the request
-        let desc_ids = self.get_descriptors_for_request(operation, buffer.len())?;
+        // Get descriptors for the request (now async)
+        let desc_ids = self.get_descriptors_for_request(operation, buffer.len()).await?;
 
         // Set up the request
         let request_header = VirtioBlkReqHeader {
@@ -357,50 +359,62 @@ impl VirtioBlockDevice {
         Ok(())
     }
 
-    /// Get required descriptors for a request
-    fn get_descriptors_for_request(
+    /// Get required descriptors for a request, with async retry logic
+    async fn get_descriptors_for_request(
         &mut self,
         operation: BlockOperation,
         data_size: usize,
     ) -> AgaveResult<Vec<u16>> {
-        // We need: header descriptor + data descriptor(s) + status descriptor
-        let mut desc_ids = Vec::new();
+        use crate::sys::task::executor::yield_once;
+        const MAX_ATTEMPTS: usize = 8;
+        let mut attempts = 0;
+        loop {
+            let mut desc_ids = Vec::new();
+            let mut failed = false;
 
-        // Header descriptor
-        if let Some(desc_id) = self.virtio.get_free_desc_id() {
-            desc_ids.push(desc_id);
-        } else {
-            return Err(AgaveError::ResourceExhausted);
-        }
+            // Header descriptor
+            if let Some(desc_id) = self.virtio.get_free_desc_id() {
+                desc_ids.push(desc_id);
+            } else {
+                failed = true;
+            }
 
-        // Data descriptor(s) - only for read/write operations
-        if matches!(operation, BlockOperation::Read | BlockOperation::Write) && data_size > 0 {
-            let segments_needed = (data_size + 4095) / 4096; // Round up to page size
-            for _ in 0..segments_needed {
+            // Data descriptor(s) - only for read/write operations
+            if !failed && matches!(operation, BlockOperation::Read | BlockOperation::Write) && data_size > 0 {
+                let segments_needed = (data_size + 4095) / 4096; // Round up to page size
+                for _ in 0..segments_needed {
+                    if let Some(desc_id) = self.virtio.get_free_desc_id() {
+                        desc_ids.push(desc_id);
+                    } else {
+                        failed = true;
+                        break;
+                    }
+                }
+            }
+
+            // Status descriptor
+            if !failed {
                 if let Some(desc_id) = self.virtio.get_free_desc_id() {
                     desc_ids.push(desc_id);
                 } else {
-                    // Return allocated descriptors if we can't get enough
-                    for id in &desc_ids {
-                        self.virtio.set_free_desc_id(*id);
-                    }
-                    return Err(AgaveError::ResourceExhausted);
+                    failed = true;
                 }
             }
-        }
 
-        // Status descriptor
-        if let Some(desc_id) = self.virtio.get_free_desc_id() {
-            desc_ids.push(desc_id);
-        } else {
-            // Return allocated descriptors if we can't get enough
-            for id in &desc_ids {
-                self.virtio.set_free_desc_id(*id);
+            if !failed {
+                return Ok(desc_ids);
+            } else {
+                // Return allocated descriptors if we can't get enough
+                for id in &desc_ids {
+                    self.virtio.set_free_desc_id(*id);
+                }
+                attempts += 1;
+                if attempts >= MAX_ATTEMPTS {
+                    return Err(AgaveError::ResourceExhausted);
+                }
+                yield_once().await;
             }
-            return Err(AgaveError::ResourceExhausted);
         }
-
-        Ok(desc_ids)
     }
 
     /// Set up the descriptor chain for a block request

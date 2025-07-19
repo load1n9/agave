@@ -82,7 +82,22 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 ## 🔧 Building and Running
 
 ```powershell
+
+# Use deno for tasks
 deno task run-all
+
+# Or use nu for tasks
+nu agave.nu run-all
+
+# Or use bash for tasks
+./agave.sh run-all
+
+# Or use powershell for tasks
+./agave.ps1 run-all
+
+# Or use cmd for tasks
+./agave.bat run-all
+
 ```
 
 ### Prerequisites

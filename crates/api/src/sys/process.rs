@@ -1,5 +1,3 @@
-/// Enhanced process management for Agave OS
-/// Provides process isolation, scheduling, and inter-process communication
 use crate::sys::{
     diagnostics::{add_diagnostic, DiagnosticCategory, DiagnosticLevel},
     error::{AgaveError, AgaveResult},
@@ -12,6 +10,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{
+    fmt,
     future::Future,
     pin::Pin,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
@@ -34,6 +33,30 @@ impl ProcessId {
     }
 }
 
+impl From<u32> for ProcessId {
+    fn from(val: u32) -> Self {
+        ProcessId(val as u64)
+    }
+}
+
+impl fmt::Display for ProcessId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+/// Set the state of a process by PID
+pub fn set_process_state(pid: ProcessId, state: ProcessState) {
+    let mut manager = PROCESS_MANAGER.lock();
+    if let Some(pcb) = manager.processes.get_mut(&pid) {
+        pcb.context.state = state;
+    }
+}
+/// Returns the current process ID
+// TODO: implement actual current process tracking
+pub fn get_current_pid() -> ProcessId {
+    let manager = PROCESS_MANAGER.lock();
+    manager.current_process.unwrap_or(ProcessId(0))
+}
 /// Process state
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ProcessState {

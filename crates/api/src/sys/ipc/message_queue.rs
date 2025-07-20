@@ -1,8 +1,6 @@
 /// Message queue implementation for IPC
-use crate::sys::{
-    error::{AgaveError, AgaveResult},
-    ipc::ProcessId,
-};
+use crate::sys::error::{AgaveError, AgaveResult};
+use crate::sys::process::ProcessId;
 use alloc::{collections::VecDeque, vec::Vec};
 use core::cmp::Ordering;
 use spin::Mutex;
@@ -67,6 +65,8 @@ pub struct MessageQueue {
     owner: ProcessId,
     creation_time: u64,
     stats: Mutex<MessageQueueStats>,
+    wait_queue: Mutex<Vec<ProcessId>>,
+    nonblocking: bool,
 }
 
 impl MessageQueue {
@@ -95,10 +95,12 @@ impl MessageQueue {
             owner,
             creation_time: current_time,
             stats: Mutex::new(MessageQueueStats::default()),
+            wait_queue: Mutex::new(Vec::new()),
+            nonblocking: false,
         })
     }
 
-    /// Send a message to the queue
+    /// Send a message to the queue (blocking/non-blocking)
     pub fn send(&self, data: &[u8], priority: u32) -> AgaveResult<()> {
         if data.len() > self.max_message_size {
             return Err(AgaveError::MessageTooLarge);
@@ -108,9 +110,15 @@ impl MessageQueue {
         let mut total_size = self.total_size.lock();
         let mut stats = self.stats.lock();
 
-        if messages.len() >= self.max_messages {
-            stats.messages_dropped += 1;
-            return Err(AgaveError::QueueFull);
+        // Wait if full and blocking
+        while messages.len() >= self.max_messages {
+            if self.nonblocking {
+                stats.messages_dropped += 1;
+                return Err(AgaveError::QueueFull);
+            }
+            drop(messages);
+            self.wait_current_process();
+            messages = self.messages.lock();
         }
 
         let message = Message::new(data.to_vec(), priority, self.owner);
@@ -140,14 +148,25 @@ impl MessageQueue {
             self.max_messages
         );
 
+        self.wake_one_waiter();
         Ok(())
     }
 
-    /// Receive a message from the queue
+    /// Receive a message from the queue (blocking/non-blocking)
     pub fn receive(&self, buffer: &mut [u8]) -> AgaveResult<(usize, u32)> {
         let mut messages = self.messages.lock();
         let mut total_size = self.total_size.lock();
         let mut stats = self.stats.lock();
+
+        // Wait if empty and blocking
+        while messages.is_empty() {
+            if self.nonblocking {
+                return Err(AgaveError::QueueEmpty);
+            }
+            drop(messages);
+            self.wait_current_process();
+            messages = self.messages.lock();
+        }
 
         let message = messages.pop_front().ok_or(AgaveError::QueueEmpty)?;
 
@@ -175,7 +194,30 @@ impl MessageQueue {
             self.max_messages
         );
 
+        self.wake_one_waiter();
         Ok((message_size, priority))
+    }
+    /// Add current process to wait queue and sleep (integrated with scheduler)
+    fn wait_current_process(&self) {
+        let pid = crate::sys::process::get_current_pid();
+        let mut queue = self.wait_queue.lock();
+        queue.push(pid);
+        // Set process state to Waiting and remove from ready queue
+    crate::sys::process::set_process_state(pid, crate::sys::process::ProcessState::Waiting);
+        // No direct access to ready_queues; rely on scheduler to skip Waiting processes
+    }
+
+    /// Wake one waiting process (integrated with scheduler)
+    fn wake_one_waiter(&self) {
+        let mut queue = self.wait_queue.lock();
+        if let Some(pid) = queue.pop() {
+            crate::sys::process::set_process_state(pid, crate::sys::process::ProcessState::Created);
+            // To re-enqueue, rely on scheduler to pick up Created processes
+        }
+    }
+    /// Set non-blocking mode for send/receive
+    pub fn set_nonblocking(&mut self, nonblocking: bool) {
+        self.nonblocking = nonblocking;
     }
 
     /// Peek at the next message without removing it

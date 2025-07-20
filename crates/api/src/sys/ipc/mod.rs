@@ -169,7 +169,7 @@ impl IpcManager {
         max_message_size: usize,
         name: Option<String>,
     ) -> AgaveResult<IpcHandle> {
-        let mq = message_queue::MessageQueue::new(max_messages, max_message_size, owner)?;
+    let mq = message_queue::MessageQueue::new(max_messages, max_message_size, crate::sys::process::ProcessId::from(owner))?;
         let handle = IpcHandle::new();
 
         self.resources.insert(handle, IpcResource::MessageQueue(mq));

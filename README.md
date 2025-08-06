@@ -7,7 +7,7 @@ Agave OS is a simple operating system written in Rust with WASI support. It is d
 ## 🚀 Try the Web Demo
 
 Experience Agave OS' desktop environment directly in your browser—no installation required!  
-[Launch the Web Demo](https://agave.load1n9.deno.net/)
+[Launch the Web Demo](https://agave.load1n9.andromeda.net/)
 
 - Explore the desktop environment
 - Test graphics, animations, and system features interactively
@@ -83,8 +83,8 @@ pub extern "C" fn update(mouse_x: i32, mouse_y: i32) {
 
 ```powershell
 
-# Use deno for tasks
-deno task run-all
+# Use andromeda for tasks
+andromeda task run-all
 
 # Or use nu for tasks
 nu agave.nu run-all
@@ -108,7 +108,7 @@ nu agave.nu run-all
 ### Quick Start
 
 ```powershell
-deno task run-all
+andromeda task run-all
 ```
 
 ## 📊 System Monitoring

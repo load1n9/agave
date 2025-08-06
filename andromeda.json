@@ -5,7 +5,7 @@
         "build:app:terminal": "cd apps/terminal && cargo build --release --target wasm32-wasip1 && cd ../..",
         "run": "cargo run --release build",
         "run-qemu": "cargo run --release --bin qemu-bios",
-        "run-all": "deno task build:app:terminal && deno task run-qemu",
+        "run-all": "andromeda task build:app:terminal && andromeda task run-qemu",
         "qemu": "qemu-system-x86_64 -nodefaults -m 2G -smp 2 -device virtio-mouse-pci -device virtio-keyboard-pci -nic user,model=virtio-net-pci -device virtio-vga-gl -display sdl,gl=on -serial stdio -drive format=raw,file=./target/release/uefi.img -bios ovmf"
     }
 }

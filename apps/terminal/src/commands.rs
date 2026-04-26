@@ -68,6 +68,8 @@ impl TerminalApp {
             self.handle_ps_command();
         } else if self.command_length == 3 && &cmd_lower[0..3] == b"cat" {
             self.handle_cat_command();
+        } else if self.command_length >= 4 && &cmd_lower[0..4] == b"cat " {
+            self.handle_cat_command();
         } else if self.command_length >= 6 && &cmd_lower[0..5] == b"write" {
             self.handle_write_command();
         } else if self.command_length >= 5 && &cmd_lower[0..5] == b"mkdir" {
@@ -222,6 +224,10 @@ impl TerminalApp {
         self.add_output_line(b"  system    - Show system information");
         self.add_output_line(b"  uname     - System name and version");
         self.add_output_line(b"  uptime    - System uptime");
+        self.add_output_line(b"  health    - System health status");
+        self.add_output_line(b"  power     - Power management status");
+        self.add_output_line(b"  security  - Security framework status");
+        self.add_output_line(b"  features  - Enhanced OS features");
         self.add_output_line(b"  clear     - Clear the screen");
         self.add_output_line(b"  reset     - Reset terminal and clear memory");
         self.add_output_line(b"  main      - Return to main screen");

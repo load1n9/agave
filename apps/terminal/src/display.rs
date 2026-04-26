@@ -1074,14 +1074,27 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     );
 
     let col1_x = margin + 30;
-    let col2_x = margin + 350;
+    let col2_x = margin + 550;
     let mut current_y = 140;
 
     // File System Commands
     draw_section_header(Position::new(col1_x, current_y), "📁 File System", colors);
     current_y += 30;
 
-    let file_commands = [("ls", "List files and directories")];
+    let file_commands = [
+        ("ls", "List files and directories"),
+        ("cat", "Show file contents (e.g., cat <file>)"),
+        ("write", "Write text to file (e.g., write <file> <text>)"),
+        ("rm", "Remove file (e.g., rm <file>)"),
+        ("mkdir", "Create directory (e.g., mkdir <dir>)"),
+        ("rmdir", "Remove directory (e.g., rmdir <dir>)"),
+        ("cd", "Change current directory (e.g., cd <dir>)"),
+        ("pwd", "Print current directory"),
+        ("fsstat", "Show filesystem statistics"),
+        ("mount", "Mount filesystem"),
+        ("sync", "Sync filesystem buffers"),
+        ("fs", "Filesystem management"),
+    ];
 
     for (cmd, desc) in file_commands.iter() {
         draw_text(
@@ -1090,12 +1103,12 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
             colors.accent_cyan,
         );
         draw_text(
-            Position::new(col1_x + 60, current_y),
+            Position::new(col1_x + 80, current_y),
             "-",
             colors.text_muted,
         );
         draw_text(
-            Position::new(col1_x + 80, current_y),
+            Position::new(col1_x + 100, current_y),
             desc,
             colors.text_primary,
         );
@@ -1115,10 +1128,13 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
     let system_commands = [
         ("ps", "Show running processes"),
         ("system", "Display system information"),
-        ("uname", "Show system name and version"),
+        ("health", "System health status"),
+        ("power", "Power management status"),
+        ("security", "Security framework status"),
+        ("features", "Enhanced OS features"),
+        ("ipc", "IPC help / stats / test"),
         ("uptime", "Display system uptime"),
         ("whoami", "Show current user"),
-        ("date", "Show current date/time"),
     ];
 
     for (cmd, desc) in system_commands.iter() {
@@ -1154,8 +1170,8 @@ fn draw_help_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
         ("clear", "Clear terminal output"),
         ("reset", "Reset terminal state"),
         ("echo", "Echo text to output"),
-        ("theme", "Change color themes"),
-        ("main", "Return to main screen"),
+        ("uname", "Show OS name and version"),
+        ("date", "Show current date/time"),
         ("exit", "Exit the terminal"),
     ];
 

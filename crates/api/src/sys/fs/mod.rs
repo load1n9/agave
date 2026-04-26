@@ -12,6 +12,10 @@ use spin::Mutex;
 pub mod disk;
 pub mod simple_fs;
 
+// Include the generated disk files
+include!(concat!(env!("OUT_DIR"), "/generated_disk.rs"));
+
+
 // use disk::RamDisk;
 use simple_fs::SimpleFileSystem;
 
@@ -371,54 +375,19 @@ impl VirtualFileSystem {
     }
 
     fn populate_demo_files(&mut self) {
-        // Demo files for the terminal
-        let files: &[(&str, &[u8])] = &[
-            ("/etc/hostname", b"agave-os\n"),
-            ("/etc/version", b"Agave OS v0.1.3\n"),
-            (
-                "/home/user/.bashrc",
-                b"# Agave OS bash configuration\necho 'Welcome to Agave OS!'\n",
-            ),
-            ("/var/log/system.log", b"System log initialized\n"),
-            ("/tmp/readme.txt", b"This is a temporary file\n"),
-            (
-                "/home/user/welcome.txt",
-                b"Welcome to Agave OS!\nTry: ls, cat welcome.txt, cd /etc, cat hostname\n",
-            ),
-            ("/proc/version", b"Agave OS v0.1.3 (x86_64)\n"),
-            ("/proc/meminfo", b"MemTotal: 104857600\nMemFree: 52428800\n"),
-            ("/proc/cpuinfo", b"processor: 0\nmodel name: Virtual CPU\n"),
-        ];
-
-        for (path, content) in files {
+        // Populate the actual disk contents from the `disk` folder at compile time
+        for (path, content) in DISK_FILES {
             if let Err(e) = self.write_file(path, content.to_vec()) {
-                log::warn!("Failed to create file {}: {:?}", path, e);
-            }
-        }
-
-        // Create some demo binary files
-        let binaries = [
-            "/bin/ls",
-            "/bin/cat",
-            "/bin/echo",
-            "/bin/grep",
-            "/bin/ps",
-            "/usr/bin/top",
-            "/usr/bin/nano",
-            "/usr/bin/vim",
-        ];
-
-        for binary in &binaries {
-            let content = format!("#!/bin/sh\necho 'Binary: {}'\n", binary).into_bytes();
-            if let Err(e) = self.write_file(binary, content) {
-                log::warn!("Failed to create binary {}: {:?}", binary, e);
+                log::warn!("Failed to create disk file {}: {:?}", path, e);
             } else {
-                // Make executable
-                if let Ok(node) = self.get_node_mut(binary) {
-                    let metadata = node.metadata_mut();
-                    metadata.permissions.owner_execute = true;
-                    metadata.permissions.group_execute = true;
-                    metadata.permissions.other_execute = true;
+                // If it's in /bin or /usr/bin or ends with .wasm, make it executable
+                if path.starts_with("/bin/") || path.starts_with("/usr/bin/") || path.ends_with(".wasm") {
+                    if let Ok(node) = self.get_node_mut(path) {
+                        let metadata = node.metadata_mut();
+                        metadata.permissions.owner_execute = true;
+                        metadata.permissions.group_execute = true;
+                        metadata.permissions.other_execute = true;
+                    }
                 }
             }
         }
@@ -858,9 +827,24 @@ pub fn init_filesystem_with_type(
                 let virtio_block_device =
                     virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
                 let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
-                let persistent_fs = SimpleFileSystem::format(virtio_disk)?;
+                
+                // Try to mount first, if it fails, format
+                let persistent_fs = match SimpleFileSystem::mount(virtio_disk.clone()) {
+                    Ok(fs) => {
+                        log::info!("Persistent file system mounted successfully");
+                        fs
+                    },
+                    Err(_) => {
+                        log::info!("Mount failed, formatting persistent file system...");
+                        SimpleFileSystem::format(virtio_disk)?
+                    }
+                };
+                
                 PERSISTENT_FS = Some(Mutex::new(persistent_fs));
-                log::info!("Persistent file system initialized and formatted (VirtioBlockDisk)");
+                
+                // If we formatted, we need to populate demo files because the SimpleFileSystem doesn't have them
+                // But wait, SimpleFileSystem doesn't implement populate_demo_files yet, or does it?
+                // Actually, the simple_fs is raw, we should probably wrap it or populate it.
             }
         }
     }

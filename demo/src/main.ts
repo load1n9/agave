@@ -180,7 +180,7 @@ const framebuffer = {
 };
 
 async function initWasm() {
-  const response = await fetch("/terminal_app.wasm");
+  const response = await fetch("/terminal_app.wasm?t=1777180685");
   const bytes = await response.arrayBuffer();
   // Keyboard state tracking
   const keyState: { [key: number]: boolean } = {};

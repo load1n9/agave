@@ -375,6 +375,10 @@ impl VirtualFileSystem {
             ),
             ("/var/log/system.log", b"System log initialized\n"),
             ("/tmp/readme.txt", b"This is a temporary file\n"),
+            (
+                "/home/user/welcome.txt",
+                b"Welcome to Agave OS!\nTry: ls, cat welcome.txt, cd /etc, cat hostname\n",
+            ),
             ("/proc/version", b"Agave OS v0.1.3 (x86_64)\n"),
             ("/proc/meminfo", b"MemTotal: 104857600\nMemFree: 52428800\n"),
             ("/proc/cpuinfo", b"processor: 0\nmodel name: Virtual CPU\n"),

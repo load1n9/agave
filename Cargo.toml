@@ -20,9 +20,9 @@ anyhow = { version = "1.0.98", default-features = false }
 arrayvec = { version = "0.7.6", default-features = false }
 bit_field = "0.10.2"
 bitflags = "2.9.1"
-bootloader_api = "0.11.10"
-bootloader-boot-config = "0.11.10"
-bootloader-x86_64-common = "0.11.10"
+bootloader_api = "0.11.15"
+bootloader-boot-config = "0.11.15"
+bootloader-x86_64-common = "0.11.15"
 conquer-once = { version = "0.4.0", default-features = false }
 core2 = { version = "0.4.0", default-features = false, features = [
     "alloc",
@@ -39,7 +39,7 @@ futures = { version = "0.3.31", default-features = false, features = [
 futures-util = { version = "0.3.31", default-features = false, features = [
     "alloc"
 ] }
-hashbrown = { version = "0.15.4", features = ["nightly"] }
+hashbrown = { version = "0.15.4", default-features = false, features = ["default-hasher", "inline-more"] }
 iced-x86 = { version = "1.21.0", default-features = false, features = [
     "decoder",
     "no_std",
@@ -83,4 +83,4 @@ x86_64 = "0.15"
 
 [build-dependencies]
 agave-kernel = { path = "crates/kernel", artifact = "bin", target = "x86_64-unknown-none" }
-bootloader = "0.11.7"
+bootloader = "0.11.15"

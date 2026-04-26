@@ -29,16 +29,17 @@ lazy_static! {
 
         idt.invalid_opcode.set_handler_fn(invalid_opcode);
         idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded);
-        idt.general_protection_fault.set_handler_fn(general_protection_fault);
-        // TODO: Fix double fault handler type mismatch
-        // unsafe {
-        //     idt.double_fault.set_handler_fn(double_fault_handler)
-        //         .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
-        // }
         unsafe {
-            idt.overflow.set_handler_fn(overflow_handler)
-                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX); // new
+            idt.general_protection_fault
+                .set_handler_fn(general_protection_fault)
+                .set_stack_index(gdt::GENERAL_PROTECTION_FAULT_IST_INDEX);
         }
+        unsafe {
+            idt.double_fault
+                .set_handler_fn(double_fault_handler)
+                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+        }
+        idt.overflow.set_handler_fn(overflow_handler);
 
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
         idt.segment_not_present.set_handler_fn(segment_not_present_handler);
@@ -46,7 +47,11 @@ lazy_static! {
         idt.alignment_check.set_handler_fn(alignment_check_handler);
 
 
-        idt.page_fault.set_handler_fn(page_fault_handler);
+        unsafe {
+            idt.page_fault
+                .set_handler_fn(page_fault_handler)
+                .set_stack_index(gdt::PAGE_FAULT_IST_INDEX);
+        }
 
 
         for i in 32..=255{
@@ -258,22 +263,14 @@ extern "x86-interrupt" fn alignment_check_handler(
     panic!("");
 }
 
-#[allow(dead_code)]
-fn double_fault_handler_impl(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+extern "x86-interrupt" fn double_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: u64,
+) -> ! {
     panic!(
         "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",
         stack_frame, error_code
     );
-}
-
-#[allow(dead_code)]
-extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
-    panic!(
-        "EXCEPTION: DOUBLE FAULT\n{:#?}\nError Code: {}",
-        stack_frame, error_code
-    );
-    #[allow(unreachable_code)]
-    loop {}
 }
 
 extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, _error_code: u64) {

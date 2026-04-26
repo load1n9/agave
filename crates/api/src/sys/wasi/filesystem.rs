@@ -1,25 +1,40 @@
-use super::super::fs::VirtualFileSystem;
+//! WASI filesystem layer.
+//!
+//! This is the logical layer of the WASI filesystem implementation. It owns
+//! the per-fd table (offsets, rights, paths) and translates WASI semantics
+//! onto the kernel's global `VirtualFileSystem` (`crate::sys::fs`). It does
+//! **not** touch WASM linear memory — that is the bridge layer's job
+//! (`super::preview1`).
+//!
+//! Read/write/readdir signatures here are deliberately memory-agnostic: they
+//! accept and return plain Rust slices and `Vec<u8>`. The bridge does the
+//! guest-memory copy.
+
 use super::error::*;
 use super::types::*;
+use crate::sys::fs;
 use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use spin::Mutex;
-use lazy_static::lazy_static;
 
-// Global filesystem state
-static FILESYSTEM: Mutex<FilesystemState> = Mutex::new(FilesystemState::new());
-lazy_static! {
-    static ref VFS: Mutex<VirtualFileSystem> = Mutex::new(VirtualFileSystem::new());
-}
+// Per-fd table. Tracks what each open WASI fd points at and where it is in the
+// file. The actual file bytes live in the kernel VFS, not here.
+//
+// Named FD_TABLE rather than FILESYSTEM to avoid grep-confusion with the
+// kernel's `static mut FILESYSTEM` in `crate::sys::fs`.
+static FD_TABLE: Mutex<FilesystemState> = Mutex::new(FilesystemState::new());
+
+/// Cap the number of simultaneously-open WASI fds. Prevents a runaway guest
+/// from exhausting kernel heap by calling `path_open` in a loop.
+const MAX_OPEN_FDS: usize = 256;
 
 #[derive(Debug)]
 pub struct FilesystemState {
     open_files: BTreeMap<Fd, FileDescriptor>,
     preopened_dirs: BTreeMap<Fd, String>,
     next_fd: Fd,
-    cwd: String,
 }
 
 impl FilesystemState {
@@ -28,7 +43,6 @@ impl FilesystemState {
             open_files: BTreeMap::new(),
             preopened_dirs: BTreeMap::new(),
             next_fd: 3, // Start after stdin(0), stdout(1), stderr(2)
-            cwd: String::new(),
         }
     }
 
@@ -54,7 +68,6 @@ pub struct FileDescriptor {
     pub file_type: u8,
     pub offset: FileSize,
     pub size: FileSize,
-    pub data: Vec<u8>,
     pub is_directory: bool,
 }
 
@@ -73,7 +86,6 @@ impl FileDescriptor {
             file_type: FILETYPE_REGULAR_FILE,
             offset: 0,
             size: 0,
-            data: Vec::new(),
             is_directory: false,
         }
     }
@@ -87,25 +99,31 @@ impl FileDescriptor {
             file_type: FILETYPE_DIRECTORY,
             offset: 0,
             size: 0,
-            data: Vec::new(),
             is_directory: true,
         }
     }
 }
 
-// Initialize filesystem with standard preopened directories
+/// Initialise WASI preopens. Idempotent. The kernel's `VirtualFileSystem` is
+/// initialised separately by `crate::sys::fs::init_filesystem_with_type`; this
+/// function only sets up the WASI fd table so guests can resolve `/` and
+/// `/tmp` via `fd_prestat_get`.
 pub fn init_filesystem() {
-    let mut fs = FILESYSTEM.lock();
-    fs.add_preopen("/".to_string());
-    fs.add_preopen("/tmp".to_string());
-    fs.cwd = "/".to_string();
+    let mut fs_state = FD_TABLE.lock();
+    // Idempotent: if preopens already set, skip.
+    if !fs_state.preopened_dirs.is_empty() {
+        return;
+    }
+    fs_state.add_preopen("/".to_string());
+    fs_state.add_preopen("/tmp".to_string());
 }
 
-// Preview 1 API implementations
-pub fn fd_prestat_get(fd: Fd) -> WasiResult<Prestat> {
-    let fs = FILESYSTEM.lock();
+// ---------- Preview 1 implementations ----------
 
-    if let Some(path) = fs.preopened_dirs.get(&fd) {
+pub fn fd_prestat_get(fd: Fd) -> WasiResult<Prestat> {
+    let fs_state = FD_TABLE.lock();
+
+    if let Some(path) = fs_state.preopened_dirs.get(&fd) {
         Ok(Prestat {
             tag: 0, // PREOPENTYPE_DIR
             u: PrestatU {
@@ -119,19 +137,14 @@ pub fn fd_prestat_get(fd: Fd) -> WasiResult<Prestat> {
     }
 }
 
-pub fn fd_prestat_dir_name(fd: Fd, _path_ptr: u32, path_len: Size) -> WasiResult<()> {
-    let fs = FILESYSTEM.lock();
-
-    if let Some(path) = fs.preopened_dirs.get(&fd) {
-        if path.len() > path_len as usize {
-            return Err(WasiError::nametoolong());
-        }
-        // In a real implementation, we would write to the WebAssembly memory
-        // For now, we'll just validate the operation
-        Ok(())
-    } else {
-        Err(WasiError::badf())
-    }
+/// Returns the preopen path string. The bridge writes it to guest memory.
+pub fn fd_prestat_dir_name(fd: Fd) -> WasiResult<String> {
+    let fs_state = FD_TABLE.lock();
+    fs_state
+        .preopened_dirs
+        .get(&fd)
+        .cloned()
+        .ok_or_else(WasiError::badf)
 }
 
 pub fn path_open(
@@ -143,244 +156,294 @@ pub fn path_open(
     fs_rights_inheriting: Rights,
     fdflags: FdFlags,
 ) -> WasiResult<Fd> {
-    let mut fs_state = FILESYSTEM.lock();
+    let mut fs_state = FD_TABLE.lock();
 
-    // Check if the directory fd exists and has the required rights
-    if !fs_state.preopened_dirs.contains_key(&fd) && !fs_state.open_files.contains_key(&fd) {
-        return Err(WasiError::badf());
+    if fs_state.open_files.len() >= MAX_OPEN_FDS {
+        return Err(WasiError::new(ERRNO_NFILE, "Too many open files"));
     }
 
-    // Create the full path
-    let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
-        preopen_path.clone()
-    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if !file_desc.is_directory {
-            return Err(WasiError::notdir());
-        }
-        file_desc.path.clone()
-    } else {
-        return Err(WasiError::badf());
+    // Locate the base path and parent rights for `fd` (preopen or open dir).
+    // Preopens get the full directory rights set; child fds inherit the parent's
+    // `rights_inheriting`. Both branches return `(base_path, max_rights)`.
+    let (base_path, parent_rights) =
+        if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
+            let max_rights = RIGHTS_FD_READ
+                | RIGHTS_FD_WRITE
+                | RIGHTS_FD_SEEK
+                | RIGHTS_FD_TELL
+                | RIGHTS_FD_FDSTAT_SET_FLAGS
+                | RIGHTS_FD_SYNC
+                | RIGHTS_FD_DATASYNC
+                | RIGHTS_FD_ADVISE
+                | RIGHTS_FD_ALLOCATE
+                | RIGHTS_FD_FILESTAT_GET
+                | RIGHTS_FD_FILESTAT_SET_SIZE
+                | RIGHTS_FD_FILESTAT_SET_TIMES
+                | RIGHTS_FD_READDIR
+                | RIGHTS_PATH_OPEN
+                | RIGHTS_PATH_CREATE_DIRECTORY
+                | RIGHTS_PATH_CREATE_FILE
+                | RIGHTS_PATH_FILESTAT_GET
+                | RIGHTS_PATH_FILESTAT_SET_SIZE
+                | RIGHTS_PATH_FILESTAT_SET_TIMES
+                | RIGHTS_PATH_LINK_SOURCE
+                | RIGHTS_PATH_LINK_TARGET
+                | RIGHTS_PATH_RENAME_SOURCE
+                | RIGHTS_PATH_RENAME_TARGET
+                | RIGHTS_PATH_READLINK
+                | RIGHTS_PATH_REMOVE_DIRECTORY
+                | RIGHTS_PATH_UNLINK_FILE
+                | RIGHTS_PATH_SYMLINK;
+            (preopen_path.clone(), max_rights)
+        } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
+            if !file_desc.is_directory {
+                return Err(WasiError::notdir());
+            }
+            (file_desc.path.clone(), file_desc.rights_inheriting)
+        } else {
+            return Err(WasiError::badf());
+        };
+
+    // Intersect guest-requested rights with what the parent allows. WASI requires
+    // hosts to refuse to grant rights the parent fd does not itself inherit.
+    let granted_base = fs_rights_base & parent_rights;
+    let granted_inheriting = fs_rights_inheriting & parent_rights;
+
+    // Resolve `..` / `.` / empty segments and confine to the preopen root.
+    let full_path = match resolve_under(&base_path, path) {
+        Some(p) => p,
+        None => return Err(WasiError::notcapable()),
     };
 
-    let full_path = if path.starts_with('/') {
-        path.to_string()
-    } else if base_path == "/" {
-        format!("/{}", path)
-    } else {
-        format!("{}/{}", base_path, path)
-    };
+    let exists = fs::exists(&full_path);
+    let is_dir = exists && fs::is_dir(&full_path);
 
-    // Use VFS for file open
-    let mut vfs = VFS.lock();
-    let exists = vfs.exists(&full_path);
-    if !exists && (oflags & 0x1) == 0 {
-        return Err(WasiError::noent());
+    // WASI OFLAGS bits: CREAT=0x1, DIRECTORY=0x2, EXCL=0x4, TRUNC=0x8.
+    let o_creat = (oflags & 0x1) != 0;
+    let o_excl = (oflags & 0x4) != 0;
+
+    if exists && o_creat && o_excl {
+        return Err(WasiError::exist());
     }
     if !exists {
-        vfs.write_file(&full_path, Vec::new()).map_err(|_| WasiError::io())?;
+        if !o_creat {
+            return Err(WasiError::noent());
+        }
+        fs::write_file(&full_path, Vec::new()).map_err(|_| WasiError::io())?;
     }
+
     let new_fd = fs_state.allocate_fd();
-    let mut file_desc = FileDescriptor::new(full_path.clone(), fdflags, fs_rights_base, fs_rights_inheriting);
-    file_desc.data = vfs.read_file(&full_path).map_err(|_| WasiError::io())?;
-    file_desc.size = file_desc.data.len() as FileSize;
+    let mut file_desc = if is_dir {
+        FileDescriptor::new_directory(full_path.clone(), granted_base, granted_inheriting)
+    } else {
+        FileDescriptor::new(full_path.clone(), fdflags, granted_base, granted_inheriting)
+    };
+    if !file_desc.is_directory {
+        file_desc.size = fs::metadata(&full_path)
+            .map(|m| m.size)
+            .unwrap_or(0);
+    }
     fs_state.open_files.insert(new_fd, file_desc);
     Ok(new_fd)
 }
 
-pub fn fd_read(fd: Fd, iovs: &[IOVec]) -> WasiResult<Size> {
-    let mut fs_state = FILESYSTEM.lock();
-    let vfs = VFS.lock();
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        let file_data = vfs.read_file(&file_desc.path).map_err(|_| WasiError::io())?;
-        let mut total_read = 0;
-        let mut offset = file_desc.offset as usize;
-        for iov in iovs {
-            let bytes_to_read = iov.buf_len.min((file_data.len() as u32).saturating_sub(offset as u32));
-            if bytes_to_read == 0 {
-                break;
-            }
-            // Here you would copy file_data[offset..offset+bytes_to_read] to WASM memory at iov.buf
-            offset += bytes_to_read as usize;
-            file_desc.offset += bytes_to_read as FileSize;
-            total_read += bytes_to_read;
-        }
-        Ok(total_read)
-    } else {
-        Err(WasiError::badf())
+/// Read up to `total_len` bytes starting at the fd's current offset. Returns
+/// the bytes read; advances the fd offset by the number of bytes returned.
+pub fn fd_read(fd: Fd, total_len: usize) -> WasiResult<Vec<u8>> {
+    let mut fs_state = FD_TABLE.lock();
+
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+
+    if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
+        return Err(WasiError::notcapable());
     }
+    if file_desc.is_directory {
+        return Err(WasiError::isdir());
+    }
+
+    let file_data = fs::read_file(&file_desc.path).map_err(|_| WasiError::io())?;
+
+    let start = file_desc.offset as usize;
+    if start >= file_data.len() {
+        return Ok(Vec::new());
+    }
+    let end = (start + total_len).min(file_data.len());
+    let bytes = file_data[start..end].to_vec();
+    file_desc.offset += bytes.len() as FileSize;
+    Ok(bytes)
 }
 
-pub fn fd_write(fd: Fd, iovs: &[CIOVec]) -> WasiResult<Size> {
-    let mut fs_state = FILESYSTEM.lock();
-    let mut vfs = VFS.lock();
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        let mut total_written = 0;
-        let mut offset = file_desc.offset as usize;
-        for iov in iovs {
-            let bytes_to_write = iov.buf_len;
-            // Here you would read bytes from WASM memory at iov.buf
-            let mut data = alloc::vec::Vec::with_capacity(bytes_to_write as usize);
-            data.resize(bytes_to_write as usize, 0u8); // Replace with real data from WASM
-            let mut file_data = vfs.read_file(&file_desc.path).unwrap_or_default();
-            let new_end = offset + bytes_to_write as usize;
-            if new_end > file_data.len() {
-                file_data.resize(new_end, 0);
-            }
-            file_data[offset..new_end].copy_from_slice(&data);
-            vfs.write_file(&file_desc.path, file_data.clone()).map_err(|_| WasiError::io())?;
-            file_desc.data = file_data;
-            file_desc.size = file_desc.data.len() as FileSize;
-            file_desc.offset += bytes_to_write as FileSize;
-            offset += bytes_to_write as usize;
-            total_written += bytes_to_write;
-        }
-        Ok(total_written)
-    } else {
-        Err(WasiError::badf())
+/// Write `data` at the fd's current offset, extending the file if needed.
+/// Returns the number of bytes written; advances the fd offset.
+pub fn fd_write(fd: Fd, data: &[u8]) -> WasiResult<Size> {
+    let mut fs_state = FD_TABLE.lock();
+
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+
+    if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
+        return Err(WasiError::notcapable());
     }
+    if file_desc.is_directory {
+        return Err(WasiError::isdir());
+    }
+    if data.is_empty() {
+        return Ok(0);
+    }
+
+    let mut file_data = fs::read_file(&file_desc.path).unwrap_or_default();
+    let offset = file_desc.offset as usize;
+    let end = offset + data.len();
+    if end > file_data.len() {
+        file_data.resize(end, 0);
+    }
+    file_data[offset..end].copy_from_slice(data);
+    fs::write_file(&file_desc.path, file_data).map_err(|_| WasiError::io())?;
+
+    file_desc.offset = end as FileSize;
+    file_desc.size = file_desc.size.max(end as FileSize);
+    Ok(data.len() as Size)
 }
 
 pub fn fd_seek(fd: Fd, offset: FileDelta, whence: Whence) -> WasiResult<FileSize> {
-    let mut fs_state = FILESYSTEM.lock();
+    let mut fs_state = FD_TABLE.lock();
 
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_SEEK) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        let new_offset = match whence {
-            0 => offset as FileSize,                             // SEEK_SET
-            1 => file_desc.offset.saturating_add_signed(offset), // SEEK_CUR
-            2 => file_desc.size.saturating_add_signed(offset),   // SEEK_END
-            _ => return Err(WasiError::inval()),
-        };
-
-        file_desc.offset = new_offset;
-        Ok(new_offset)
-    } else {
-        Err(WasiError::badf())
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_SEEK) == 0 {
+        return Err(WasiError::notcapable());
     }
+
+    let new_offset = match whence {
+        0 => {
+            // SEEK_SET requires a non-negative absolute offset.
+            if offset < 0 {
+                return Err(WasiError::inval());
+            }
+            offset as FileSize
+        }
+        1 => file_desc.offset.saturating_add_signed(offset), // SEEK_CUR
+        2 => file_desc.size.saturating_add_signed(offset),   // SEEK_END
+        _ => return Err(WasiError::inval()),
+    };
+
+    file_desc.offset = new_offset;
+    Ok(new_offset)
 }
 
 pub fn fd_tell(fd: Fd) -> WasiResult<FileSize> {
-    let fs_state = FILESYSTEM.lock();
+    let fs_state = FD_TABLE.lock();
 
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_TELL) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        Ok(file_desc.offset)
-    } else {
-        Err(WasiError::badf())
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_TELL) == 0 {
+        return Err(WasiError::notcapable());
     }
+    Ok(file_desc.offset)
 }
 
 pub fn fd_close(fd: Fd) -> WasiResult<()> {
-    let mut fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.remove(&fd) {
-        if !file_desc.is_directory {
-            let mut vfs = VFS.lock();
-            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
-        }
-        Ok(())
-    } else {
-        Err(WasiError::badf())
-    }
+    let mut fs_state = FD_TABLE.lock();
+    fs_state
+        .open_files
+        .remove(&fd)
+        .ok_or_else(WasiError::badf)?;
+    Ok(())
 }
 
 pub fn fd_sync(fd: Fd) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_SYNC) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        if !file_desc.is_directory {
-            let mut vfs = VFS.lock();
-            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
-        }
-        Ok(())
-    } else {
-        Err(WasiError::badf())
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_SYNC) == 0 {
+        return Err(WasiError::notcapable());
     }
+    // Kernel VFS write-through: writes are already persisted. Sync is a no-op.
+    Ok(())
 }
 
 pub fn fd_datasync(fd: Fd) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_DATASYNC) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        if !file_desc.is_directory {
-                let mut vfs = VFS.lock();
-            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
-        }
-        Ok(())
-    } else {
-        Err(WasiError::badf())
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_DATASYNC) == 0 {
+        return Err(WasiError::notcapable());
     }
+    Ok(())
 }
 
 pub fn fd_allocate(fd: Fd, offset: FileSize, len: FileSize) -> WasiResult<()> {
-    let mut fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_ALLOCATE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        let new_size = offset + len;
-        if new_size > file_desc.size {
-            file_desc.data.resize(new_size as usize, 0);
-            file_desc.size = new_size;
-        }
-        Ok(())
-    } else {
-        Err(WasiError::badf())
+    let mut fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_ALLOCATE) == 0 {
+        return Err(WasiError::notcapable());
     }
+
+    // Refuse silently-wrapping arithmetic; refuse sizes that would not fit on
+    // a 64-bit host's heap.
+    let new_size = offset.checked_add(len).ok_or_else(WasiError::fbig)?;
+    if new_size > usize::MAX as FileSize {
+        return Err(WasiError::fbig());
+    }
+    if new_size > file_desc.size {
+        let path = file_desc.path.clone();
+        let mut data = fs::read_file(&path).unwrap_or_default();
+        data.resize(new_size as usize, 0);
+        fs::write_file(&path, data).map_err(|_| WasiError::io())?;
+        file_desc.size = new_size;
+    }
+    Ok(())
 }
 
 pub fn fd_advise(fd: Fd, _offset: FileSize, _len: FileSize, _advice: Advice) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_ADVISE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        // Advice is just a hint, so we always succeed
-        Ok(())
-    } else {
-        Err(WasiError::badf())
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_ADVISE) == 0 {
+        return Err(WasiError::notcapable());
     }
+    Ok(())
 }
 
 pub fn fd_fdstat_get(fd: Fd) -> WasiResult<FdStat> {
-    let fs_state = FILESYSTEM.lock();
+    let fs_state = FD_TABLE.lock();
 
     if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        // Create fdstat structure
         let mut fdstat = [0u8; 24];
         fdstat[0] = file_desc.file_type;
-        // flags (2 bytes at offset 2)
         fdstat[2..4].copy_from_slice(&file_desc.flags.to_le_bytes());
-        // rights_base (8 bytes at offset 8)
         fdstat[8..16].copy_from_slice(&file_desc.rights_base.to_le_bytes());
-        // rights_inheriting (8 bytes at offset 16)
         fdstat[16..24].copy_from_slice(&file_desc.rights_inheriting.to_le_bytes());
         Ok(fdstat)
     } else if fs_state.preopened_dirs.contains_key(&fd) {
-        // Preopened directory
         let mut fdstat = [0u8; 24];
         fdstat[0] = FILETYPE_DIRECTORY;
-        let rights = RIGHTS_FD_READ | RIGHTS_PATH_OPEN | RIGHTS_FD_READDIR;
+        let rights = RIGHTS_FD_READ
+            | RIGHTS_PATH_OPEN
+            | RIGHTS_FD_READDIR
+            | RIGHTS_PATH_CREATE_DIRECTORY
+            | RIGHTS_PATH_CREATE_FILE
+            | RIGHTS_PATH_FILESTAT_GET
+            | RIGHTS_PATH_UNLINK_FILE
+            | RIGHTS_PATH_REMOVE_DIRECTORY;
         fdstat[8..16].copy_from_slice(&rights.to_le_bytes());
         fdstat[16..24].copy_from_slice(&rights.to_le_bytes());
         Ok(fdstat)
@@ -390,138 +453,119 @@ pub fn fd_fdstat_get(fd: Fd) -> WasiResult<FdStat> {
 }
 
 pub fn fd_fdstat_set_flags(fd: Fd, flags: FdFlags) -> WasiResult<()> {
-    let mut fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_FDSTAT_SET_FLAGS) == 0 {
-            return Err(WasiError::notcapable());
-        }
-        file_desc.flags = flags;
-        Ok(())
-    } else {
-        Err(WasiError::badf())
+    let mut fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_FDSTAT_SET_FLAGS) == 0 {
+        return Err(WasiError::notcapable());
     }
-}
-
-pub fn fd_filestat_get(fd: Fd) -> WasiResult<FileStat> {
-    let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_FILESTAT_GET) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        let mut filestat = [0u8; 56];
-        // dev (8 bytes at offset 0)
-        filestat[0..8].copy_from_slice(&1u64.to_le_bytes());
-        // ino (8 bytes at offset 8)
-        filestat[8..16].copy_from_slice(&(fd as u64).to_le_bytes());
-        // filetype (1 byte at offset 16)
-        filestat[16] = file_desc.file_type;
-        // nlink (8 bytes at offset 24)
-        filestat[24..32].copy_from_slice(&1u64.to_le_bytes());
-        // size (8 bytes at offset 32)
-        filestat[32..40].copy_from_slice(&file_desc.size.to_le_bytes());
-        // atim, mtim, ctim (8 bytes each at offsets 40, 48, 56)
-        let current_time = super::clocks::clock_time_get(CLOCKID_REALTIME, 0).unwrap_or(0);
-        filestat[40..48].copy_from_slice(&current_time.to_le_bytes());
-        filestat[48..56].copy_from_slice(&current_time.to_le_bytes());
-
-        Ok(filestat)
-    } else {
-        Err(WasiError::badf())
-    }
-}
-
-pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
-    let mut fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_FILESTAT_SET_SIZE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        file_desc.data.resize(size as usize, 0);
-        file_desc.size = size;
-
-        if file_desc.offset > size {
-            file_desc.offset = size;
-        }
-
-        if !file_desc.is_directory {
-                let mut vfs = VFS.lock();
-            let _ = vfs.write_file(&file_desc.path, file_desc.data.clone());
-        }
-        Ok(())
-    } else {
-        Err(WasiError::badf())
-    }
-}
-
-pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-    let mut vfs = VFS.lock();
-    let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
-        preopen_path.clone()
-    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        file_desc.path.clone()
-    } else {
-        return Err(WasiError::badf());
-    };
-    let full_path = if path.starts_with('/') {
-        path.to_string()
-    } else if base_path == "/" {
-        format!("/{}", path)
-    } else {
-        format!("{}/{}", base_path, path)
-    };
-    vfs.create_dir_all(&full_path).map_err(|_| WasiError::io())
-}
-
-pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-    let mut vfs = VFS.lock();
-    let base_path = if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
-        preopen_path.clone()
-    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        file_desc.path.clone()
-    } else {
-        return Err(WasiError::badf());
-    };
-    let full_path = if path.starts_with('/') {
-        path.to_string()
-    } else if base_path == "/" {
-        format!("/{}", path)
-    } else {
-        format!("{}/{}", base_path, path)
-    };
-    vfs.remove(&full_path).map_err(|_| WasiError::io())
-}
-
-pub fn path_remove_directory(fd: Fd, _path: &str) -> WasiResult<()> {
-    let fs_state = FILESYSTEM.lock();
-
-    // Check directory permissions
-    if !fs_state.preopened_dirs.contains_key(&fd) {
-        if let Some(file_desc) = fs_state.open_files.get(&fd) {
-            if !file_desc.is_directory
-                || (file_desc.rights_base & RIGHTS_PATH_REMOVE_DIRECTORY) == 0
-            {
-                return Err(WasiError::notcapable());
-            }
-        } else {
-            return Err(WasiError::badf());
-        }
-    }
-
-    // In a real implementation, this would remove the directory
-    // For now, we'll just validate the operation
+    file_desc.flags = flags;
     Ok(())
 }
 
-pub fn fd_readdir(fd: Fd, _buf: &mut [u8], _cookie: DirCookie) -> WasiResult<Size> {
-    let fs_state = FILESYSTEM.lock();
-    let vfs = VFS.lock();
+pub fn fd_filestat_get(fd: Fd) -> WasiResult<FileStat> {
+    let fs_state = FD_TABLE.lock();
+
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_FILESTAT_GET) == 0 {
+        return Err(WasiError::notcapable());
+    }
+
+    let mut filestat = [0u8; 56];
+    filestat[0..8].copy_from_slice(&1u64.to_le_bytes());
+    filestat[8..16].copy_from_slice(&(fd as u64).to_le_bytes());
+    filestat[16] = file_desc.file_type;
+    filestat[24..32].copy_from_slice(&1u64.to_le_bytes());
+    filestat[32..40].copy_from_slice(&file_desc.size.to_le_bytes());
+    let current_time = super::clocks::clock_time_get(CLOCKID_REALTIME, 0).unwrap_or(0);
+    filestat[40..48].copy_from_slice(&current_time.to_le_bytes());
+    filestat[48..56].copy_from_slice(&current_time.to_le_bytes());
+    Ok(filestat)
+}
+
+pub fn fd_filestat_set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
+    let mut fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get_mut(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_FILESTAT_SET_SIZE) == 0 {
+        return Err(WasiError::notcapable());
+    }
+
+    if file_desc.is_directory {
+        return Err(WasiError::isdir());
+    }
+
+    if size > usize::MAX as FileSize {
+        return Err(WasiError::fbig());
+    }
+
+    let path = file_desc.path.clone();
+    let mut data = fs::read_file(&path).unwrap_or_default();
+    data.resize(size as usize, 0);
+    fs::write_file(&path, data).map_err(|_| WasiError::io())?;
+    file_desc.size = size;
+    if file_desc.offset > size {
+        file_desc.offset = size;
+    }
+    Ok(())
+}
+
+pub fn path_create_directory(fd: Fd, path: &str) -> WasiResult<()> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    let full_path = resolve_under(&base_path, path).ok_or_else(WasiError::notcapable)?;
+    fs::create_dir_all(&full_path).map_err(|_| WasiError::io())
+}
+
+pub fn path_unlink_file(fd: Fd, path: &str) -> WasiResult<()> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    let full_path = resolve_under(&base_path, path).ok_or_else(WasiError::notcapable)?;
+    if !fs::exists(&full_path) {
+        return Err(WasiError::noent());
+    }
+    if fs::is_dir(&full_path) {
+        return Err(WasiError::isdir());
+    }
+    fs::remove(&full_path).map_err(|_| WasiError::io())
+}
+
+pub fn path_remove_directory(fd: Fd, path: &str) -> WasiResult<()> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    let full_path = resolve_under(&base_path, path).ok_or_else(WasiError::notcapable)?;
+    if !fs::exists(&full_path) {
+        return Err(WasiError::noent());
+    }
+    if !fs::is_dir(&full_path) {
+        return Err(WasiError::notdir());
+    }
+    fs::remove(&full_path).map_err(|_| WasiError::io())
+}
+
+/// Directory entry as returned to the bridge, which then serialises into the
+/// WASI dirent ABI.
+#[derive(Debug, Clone)]
+pub struct DirEntryRecord {
+    pub ino: u64,
+    pub name: String,
+    pub file_type: u8,
+}
+
+/// List directory entries starting at `cookie` (entry index). The bridge
+/// serialises and writes to guest memory.
+pub fn fd_readdir_entries(fd: Fd, cookie: DirCookie) -> WasiResult<Vec<DirEntryRecord>> {
+    let fs_state = FD_TABLE.lock();
     let path = if let Some(file_desc) = fs_state.open_files.get(&fd) {
         if !file_desc.is_directory || (file_desc.rights_base & RIGHTS_FD_READDIR) == 0 {
             return Err(WasiError::notdir());
@@ -532,14 +576,31 @@ pub fn fd_readdir(fd: Fd, _buf: &mut [u8], _cookie: DirCookie) -> WasiResult<Siz
     } else {
         return Err(WasiError::badf());
     };
-    let entries = vfs.read_dir(&path).map_err(|_| WasiError::io())?;
-    // Here you would serialize entries into WASM memory at _buf
-    Ok(entries.len() as Size)
+    drop(fs_state);
+
+    let entries = fs::read_dir(&path).map_err(|_| WasiError::io())?;
+    let mut records = Vec::with_capacity(entries.len());
+    for (idx, entry) in entries.into_iter().enumerate().skip(cookie as usize) {
+        let file_type = match entry.file_type {
+            crate::sys::fs::FileType::Regular => FILETYPE_REGULAR_FILE,
+            crate::sys::fs::FileType::Directory => FILETYPE_DIRECTORY,
+            crate::sys::fs::FileType::Symlink => FILETYPE_SYMBOLIC_LINK,
+            crate::sys::fs::FileType::Pipe => FILETYPE_UNKNOWN,
+            crate::sys::fs::FileType::Socket => FILETYPE_SOCKET_STREAM,
+            crate::sys::fs::FileType::Device => FILETYPE_BLOCK_DEVICE,
+        };
+        records.push(DirEntryRecord {
+            ino: idx as u64,
+            name: entry.name,
+            file_type,
+        });
+    }
+    Ok(records)
 }
 
-// Preview 2 API extensions
+// ---------- Preview 2 helpers (memory-agnostic by design) ----------
+
 pub fn open_at(dir_fd: Fd, path: &str, open_flags: u32, create_flags: u32) -> WasiResult<(Fd, u8)> {
-    // Convert Preview 2 flags to Preview 1 flags
     let oflags = if (create_flags & 0x1) != 0 { 0x1 } else { 0 }; // O_CREAT
     let fdflags = if (open_flags & 0x1) != 0 {
         FDFLAGS_APPEND
@@ -551,9 +612,8 @@ pub fn open_at(dir_fd: Fd, path: &str, open_flags: u32, create_flags: u32) -> Wa
 
     let fd = path_open(dir_fd, 0, path, oflags, rights, rights, fdflags)?;
 
-    // Return file descriptor and file type
     let file_type = {
-        let fs_state = FILESYSTEM.lock();
+        let fs_state = FD_TABLE.lock();
         if let Some(file_desc) = fs_state.open_files.get(&fd) {
             file_desc.file_type
         } else {
@@ -565,244 +625,263 @@ pub fn open_at(dir_fd: Fd, path: &str, open_flags: u32, create_flags: u32) -> Wa
 }
 
 pub fn read_via_stream(fd: Fd, offset: FileSize) -> WasiResult<super::io::InputStream> {
-    let mut fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get_mut(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        // Create a stream from the file data starting at the offset
-        let start = offset.min(file_desc.size) as usize;
-        let data = file_desc.data[start..].to_vec();
-
-        Ok(super::io::create_input_stream(data))
-    } else {
-        Err(WasiError::badf())
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_READ) == 0 {
+        return Err(WasiError::notcapable());
     }
+    let path = file_desc.path.clone();
+    drop(fs_state);
+
+    let data = fs::read_file(&path).map_err(|_| WasiError::io())?;
+    let start = (offset as usize).min(data.len());
+    Ok(super::io::create_input_stream(data[start..].to_vec()))
 }
 
 pub fn write_via_stream(fd: Fd, _offset: FileSize) -> WasiResult<super::io::OutputStream> {
-    let fs_state = FILESYSTEM.lock();
-
-    if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        // Create an output stream for the file
-        Ok(super::io::create_output_stream())
-    } else {
-        Err(WasiError::badf())
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
+        return Err(WasiError::notcapable());
     }
+    Ok(super::io::create_output_stream())
 }
 
 pub fn append_via_stream(fd: Fd) -> WasiResult<super::io::OutputStream> {
-    let fs_state = FILESYSTEM.lock();
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
+        return Err(WasiError::notcapable());
+    }
+    Ok(super::io::create_output_stream())
+}
 
+pub fn list_directory_entries(fd: Fd) -> WasiResult<Vec<String>> {
+    let entries = fd_readdir_entries(fd, 0)?;
+    Ok(entries.into_iter().map(|e| e.name).collect())
+}
+
+pub fn advise(fd: Fd, _offset: FileSize, _len: FileSize, _advice: Advice) -> WasiResult<()> {
+    let _ = fd;
+    Ok(())
+}
+
+pub fn sync_data(_fd: Fd) -> WasiResult<()> {
+    fs::sync_filesystem().map_err(|_| WasiError::io())
+}
+
+pub fn get_flags(fd: Fd) -> WasiResult<u32> {
+    let fs_state = FD_TABLE.lock();
+    let file_desc = fs_state
+        .open_files
+        .get(&fd)
+        .ok_or_else(WasiError::badf)?;
+    Ok(file_desc.flags as u32)
+}
+
+pub fn get_type(fd: Fd) -> WasiResult<u8> {
+    let fs_state = FD_TABLE.lock();
     if let Some(file_desc) = fs_state.open_files.get(&fd) {
-        if (file_desc.rights_base & RIGHTS_FD_WRITE) == 0 {
-            return Err(WasiError::notcapable());
-        }
-
-        // Create an output stream for appending to the file
-        Ok(super::io::create_output_stream())
+        Ok(file_desc.file_type)
+    } else if fs_state.preopened_dirs.contains_key(&fd) {
+        Ok(FILETYPE_DIRECTORY)
     } else {
         Err(WasiError::badf())
     }
 }
 
-// Additional functions for demo compatibility
-pub fn list_directory_entries(fd: Fd) -> WasiResult<Vec<String>> {
-    // Basic implementation - in a real OS this would read actual directory entries
-    log::debug!("list_directory_entries({})", fd);
-    use alloc::vec;
-    Ok(vec![
-        ".".to_string(),
-        "..".to_string(),
-        "file1.txt".to_string(),
-        "file2.txt".to_string(),
-    ])
-}
-
-// Additional filesystem functions for Preview 2 compatibility
-pub fn advise(fd: Fd, offset: FileSize, len: FileSize, advice: Advice) -> WasiResult<()> {
-    // For demo, just pretend to advise
-    log::info!(
-        "Advising fd {} offset {} len {} advice {:?}",
-        fd,
-        offset,
-        len,
-        advice
-    );
-    Ok(())
-}
-
-pub fn sync_data(fd: Fd) -> WasiResult<()> {
-    // For demo, just pretend to sync
-    log::info!("Syncing data for fd {}", fd);
-    Ok(())
-}
-
-pub fn get_flags(_fd: Fd) -> WasiResult<u32> {
-    // Return some default flags
-    Ok(0)
-}
-
-pub fn get_type(_fd: Fd) -> WasiResult<u8> {
-    // Return regular file type
-    Ok(4) // FILETYPE_REGULAR_FILE
-}
-
 pub fn set_size(fd: Fd, size: FileSize) -> WasiResult<()> {
-    // For demo, just pretend to set size
-    log::info!("Setting size of fd {} to {}", fd, size);
-    Ok(())
+    fd_filestat_set_size(fd, size)
 }
 
 pub fn set_times(
-    fd: Fd,
-    data_access_timestamp: u64,
-    data_modification_timestamp: u64,
+    _fd: Fd,
+    _data_access_timestamp: u64,
+    _data_modification_timestamp: u64,
 ) -> WasiResult<()> {
-    // For demo, just pretend to set times
-    log::info!(
-        "Setting times for fd {} access {} modify {}",
-        fd,
-        data_access_timestamp,
-        data_modification_timestamp
-    );
+    // Kernel VFS does not yet expose per-fd time setters; treat as no-op.
     Ok(())
 }
 
-pub fn read(_fd: Fd, length: FileSize, _offset: FileSize) -> WasiResult<(Vec<u8>, bool)> {
-    // For demo, return empty data
-    let data = alloc::vec![0u8; length.min(1024) as usize];
-    Ok((data, true)) // true = end of file
+pub fn read(fd: Fd, length: FileSize, _offset: FileSize) -> WasiResult<(Vec<u8>, bool)> {
+    let data = fd_read(fd, length as usize)?;
+    let eof = (data.len() as FileSize) < length;
+    Ok((data, eof))
 }
 
-pub fn write(fd: Fd, buffer: &[u8], offset: FileSize) -> WasiResult<FileSize> {
-    // For demo, pretend to write all bytes
-    log::info!(
-        "Writing {} bytes to fd {} at offset {}",
-        buffer.len(),
-        fd,
-        offset
-    );
-    Ok(buffer.len() as FileSize)
+pub fn write(fd: Fd, buffer: &[u8], _offset: FileSize) -> WasiResult<FileSize> {
+    let n = fd_write(fd, buffer)?;
+    Ok(n as FileSize)
 }
 
 pub fn read_directory(fd: Fd) -> WasiResult<u32> {
-    // Return a dummy directory stream ID
     Ok(fd)
 }
 
-pub fn sync(fd: Fd) -> WasiResult<()> {
-    // For demo, just pretend to sync
-    log::info!("Syncing fd {}", fd);
-    Ok(())
+pub fn sync(_fd: Fd) -> WasiResult<()> {
+    fs::sync_filesystem().map_err(|_| WasiError::io())
 }
 
 pub fn create_directory_at(fd: Fd, path: &str) -> WasiResult<()> {
-    // For demo, just pretend to create directory
-    log::info!("Creating directory {} at fd {}", path, fd);
-    Ok(())
+    path_create_directory(fd, path)
 }
 
-pub fn stat(fd: Fd, path_flags: u16, path: &str) -> WasiResult<u64> {
-    // Return dummy stat data
-    log::info!("Stat {} at fd {} with flags {}", path, fd, path_flags);
-    Ok(0x1000) // Dummy stat
+pub fn stat(fd: Fd, _path_flags: u16, path: &str) -> WasiResult<u64> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    let full_path = resolve_under(&base_path, path).ok_or_else(WasiError::notcapable)?;
+    fs::metadata(&full_path).map(|m| m.size).map_err(|_| WasiError::noent())
 }
 
-pub fn stat_open_directory(fd: Fd, path_flags: u16, path: &str) -> WasiResult<Fd> {
-    // Return dummy directory fd
-    log::info!(
-        "Stat open directory {} at fd {} with flags {}",
-        path,
-        fd,
-        path_flags
-    );
-    Ok(fd + 1)
+/// Resolve `path` against `fd`'s base, with the same confinement rules used
+/// by `path_open`. Returned only — caller does the filestat encoding.
+pub fn stat_resolve(fd: Fd, _path_flags: u16, path: &str) -> WasiResult<String> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    resolve_under(&base_path, path).ok_or_else(WasiError::notcapable)
+}
+
+pub fn stat_open_directory(fd: Fd, _path_flags: u16, path: &str) -> WasiResult<Fd> {
+    let rights = RIGHTS_FD_READ | RIGHTS_PATH_OPEN | RIGHTS_FD_READDIR;
+    path_open(fd, 0, path, 0, rights, rights, 0)
 }
 
 pub fn link(
-    fd: Fd,
+    old_fd: Fd,
     _old_path_flags: u16,
     old_path: &str,
-    new_fd: Fd,
+    _new_fd: Fd,
     new_path: &str,
 ) -> WasiResult<()> {
-    // For demo, just pretend to create link
-    log::info!(
-        "Link {} (fd {}) to {} (fd {})",
-        old_path,
-        fd,
-        new_path,
-        new_fd
-    );
-    Ok(())
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, old_fd)?;
+    drop(fs_state);
+    let from = resolve_under(&base_path, old_path).ok_or_else(WasiError::notcapable)?;
+    let to = resolve_under(&base_path, new_path).ok_or_else(WasiError::notcapable)?;
+    let data = fs::read_file(&from).map_err(|_| WasiError::noent())?;
+    fs::write_file(&to, data).map_err(|_| WasiError::io())
 }
 
-pub fn readlink_at(fd: Fd, path: &str) -> WasiResult<String> {
-    // Return dummy link target
-    log::info!("Readlink {} at fd {}", path, fd);
-    Ok("/dummy/target".to_string())
+pub fn readlink_at(_fd: Fd, _path: &str) -> WasiResult<String> {
+    Err(WasiError::inval())
 }
 
 pub fn remove_directory_at(fd: Fd, path: &str) -> WasiResult<()> {
-    // For demo, just pretend to remove directory
-    log::info!("Removing directory {} at fd {}", path, fd);
-    Ok(())
+    path_remove_directory(fd, path)
 }
 
-pub fn rename_at(fd: Fd, old_path: &str, new_fd: Fd, new_path: &str) -> WasiResult<()> {
-    // For demo, just pretend to rename
-    log::info!(
-        "Rename {} (fd {}) to {} (fd {})",
-        old_path,
-        fd,
-        new_path,
-        new_fd
-    );
-    Ok(())
+pub fn rename_at(fd: Fd, old_path: &str, _new_fd: Fd, new_path: &str) -> WasiResult<()> {
+    let fs_state = FD_TABLE.lock();
+    let base_path = base_path_of(&fs_state, fd)?;
+    drop(fs_state);
+    let from = resolve_under(&base_path, old_path).ok_or_else(WasiError::notcapable)?;
+    let to = resolve_under(&base_path, new_path).ok_or_else(WasiError::notcapable)?;
+    if !fs::exists(&from) {
+        return Err(WasiError::noent());
+    }
+    let data = fs::read_file(&from).map_err(|_| WasiError::io())?;
+    fs::write_file(&to, data).map_err(|_| WasiError::io())?;
+    fs::remove(&from).map_err(|_| WasiError::io())
 }
 
-pub fn symlink_at(fd: Fd, old_path: &str, new_path: &str) -> WasiResult<()> {
-    // For demo, just pretend to create symlink
-    log::info!("Symlink {} to {} at fd {}", old_path, new_path, fd);
-    Ok(())
+pub fn symlink_at(_fd: Fd, _old_path: &str, _new_path: &str) -> WasiResult<()> {
+    // Kernel VFS supports symlinks at the model level but no free function is
+    // exposed yet. Treat as unsupported.
+    Err(WasiError::notsup())
 }
 
 pub fn unlink_file_at(fd: Fd, path: &str) -> WasiResult<()> {
-    // For demo, just pretend to unlink file
-    log::info!("Unlink file {} at fd {}", path, fd);
-    Ok(())
+    path_unlink_file(fd, path)
 }
 
 pub fn is_same_object(fd1: Fd, fd2: Fd) -> WasiResult<bool> {
-    // For demo, just compare fds
     Ok(fd1 == fd2)
 }
 
 pub fn metadata_hash(fd: Fd) -> WasiResult<u64> {
-    // Return dummy hash
-    Ok(fd as u64 * 0x123456789)
+    Ok(fd as u64 * 0x9E3779B97F4A7C15)
 }
 
-pub fn metadata_hash_at(fd: Fd, path_flags: u16, path: &str) -> WasiResult<u64> {
-    // Return dummy hash based on path
-    log::info!(
-        "Metadata hash for {} at fd {} with flags {}",
-        path,
-        fd,
-        path_flags
-    );
-    Ok(path.len() as u64 * 0x987654321)
+pub fn metadata_hash_at(fd: Fd, _path_flags: u16, path: &str) -> WasiResult<u64> {
+    Ok((fd as u64).wrapping_add(path.len() as u64).wrapping_mul(0x9E3779B97F4A7C15))
 }
 
 pub fn drop_descriptor(fd: Fd) -> WasiResult<()> {
-    // For demo, just pretend to drop descriptor
-    log::info!("Dropping descriptor {}", fd);
-    Ok(())
+    fd_close(fd)
+}
+
+// ---------- helpers ----------
+
+fn base_path_of(fs_state: &FilesystemState, fd: Fd) -> WasiResult<String> {
+    if let Some(preopen_path) = fs_state.preopened_dirs.get(&fd) {
+        Ok(preopen_path.clone())
+    } else if let Some(file_desc) = fs_state.open_files.get(&fd) {
+        Ok(file_desc.path.clone())
+    } else {
+        Err(WasiError::badf())
+    }
+}
+
+/// Resolve `path` against `base_path` and confine the result inside `base_path`
+/// (the preopen root or open directory).
+///
+/// `..` segments that would escape the base return `None`. The kernel VFS does
+/// not normalise paths itself, so a literal `/tmp/../etc/hostname` would be
+/// interpreted as a top-level lookup that misses the preopen sandbox; this
+/// helper canonicalises before handing the path to the VFS.
+fn resolve_under(base_path: &str, path: &str) -> Option<String> {
+    let combined = if path.starts_with('/') {
+        path.to_string()
+    } else if base_path == "/" {
+        format!("/{}", path)
+    } else {
+        format!("{}/{}", base_path, path)
+    };
+
+    let normalised = normalise_path(&combined);
+
+    // The base path itself may need normalising (e.g. "//"); collapse for the
+    // confinement check.
+    let base_norm = normalise_path(base_path);
+    if base_norm != "/" && !(normalised == base_norm
+        || normalised.starts_with(&format!("{}/", base_norm)))
+    {
+        return None;
+    }
+
+    Some(normalised)
+}
+
+fn normalise_path(path: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for seg in path.split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    if parts.is_empty() {
+        "/".to_string()
+    } else {
+        let mut out = String::new();
+        for p in &parts {
+            out.push('/');
+            out.push_str(p);
+        }
+        out
+    }
 }

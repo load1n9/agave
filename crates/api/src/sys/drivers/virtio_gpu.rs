@@ -52,10 +52,6 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         const VIRTIO_GPU_F_RESOURCE_BLOB: u64 = 3;
         const VIRTIO_GPU_F_CONTEXT_INIT: u64 = 4;
 
-        // VirtIO Device Status constants
-        const VIRTIO_STATUS_DRIVER: u8 = 2;
-        const VIRTIO_STATUS_DRIVER_OK: u8 = 4;
-
         // Negotiate features - request basic GPU features
         let desired_features = (1 << VIRTIO_GPU_F_VIRGL) | // Enable 3D/virgl support
                               (1 << VIRTIO_GPU_F_EDID); // Enable EDID support
@@ -73,8 +69,13 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
             if virgl_enabled { "enabled" } else { "disabled" }
         );
 
-        // Initialize driver status
-        virtio.set_device_status(VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_DRIVER_OK);
+        // Note: `Virtio::init` already drove the device through
+        // ACK | DRIVER | FEATURES_OK | DRIVER_OK. Calling `set_device_status`
+        // here would *overwrite* (not OR) the status byte, clearing ACK and
+        // FEATURES_OK and putting the device into a state where it accepts
+        // queue kicks but never updates the used ring. That manifested as
+        // every `request().await` hanging forever and the screen never
+        // showing the WASM render.
 
         let q = 0;
         virtio.queue_select(q);
@@ -195,7 +196,6 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         // let framebuffer_ptr =
         //     ALLOCATOR.alloc(Layout::from_size_align_unchecked(capacity * 4, 4096));
         let mut framebuffer: Vec<RGBA> = Vec::from_raw_parts(addr as *mut RGBA, capacity, capacity);
-        // log::info!("(*fb).update {:?}", addr as *mut RGBA);
         (*fb).update(
             addr as *mut RGBA,
             display_info.pmodes.rect.w as usize,
@@ -278,7 +278,6 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         )
         .await;
         let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
-        // log::info!("{:?}", nodata.type_);
 
         let mut debug_name: [char; 64] = ['1'; 64];
         let name = "Debug\0";

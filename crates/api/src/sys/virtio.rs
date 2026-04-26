@@ -578,19 +578,30 @@ impl Virtio {
         let mut this = unsafe {
             let mut queues = Vec::new();
 
-            // Reset device
+            // Reset device. UEFI typically hands devices off in DRIVER_OK
+            // state (it uses VirtIO for its own console/input/display); per
+            // the spec we must drive status back to 0 and *wait* until the
+            // device confirms before doing anything else, otherwise queue
+            // config writes are ignored and the device sits in its old state.
             write_volatile(&mut cap_common.device_status, 0);
+            let mut reset_timeout = 100_000;
+            while read_volatile(&cap_common.device_status) != 0 && reset_timeout > 0 {
+                core::hint::spin_loop();
+                reset_timeout -= 1;
+            }
+            if reset_timeout == 0 {
+                log::error!("VirtIO device did not acknowledge reset");
+            }
 
-            // Acknowledge device
-            write_volatile(
-                &mut cap_common.device_status,
-                read_volatile(&cap_common.device_status) | VIRTIO_STATUS_ACKNOWLEDGE,
-            );
+            // Acknowledge device. Use absolute writes from this point —
+            // OR-ing with read-back can carry over `DEVICE_NEEDS_RESET` if
+            // the device latched it during the previous boot session.
+            write_volatile(&mut cap_common.device_status, VIRTIO_STATUS_ACKNOWLEDGE);
 
             // Driver loaded
             write_volatile(
                 &mut cap_common.device_status,
-                read_volatile(&cap_common.device_status) | VIRTIO_STATUS_DRIVER,
+                VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER,
             );
 
             // Feature negotiation
@@ -654,7 +665,7 @@ impl Virtio {
             // Features OK
             write_volatile(
                 &mut cap_common.device_status,
-                read_volatile(&cap_common.device_status) | VIRTIO_STATUS_FEATURE_OK,
+                VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER | VIRTIO_STATUS_FEATURE_OK,
             );
 
             if read_volatile(&cap_common.device_status) & VIRTIO_STATUS_FEATURE_OK == 0 {
@@ -814,7 +825,10 @@ impl Virtio {
             // Driver OK
             write_volatile(
                 &mut cap_common.device_status,
-                read_volatile(&cap_common.device_status) | VIRTIO_STATUS_DRIVER_OK,
+                VIRTIO_STATUS_ACKNOWLEDGE
+                    | VIRTIO_STATUS_DRIVER
+                    | VIRTIO_STATUS_FEATURE_OK
+                    | VIRTIO_STATUS_DRIVER_OK,
             );
 
             // Store values before moving common

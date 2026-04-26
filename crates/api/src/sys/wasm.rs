@@ -502,6 +502,45 @@ impl WasmApp {
             .define("agave", "get_key_history_event", get_key_history_event)
             .unwrap();
 
+        // Filesystem stats / sync host functions for the agave-lib bridge.
+        let fs_stats_get = Func::wrap(
+            &mut store,
+            |mut caller: Caller<'_, *mut FB>, out_ptr: i32| -> i32 {
+                let memory = match caller.get_export("memory") {
+                    Some(Extern::Memory(m)) => m,
+                    _ => return -1,
+                };
+                let stats = match crate::sys::fs::get_filesystem_stats() {
+                    Ok(s) => s,
+                    Err(_) => return -1,
+                };
+                let mut buf = [0u8; 48];
+                let tag: u32 = match crate::sys::fs::get_current_filesystem_type() {
+                    crate::sys::fs::FileSystemType::Virtual => 0,
+                    crate::sys::fs::FileSystemType::Persistent => 1,
+                };
+                buf[0..4].copy_from_slice(&tag.to_le_bytes());
+                buf[8..16].copy_from_slice(&stats.total_size.to_le_bytes());
+                buf[16..24].copy_from_slice(&stats.used_size.to_le_bytes());
+                buf[24..32].copy_from_slice(&stats.free_size.to_le_bytes());
+                buf[32..40].copy_from_slice(&stats.total_files.to_le_bytes());
+                buf[40..48].copy_from_slice(&stats.block_size.to_le_bytes());
+                if memory.write(&mut caller, out_ptr as usize, &buf).is_err() {
+                    return -1;
+                }
+                0
+            },
+        );
+        linker.define("agave", "fs_stats_get", fs_stats_get).unwrap();
+
+        let fs_sync = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
+            match crate::sys::fs::sync_filesystem() {
+                Ok(()) => 0,
+                Err(_) => -1,
+            }
+        });
+        linker.define("agave", "fs_sync", fs_sync).unwrap();
+
         // Link comprehensive WASI Preview 1 implementation
         wasi::preview1::link_preview1_functions(&mut linker, &mut store).unwrap();
 
@@ -553,12 +592,13 @@ impl WasmApp {
 
         match update {
             Ok(update) => {
-                update
-                    .call(
-                        &mut self.store,
-                        (input.mouse_x as i32, input.mouse_y as i32),
-                    )
-                    .unwrap();
+                if let Err(e) = update.call(
+                    &mut self.store,
+                    (input.mouse_x as i32, input.mouse_y as i32),
+                ) {
+                    log::error!("WASM: update() trapped: {:?}", e);
+                    panic!("WASM update trap");
+                }
             }
             Err(e) => {
                 log::trace!("WASM: No update function found: {:?}", e);

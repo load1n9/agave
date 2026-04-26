@@ -39,7 +39,16 @@ lazy_static::lazy_static! {
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
     config.mappings.physical_memory = Some(Mapping::Dynamic);
-    config.kernel_stack_size = 128 * 1024;
+    // Keep all bootloader-chosen mappings (phys-mem, kernel image, stack,
+    // framebuffer, boot info, ramdisk) below 0x4000_0000_0000 so they cannot
+    // collide with the kernel heap region anchored at HEAP_START =
+    // 0x_4444_4444_0000. Required since bootloader 0.11.14's address-calc
+    // overflow fix; previously the placer happened to leave that range clear.
+    config.mappings.dynamic_range_end = Some(0x4000_0000_0000);
+    // wasmi's interpreter recurses into host fns through several Rust frames per
+    // WASM call, and the terminal app's first update tick blew the 128 KiB stack
+    // (kernel-stack overflow → page fault on guard page). Raised to 2 MiB.
+    config.kernel_stack_size = 2 * 1024 * 1024;
     config
 };
 entry_point!(main, config = &CONFIG);
@@ -49,6 +58,14 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
     let fbinfo = framebuffer.info();
     let fbm = framebuffer.buffer_mut();
+    // Stash a raw pointer to the bootloader-supplied framebuffer before the
+    // logger takes ownership of it. The WASM main loop will copy fb.pixels
+    // into this region every frame so we get visible rendering even when the
+    // VirtIO GPU bring-up hangs (which it currently does -- the kick reaches
+    // the device but the device never updates the used ring).
+    let boot_fb_ptr: *mut u8 = fbm.as_mut_ptr();
+    let boot_fb_len: usize = fbm.len();
+    let boot_fb_pixel_format = fbinfo.pixel_format;
 
     init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
@@ -314,7 +331,21 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         log::error!("Failed to initialize filesystem: {:?}", e);
     } else {
         log::info!("Filesystem initialized successfully");
+        match fs::get_filesystem_stats() {
+            Ok(stats) => log::info!(
+                "FS: {} files seeded; type={:?}",
+                stats.total_files,
+                fs::get_current_filesystem_type()
+            ),
+            Err(e) => log::warn!("FS: stats unavailable: {:?}", e),
+        }
     }
+
+    // Set up WASI preopens for the WASM apps. The WASI shim shares the kernel
+    // VFS through the public `crate::sys::fs` free functions; this only adds
+    // the per-fd preopen entries (`/`, `/tmp`).
+    agave_api::sys::wasi::filesystem::init_filesystem();
+    log::info!("WASI: filesystem bridge ready (preopens=/, /tmp)");
     show_loading_screen("Filesystem initialized...", 65, &mut *fb);
 
     // Initialize IPC system
@@ -446,6 +477,31 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 power::record_system_activity();
                 for app in apps.iter_mut() {
                     app.call_update(input);
+                }
+
+                // Push the WASM-rendered pixels straight to the bootloader's
+                // framebuffer. This bypasses the VirtIO GPU path (which is
+                // currently broken: device accepts kicks but never updates
+                // the used ring) and gives us a working display.
+                unsafe {
+                    let fb_ref = &mut *fb_clone;
+                    let pixels = &fb_ref.pixels;
+                    let count = pixels.len().min(boot_fb_len / 4);
+                    let dst = boot_fb_ptr;
+                    let src = pixels.as_ptr();
+                    use bootloader_api::info::PixelFormat;
+                    if matches!(boot_fb_pixel_format, PixelFormat::Bgr) {
+                        for i in 0..count {
+                            let p = *src.add(i);
+                            let off = i * 4;
+                            *dst.add(off) = p.b;
+                            *dst.add(off + 1) = p.g;
+                            *dst.add(off + 2) = p.r;
+                            *dst.add(off + 3) = 0;
+                        }
+                    } else {
+                        core::ptr::copy_nonoverlapping(src as *const u8, dst, count * 4);
+                    }
                 }
 
                 frame_counter += 1;

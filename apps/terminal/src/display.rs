@@ -582,7 +582,7 @@ fn draw_files_screen(dim: agave_lib::Dimensions, colors: &ThemeColors) {
 
         // File listing with alternating backgrounds and scrolling support
         let max_visible_files = 15;
-        let path = Path::new(TERMINAL.current_directory);
+        let path = Path::new(TERMINAL.current_directory.as_str());
         let entries: Vec<_> = match fs::read_dir(path) {
             Ok(read_dir) => read_dir.filter_map(|e| e.ok()).collect(),
             Err(_) => Vec::new(),

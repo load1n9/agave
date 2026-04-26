@@ -4,7 +4,18 @@ use bootloader::BootConfig;
 
 fn main() {
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
-    let kernel = PathBuf::from(std::env::var_os("CARGO_BIN_FILE_AGAVE_kernel").unwrap());
+    // The bindeps env var name for the agave-kernel binary differs across cargo
+    // versions: older nightlies used `CARGO_BIN_FILE_AGAVE_kernel`, newer ones
+    // use `CARGO_BIN_FILE_AGAVE_KERNEL_agave-kernel`. Try both, report a clear
+    // error otherwise.
+    let kernel = std::env::var_os("CARGO_BIN_FILE_AGAVE_KERNEL_agave-kernel")
+        .or_else(|| std::env::var_os("CARGO_BIN_FILE_AGAVE_KERNEL"))
+        .or_else(|| std::env::var_os("CARGO_BIN_FILE_AGAVE_kernel"))
+        .map(PathBuf::from)
+        .expect(
+            "agave-kernel binary path env var not set; ensure `bindeps` is enabled and the \
+             agave-kernel build-dependency is in scope",
+        );
 
     let uefi_path = out_dir.join("uefi.img");
 

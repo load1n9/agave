@@ -54,6 +54,12 @@ static PERFORMANCE_MONITOR: Mutex<PerformanceMonitor> = Mutex::new(PerformanceMo
     max_events: 100,
 });
 
+impl Default for PerformanceMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceMonitor {
     pub fn new() -> Self {
         Self {
@@ -243,7 +249,7 @@ impl Profiler {
 #[macro_export]
 macro_rules! profile {
     ($name:expr, $code:block) => {{
-        let _profiler = crate::sys::monitor::Profiler::new($name);
+        let _profiler = $crate::sys::monitor::Profiler::new($name);
         let result = $code;
         _profiler.finish();
         result

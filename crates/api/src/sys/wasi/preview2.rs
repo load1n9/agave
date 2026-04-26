@@ -26,18 +26,18 @@ fn wasi_error_to_u16(error: WasiError) -> u16 {
     error.errno
 }
 
-fn option_u32_result_wasi_to_unit(result: Result<Option<u32>, WasiError>) -> Result<u32, ()> {
+fn option_u32_result_wasi_to_unit(result: Result<Option<u32>, WasiError>) -> Result<u32, ErrorCode> {
     match result {
         Ok(Some(val)) => Ok(val),
-        Ok(None) => Err(()),
-        Err(_) => Err(()),
+        Ok(None) => Err(1),
+        Err(e) => Err(wasi_error_to_error_code(e)),
     }
 }
 
-fn unit_result_wasi_to_unit(result: Result<(), WasiError>) -> Result<(), ()> {
+fn unit_result_wasi_to_unit(result: Result<(), WasiError>) -> Result<(), ErrorCode> {
     match result {
         Ok(()) => Ok(()),
-        Err(_) => Err(()),
+        Err(e) => Err(wasi_error_to_error_code(e)),
     }
 }
 
@@ -358,7 +358,7 @@ impl Component {
         open_flags: OpenFlags,
         flags: DescriptorFlags,
     ) -> Result<Descriptor, ErrorCode> {
-        match filesystem::open_at(this, &path, open_flags as u32, flags as u32) {
+        match filesystem::open_at(this, &path, open_flags as u32, flags) {
             Ok((fd, _)) => Ok(fd),
             Err(e) => Err(ErrorCode::from(e.errno)),
         }
@@ -753,7 +753,7 @@ impl Component {
     pub fn http_incoming_request_consume(
         &self,
         this: IncomingRequest,
-    ) -> Result<IncomingStream, ()> {
+    ) -> Result<IncomingStream, ErrorCode> {
         option_u32_result_wasi_to_unit(http::incoming_request_consume(this))
     }
 
@@ -761,7 +761,7 @@ impl Component {
         http::new_outgoing_request(headers)
     }
 
-    pub fn http_outgoing_request_body(&self, this: OutgoingRequest) -> Result<OutgoingStream, ()> {
+    pub fn http_outgoing_request_body(&self, this: OutgoingRequest) -> Result<OutgoingStream, ErrorCode> {
         option_u32_result_wasi_to_unit(http::outgoing_request_body(this))
     }
 
@@ -773,7 +773,7 @@ impl Component {
         &self,
         param: ResponseOutparam,
         response: Result<OutgoingResponse, ErrorCode>,
-    ) -> Result<(), ()> {
+    ) -> Result<(), ErrorCode> {
         unit_result_wasi_to_unit(http::set_response_outparam(param, response))
     }
 
@@ -796,7 +796,7 @@ impl Component {
     pub fn http_incoming_response_consume(
         &self,
         this: IncomingResponse,
-    ) -> Result<IncomingStream, ()> {
+    ) -> Result<IncomingStream, ErrorCode> {
         option_u32_result_wasi_to_unit(http::incoming_response_consume(this))
     }
 
@@ -812,7 +812,7 @@ impl Component {
         &self,
         this: OutgoingResponse,
         status_code: StatusCode,
-    ) -> Result<(), ()> {
+    ) -> Result<(), ErrorCode> {
         unit_result_wasi_to_unit(http::outgoing_response_set_status_code(this, status_code))
     }
 
@@ -823,7 +823,7 @@ impl Component {
     pub fn http_outgoing_response_body(
         &self,
         this: OutgoingResponse,
-    ) -> Result<OutgoingStream, ()> {
+    ) -> Result<OutgoingStream, ErrorCode> {
         option_u32_result_wasi_to_unit(http::outgoing_response_body(this))
     }
 
@@ -842,7 +842,7 @@ impl Component {
     pub fn http_future_incoming_response_get(
         &self,
         this: FutureIncomingResponse,
-    ) -> Option<Result<Result<IncomingResponse, ErrorCode>, ()>> {
+    ) -> Option<Result<Result<IncomingResponse, ErrorCode>, ErrorCode>> {
         http::future_incoming_response_get(this)
     }
 

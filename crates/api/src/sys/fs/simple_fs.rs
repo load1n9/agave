@@ -62,8 +62,7 @@ impl Superblock {
     pub fn new(total_blocks: u32) -> Self {
         let inode_count = total_blocks / 8; // 1/8 of blocks for inodes
         let bitmap_blocks = 2; // One for block bitmap, one for inode bitmap
-        let inode_table_blocks =
-            (inode_count * INODE_SIZE as u32 + BLOCK_SIZE as u32 - 1) / BLOCK_SIZE as u32;
+        let inode_table_blocks = (inode_count * INODE_SIZE as u32).div_ceil(BLOCK_SIZE as u32);
 
         Self {
             magic: FS_MAGIC,
@@ -283,7 +282,7 @@ impl<D: DiskBackend> SimpleFileSystem<D> {
         disk.write_block(0, &block)?;
 
         // Initialize block bitmap (all blocks initially free except system blocks)
-        let bitmap_size = (total_blocks + 7) / 8;
+        let bitmap_size = total_blocks.div_ceil(8);
         let mut block_bitmap = vec![0u8; bitmap_size as usize];
 
         // Mark system blocks as used
@@ -300,7 +299,7 @@ impl<D: DiskBackend> SimpleFileSystem<D> {
         disk.write_block(superblock.free_block_bitmap_block as u64, &bitmap_block)?;
 
         // Initialize inode bitmap (all inodes free except root)
-        let inode_bitmap_size = (superblock.total_inodes + 7) / 8;
+        let inode_bitmap_size = superblock.total_inodes.div_ceil(8);
         let mut inode_bitmap = vec![0u8; inode_bitmap_size as usize];
 
         // Mark root inode as used
@@ -396,14 +395,14 @@ impl<D: DiskBackend> SimpleFileSystem<D> {
 
         // Read block bitmap
         disk.read_block(superblock.free_block_bitmap_block as u64, &mut block)?;
-        let bitmap_size = (superblock.total_blocks + 7) / 8;
+        let bitmap_size = superblock.total_blocks.div_ceil(8);
         let mut block_bitmap = vec![0u8; bitmap_size as usize];
         let copy_len = bitmap_size.min(BLOCK_SIZE as u32) as usize;
         block_bitmap[..copy_len].copy_from_slice(&block[..copy_len]);
 
         // Read inode bitmap
         disk.read_block(superblock.free_inode_bitmap_block as u64, &mut block)?;
-        let inode_bitmap_size = (superblock.total_inodes + 7) / 8;
+        let inode_bitmap_size = superblock.total_inodes.div_ceil(8);
         let mut inode_bitmap = vec![0u8; inode_bitmap_size as usize];
         let copy_len = inode_bitmap_size.min(BLOCK_SIZE as u32) as usize;
         inode_bitmap[..copy_len].copy_from_slice(&block[..copy_len]);

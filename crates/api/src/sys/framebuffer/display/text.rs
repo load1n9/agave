@@ -46,8 +46,8 @@ impl Displayable for TextDisplay {
             self.width as isize,
             self.height as isize,
             string,
-            self.fg_color.into(),
-            self.bg_color.into(),
+            self.fg_color,
+            self.bg_color,
             col as isize,
             line as isize,
         );

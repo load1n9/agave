@@ -36,6 +36,12 @@ pub struct SocketManager {
     next_socket_id: u64,
 }
 
+impl Default for SocketManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SocketManager {
     pub fn new() -> Self {
         Self {
@@ -110,7 +116,7 @@ impl SocketManager {
             sockets.push((*id, SocketType::Tcp, socket.state.clone().into()));
         }
 
-        for (id, _socket) in &self.udp_sockets {
+        for id in self.udp_sockets.keys() {
             sockets.push((*id, SocketType::Udp, SocketState::Bound)); // UDP is always "bound"
         }
 

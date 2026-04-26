@@ -2,7 +2,6 @@
 #![allow(internal_features)]
 #![feature(core_intrinsics)]
 #![feature(abi_x86_interrupt)]
-#![feature(allocator_api)]
 
 extern crate alloc;
 extern crate lazy_static;

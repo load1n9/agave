@@ -137,6 +137,12 @@ pub struct EthernetFrameBuilder {
     ethertype: u16,
 }
 
+impl Default for EthernetFrameBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EthernetFrameBuilder {
     pub fn new() -> Self {
         Self {

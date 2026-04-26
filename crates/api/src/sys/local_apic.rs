@@ -10,10 +10,7 @@ pub static LOCAL_APIC: OnceCell<LocalApic> = OnceCell::uninit();
 pub fn cpuid() -> Option<CpuId> {
     //TODO: ensure that CPUID exists! https://wiki.osdev.org/CPUID#Checking_CPUID_availability
     Some(CpuId::with_cpuid_fn(|a, c| {
-        let result = unsafe {
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-            core::arch::x86_64::__cpuid_count(a, c)
-        };
+        let result = core::arch::x86_64::__cpuid_count(a, c);
         CpuIdResult {
             eax: result.eax,
             ebx: result.ebx,
@@ -28,6 +25,8 @@ pub struct LocalApic {
 }
 
 impl LocalApic {
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn init(local_apic_address: PhysAddr) -> &'static Self {
         disable_pic();
 
@@ -93,48 +92,70 @@ impl LocalApic {
         self.set_icr((u64::from(apic_id) << shift) | (1 << 14) | (0b100 << 8));
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn eoi(&self) {
         self.write(0xB0, 0);
     }
 
     /// Reads the Error Status Register.
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn esr(&self) -> u32 {
         self.write(0x280, 0);
         self.read(0x280)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn lvt_timer(&self) -> u32 {
         self.read(0x320)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn set_lvt_timer(&self, value: u32) {
         self.write(0x320, value);
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn init_count(&self) -> u32 {
         self.read(0x380)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn set_init_count(&self, initial_count: u32) {
         self.write(0x380, initial_count);
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn cur_count(&self) -> u32 {
         self.read(0x390)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn div_conf(&self) -> u32 {
         self.read(0x3E0)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn set_div_conf(&self, div_conf: u32) {
         self.write(0x3E0, div_conf);
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn lvt_error(&self) -> u32 {
         self.read(0x370)
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn set_lvt_error(&self, lvt_error: u32) {
         self.write(0x370, lvt_error);
     }
@@ -145,6 +166,8 @@ impl LocalApic {
     }
 }
 
+/// # Safety
+/// This function is unsafe.
 pub unsafe fn disable_pic() {
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     use x86_64::instructions::port::Port;

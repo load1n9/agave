@@ -18,6 +18,12 @@ pub struct StreamRegistry {
     next_id: u32,
 }
 
+impl Default for StreamRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl StreamRegistry {
     pub const fn new() -> Self {
         Self {
@@ -62,6 +68,12 @@ impl StreamRegistry {
 pub struct PollableRegistry {
     pollables: BTreeMap<Pollable, PollableImpl>,
     next_id: u32,
+}
+
+impl Default for PollableRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PollableRegistry {
@@ -161,6 +173,12 @@ pub struct OutputStreamImpl {
     buffer: Vec<u8>,
     closed: bool,
     flushed: bool,
+}
+
+impl Default for OutputStreamImpl {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OutputStreamImpl {
@@ -501,7 +519,7 @@ pub fn drop_pollable(id: Pollable) {
 // Additional I/O functions for Preview 2 compatibility
 pub fn read(_stream: InputStream, len: u64) -> WasiResult<(Vec<u8>, u8)> {
     let mut buffer = alloc::vec![0u8; len as usize];
-    let bytes_read = crate::sys::fs::read_file(&alloc::format!("/dev/stdin"))
+    let bytes_read = crate::sys::fs::read_file(&alloc::string::String::from("/dev/stdin"))
         .map(|data| data.len().min(len as usize))
         .unwrap_or(0);
     buffer.truncate(bytes_read);

@@ -29,6 +29,11 @@ pub struct InputEvent {
     pub trigger: bool,
     pub key: usize,
 }
+impl Default for Input {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Input {
@@ -61,8 +66,10 @@ impl Input {
 
 #[repr(u8)]
 #[derive(Clone, Debug, Copy)]
+#[derive(Default)]
 pub enum KeyState {
     ///Key is not pressed now
+    #[default]
     Off = 0,
     ///Key is not pressed now, but was last frame
     OffFromOn = 1,
@@ -73,11 +80,6 @@ pub enum KeyState {
     On = 130,
 }
 
-impl Default for KeyState {
-    fn default() -> Self {
-        KeyState::Off
-    }
-}
 
 impl Input {
     pub fn handle_incoming_state(&mut self, key: usize, b: bool) {

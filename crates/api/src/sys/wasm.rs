@@ -348,14 +348,12 @@ impl WasmApp {
             &mut store,
             |caller: Caller<'_, *mut FB>, x: i32, y: i32, r: i32, g: i32, b: i32, a: i32| {
                 let fb = unsafe { caller.data().as_mut().unwrap() };
-                fb.pixels
-                    .get_mut((y * (fb.w as i32) + x) as usize)
-                    .map(|p| {
+                if let Some(p) = fb.pixels.get_mut((y * (fb.w as i32) + x) as usize) {
                         p.r = r as u8;
                         p.g = g as u8;
                         p.b = b as u8;
                         p.a = a as u8;
-                    });
+                    }
             },
         );
 
@@ -375,14 +373,12 @@ impl WasmApp {
                 let fb = unsafe { caller.data().as_mut().unwrap() };
                 for y in y0..y1 {
                     for x in x0..x1 {
-                        fb.pixels
-                            .get_mut((y * (fb.w as i32) + x) as usize)
-                            .map(|p| {
-                                p.r = r as u8;
-                                p.g = g as u8;
-                                p.b = b as u8;
-                                p.a = a as u8;
-                            });
+                        if let Some(p) = fb.pixels.get_mut((y * (fb.w as i32) + x) as usize) {
+                        p.r = r as u8;
+                        p.g = g as u8;
+                        p.b = b as u8;
+                        p.a = a as u8;
+                    }
                     }
                 }
             },

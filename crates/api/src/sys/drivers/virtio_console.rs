@@ -80,7 +80,7 @@ impl ConsolePort {
     /// Read data from the port
     pub fn read(&mut self, buffer: &mut [u8]) -> usize {
         let mut bytes_read = 0;
-        for (_i, byte) in buffer.iter_mut().enumerate() {
+        for byte in buffer.iter_mut() {
             if let Some(data) = self.rx_queue.pop_front() {
                 *byte = data;
                 bytes_read += 1;
@@ -388,7 +388,7 @@ impl VirtioConsole {
                 if data_len > 0 {
                     let mut received_data = Vec::with_capacity(data_len);
                     for i in 0..data_len {
-                        received_data.push(read_volatile(data_ptr.offset(i as isize)));
+                        received_data.push(read_volatile(data_ptr.add(i)));
                     }
 
                     // Add to port 0's receive queue

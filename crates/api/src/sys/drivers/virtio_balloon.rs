@@ -381,32 +381,28 @@ impl VirtioBalloon {
         self.update_memory_stats()?;
 
         // Create statistics buffer
-        let mut stats_buffer = Vec::new();
-
-        stats_buffer.push(VirtioBalloonStat {
-            tag: BalloonStatTag::FreeMemory as u16,
-            val: self.stats.free_memory,
-        });
-
-        stats_buffer.push(VirtioBalloonStat {
-            tag: BalloonStatTag::TotalMemory as u16,
-            val: self.stats.total_memory,
-        });
-
-        stats_buffer.push(VirtioBalloonStat {
-            tag: BalloonStatTag::AvailableMemory as u16,
-            val: self.stats.available_memory,
-        });
-
-        stats_buffer.push(VirtioBalloonStat {
-            tag: BalloonStatTag::MajorFaults as u16,
-            val: self.stats.major_faults,
-        });
-
-        stats_buffer.push(VirtioBalloonStat {
-            tag: BalloonStatTag::MinorFaults as u16,
-            val: self.stats.minor_faults,
-        });
+        let stats_buffer = alloc::vec![
+            VirtioBalloonStat {
+                tag: BalloonStatTag::FreeMemory as u16,
+                val: self.stats.free_memory,
+            },
+            VirtioBalloonStat {
+                tag: BalloonStatTag::TotalMemory as u16,
+                val: self.stats.total_memory,
+            },
+            VirtioBalloonStat {
+                tag: BalloonStatTag::AvailableMemory as u16,
+                val: self.stats.available_memory,
+            },
+            VirtioBalloonStat {
+                tag: BalloonStatTag::MajorFaults as u16,
+                val: self.stats.major_faults,
+            },
+            VirtioBalloonStat {
+                tag: BalloonStatTag::MinorFaults as u16,
+                val: self.stats.minor_faults,
+            },
+        ];
 
         // Send statistics via stats queue
         self.virtio.queue_select(BALLOON_STATS_QUEUE);
@@ -594,7 +590,6 @@ pub async fn drive(virtio: Virtio) {
 }
 
 /// Public API functions
-
 /// Inflate balloon by specified number of pages
 pub fn inflate_balloon(pages: u32) -> AgaveResult<u32> {
     if let Some(ref mut balloon) = VIRTIO_BALLOON.lock().as_mut() {

@@ -67,7 +67,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let boot_fb_len: usize = fbm.len();
     let boot_fb_pixel_format = fbinfo.pixel_format;
 
-    init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
+    init_logger(fbm, fbinfo, LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
     // Now initialize GDT and IDT
     log::info!("KERNEL: Initializing GDT");
@@ -153,7 +153,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             log::info!("Initializing local APIC...");
             let lapic = local_apic::LocalApic::init(PhysAddr::new(apic.local_apic_address));
             log::info!("Local APIC initialized");
-            let mut freq = 1000_000_000;
+            let mut freq = 1_000_000_000;
             if let Some(cpuid) = local_apic::cpuid() {
                 log::info!("CPUID info obtained");
                 if let Some(tsc) = cpuid.get_tsc_info() {
@@ -163,8 +163,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                         tsc.tsc_frequency().unwrap()
                     );
                     freq = tsc.nominal_frequency();
-                } else {
-                }
+                } 
             }
             log::info!("Setting APIC timer configuration...");
             lapic.set_div_conf(0b1011);
@@ -273,7 +272,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Framebuffer created at {:?}", fb_clone);
 
     // Show loading screen now that framebuffer is available
-    show_loading_screen("Basic initialization complete...", 25, &mut *fb);
+    show_loading_screen("Basic initialization complete...", 25, &mut fb);
 
     // log::info!("fbclone {:?}", fb_clone);
 
@@ -281,31 +280,31 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Initializing system monitoring...");
     monitor::init_monitoring();
     log::info!("System monitoring enabled");
-    show_loading_screen("System monitoring enabled...", 35, &mut *fb);
+    show_loading_screen("System monitoring enabled...", 35, &mut fb);
 
     // Initialize enhanced diagnostics
     log::info!("Initializing enhanced diagnostics...");
     diagnostics::init_diagnostics();
     log::info!("Enhanced diagnostics enabled");
-    show_loading_screen("Enhanced diagnostics enabled...", 40, &mut *fb);
+    show_loading_screen("Enhanced diagnostics enabled...", 40, &mut fb);
 
     // Initialize security framework
     log::info!("Initializing security framework...");
     security::init_security();
     log::info!("Security framework enabled");
-    show_loading_screen("Security framework enabled...", 45, &mut *fb);
+    show_loading_screen("Security framework enabled...", 45, &mut fb);
 
     // Initialize process management
     log::info!("Initializing process management...");
     process::init_process_management();
     log::info!("Process management enabled");
-    show_loading_screen("Process management enabled...", 50, &mut *fb);
+    show_loading_screen("Process management enabled...", 50, &mut fb);
 
     // Initialize power management
     log::info!("Initializing power management...");
     power::init_power_management();
     log::info!("Power management enabled");
-    show_loading_screen("Power management enabled...", 55, &mut *fb);
+    show_loading_screen("Power management enabled...", 55, &mut fb);
 
     // Initialize filesystem with VirtIO block device if available
     log::info!("Initializing filesystem...");
@@ -346,7 +345,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     // the per-fd preopen entries (`/`, `/tmp`).
     agave_api::sys::wasi::filesystem::init_filesystem();
     log::info!("WASI: filesystem bridge ready (preopens=/, /tmp)");
-    show_loading_screen("Filesystem initialized...", 65, &mut *fb);
+    show_loading_screen("Filesystem initialized...", 65, &mut fb);
 
     // Initialize IPC system
     log::info!("Initializing IPC system...");
@@ -355,7 +354,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("IPC system initialized successfully");
     }
-    show_loading_screen("IPC system ready...", 70, &mut *fb);
+    show_loading_screen("IPC system ready...", 70, &mut fb);
 
     // Initialize network stack
     log::info!("Initializing network stack...");
@@ -364,7 +363,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Network stack initialized successfully");
     }
-    show_loading_screen("Network stack ready...", 75, &mut *fb);
+    show_loading_screen("Network stack ready...", 75, &mut fb);
 
     // Initialize socket subsystem
     log::info!("Initializing socket subsystem...");
@@ -373,7 +372,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Socket subsystem initialized successfully");
     }
-    show_loading_screen("VirtIO devices ready...", 85, &mut *fb);
+    show_loading_screen("VirtIO devices ready...", 85, &mut fb);
 
     // Log initial system status
     log::info!("Logging initial system status...");
@@ -384,7 +383,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         let mut executor = task::executor::Executor::new();
         let spawner = executor.spawner();
         log::info!("Task executor created");
-        show_loading_screen("Task executor ready...", 90, &mut *fb);
+        show_loading_screen("Task executor ready...", 90, &mut fb);
 
         log::info!("Setting up VirtIO device drivers...");
         for virtio in virtio_devices.into_iter() {
@@ -430,7 +429,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             }
         }
         log::info!("VirtIO drivers spawned");
-        show_loading_screen("VirtIO drivers active...", 95, &mut *fb);
+        show_loading_screen("VirtIO drivers active...", 95, &mut fb);
 
         log::info!("Setting up WASM application task...");
         spawner.run(async move {
@@ -507,13 +506,13 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                 frame_counter += 1;
 
                 // Update power management every 10 frames (~100Hz)
-                if frame_counter % 10 == 0 {
+                if frame_counter.is_multiple_of(10) {
                     if let Err(e) = power::update_power_management() {
                         log::error!("Power management update failed: {:?}", e);
                     }
                 }
                 // Enhanced monitoring and diagnostics (every ~1000 frames, roughly once per second)
-                if frame_counter % 1000 == 0 {
+                if frame_counter.is_multiple_of(1000) {
                     let current_time = agave_api::sys::interrupts::TIME_MS
                         .load(core::sync::atomic::Ordering::Relaxed);
                     // Run periodic diagnostics every 10 seconds
@@ -531,7 +530,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                         last_monitor_check = current_time;
                     }
                     // Log comprehensive system status every 30 seconds
-                    if frame_counter % 30000 == 0 {
+                    if frame_counter.is_multiple_of(30000) {
                         monitor::log_system_status();
 
                         // Log power status
@@ -561,7 +560,9 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
 // --- Kernel-side FFI for VirtioDisk ---
 #[no_mangle]
-pub extern "C" fn virtio_block_read(
+/// # Safety
+/// This function is unsafe.
+pub unsafe extern "C" fn virtio_block_read(
     device_id: u32,
     block_num: u64,
     buffer: *mut u8,
@@ -572,7 +573,7 @@ pub extern "C" fn virtio_block_read(
     if let Some(dev) = block_devices.get(idx) {
         let mut dev = dev.lock();
         let mut block = [0u8; BLOCK_SIZE];
-        if let Err(_) = BlockDevice::read_block(&mut *dev, block_num, &mut block) {
+        if BlockDevice::read_block(&mut *dev, block_num, &mut block).is_err() {
             return -1;
         }
         unsafe {
@@ -585,7 +586,9 @@ pub extern "C" fn virtio_block_read(
 }
 
 #[no_mangle]
-pub extern "C" fn virtio_block_write(
+/// # Safety
+/// This function is unsafe.
+pub unsafe extern "C" fn virtio_block_write(
     device_id: u32,
     block_num: u64,
     buffer: *const u8,
@@ -599,7 +602,7 @@ pub extern "C" fn virtio_block_write(
         unsafe {
             core::ptr::copy_nonoverlapping(buffer, block.as_mut_ptr(), size.min(BLOCK_SIZE));
         }
-        if let Err(_) = BlockDevice::write_block(&mut *dev, block_num, &block) {
+        if BlockDevice::write_block(&mut *dev, block_num, &block).is_err() {
             return -1;
         }
         0

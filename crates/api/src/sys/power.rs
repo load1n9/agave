@@ -318,7 +318,7 @@ impl ThermalManager {
         }
 
         // Check cooling policies
-        let policies: Vec<_> = self.cooling_policies.iter().cloned().collect();
+        let policies: Vec<_> = self.cooling_policies.to_vec();
         for policy in policies {
             if self.cpu_temperature_celsius >= policy.trigger_temp {
                 self.apply_cooling_policy(&policy, freq_scaler)?;
@@ -438,7 +438,7 @@ impl PowerManager {
         self.update_statistics(now);
 
         // Periodic logging
-        if now % 60000 == 0 {
+        if now.is_multiple_of(60000) {
             // Every minute
             self.log_power_status();
         }

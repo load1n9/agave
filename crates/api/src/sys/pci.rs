@@ -140,23 +140,23 @@ pub enum Bar {
 
 impl Pci {
     pub fn config_read_u8(&self, off: u8) -> u8 {
-        config_read_u8(self.bus, self.slot, self.func, off as u8)
+        config_read_u8(self.bus, self.slot, self.func, off)
     }
 
     pub fn config_write_u8(&self, off: u8, val: u8) {
-        config_write_u8(self.bus, self.slot, self.func, off as u8, val)
+        config_write_u8(self.bus, self.slot, self.func, off, val)
     }
 
     pub fn config_read_u16(&self, off: u8) -> u16 {
-        config_read_u16(self.bus, self.slot, self.func, off as u8)
+        config_read_u16(self.bus, self.slot, self.func, off)
     }
 
     pub fn config_write_u16(&self, off: u8, val: u16) {
-        config_write_u16(self.bus, self.slot, self.func, off as u8, val)
+        config_write_u16(self.bus, self.slot, self.func, off, val)
     }
 
     pub fn config_read_u32(&self, off: u8) -> u32 {
-        config_read_u32(self.bus, self.slot, self.func, off as u8)
+        config_read_u32(self.bus, self.slot, self.func, off)
     }
 
     pub fn get_bar(&self, idx: u8) -> Bar {
@@ -187,7 +187,7 @@ impl Pci {
                 self.bus,
                 self.slot,
                 self.func,
-                PCIConfigRegisters::PCIBAR0 as u8 + ((idx as u8 + 1) * 4),
+                PCIConfigRegisters::PCIBAR0 as u8 + ((idx + 1) * 4),
             ) as u64)
                 << 32;
         }
@@ -207,6 +207,12 @@ impl Pci {
 
 pub struct Pcis {
     pub devs: Vec<Pci>,
+}
+
+impl Default for Pcis {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Pcis {

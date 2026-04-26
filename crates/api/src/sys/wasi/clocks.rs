@@ -96,7 +96,7 @@ pub fn timezone_utc_offset(_when: Timestamp, timezone: &str) -> WasiResult<i32> 
         "America/New_York" => Ok(-5 * 3600),    // EST is UTC-5
         "America/Los_Angeles" => Ok(-8 * 3600), // PST is UTC-8
         "Europe/London" => Ok(0),               // GMT is UTC+0
-        "Europe/Paris" => Ok(1 * 3600),         // CET is UTC+1
+        "Europe/Paris" => Ok(3600),         // CET is UTC+1
         "Asia/Tokyo" => Ok(9 * 3600),           // JST is UTC+9
         _ => Ok(0),                             // Default to UTC
     }

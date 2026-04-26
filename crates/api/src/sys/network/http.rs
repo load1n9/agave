@@ -88,9 +88,11 @@ impl HttpResponse {
 }
 
 /// Simple HTTP server
+pub type RouteHandler = Box<dyn Fn(&HttpRequest) -> HttpResponse>;
+
 pub struct HttpServer {
     port: u16,
-    routes: BTreeMap<String, Box<dyn Fn(&HttpRequest) -> HttpResponse>>,
+    routes: BTreeMap<String, RouteHandler>,
 }
 
 impl HttpServer {

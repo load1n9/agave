@@ -37,6 +37,12 @@ pub struct FilesystemState {
     next_fd: Fd,
 }
 
+impl Default for FilesystemState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FilesystemState {
     pub const fn new() -> Self {
         Self {

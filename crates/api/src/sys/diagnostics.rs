@@ -171,15 +171,11 @@ impl HealthChecker {
                     overall_status = SystemHealthStatus::Critical;
                     break;
                 }
-                DiagnosticLevel::Error => {
-                    if overall_status != SystemHealthStatus::Critical {
-                        overall_status = SystemHealthStatus::Degraded;
-                    }
+                DiagnosticLevel::Error if overall_status != SystemHealthStatus::Critical => {
+                    overall_status = SystemHealthStatus::Degraded;
                 }
-                DiagnosticLevel::Warning => {
-                    if overall_status == SystemHealthStatus::Healthy {
-                        overall_status = SystemHealthStatus::Warning;
-                    }
+                DiagnosticLevel::Warning if overall_status == SystemHealthStatus::Healthy => {
+                    overall_status = SystemHealthStatus::Warning;
                 }
                 _ => {}
             }
@@ -228,7 +224,7 @@ impl HealthChecker {
                 level: DiagnosticLevel::Warning,
                 category: DiagnosticCategory::Memory,
                 message: format!("High memory usage: {:.1}%", utilization),
-                details: Some(format!("Consider freeing unused resources")),
+                details: Some("Consider freeing unused resources".to_string()),
                 count: 1,
             });
         }
@@ -344,7 +340,7 @@ impl HealthChecker {
 
         // Check system uptime milestones
         let uptime_hours = metrics.uptime_ms as f32 / (1000.0 * 60.0 * 60.0);
-        if uptime_hours >= 24.0 && (uptime_hours as u32 % 24) == 0 {
+        if uptime_hours >= 24.0 && (uptime_hours as u32).is_multiple_of(24) {
             issues.push(DiagnosticEntry {
                 timestamp: metrics.uptime_ms,
                 level: DiagnosticLevel::Info,

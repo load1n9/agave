@@ -145,6 +145,12 @@ pub struct VirtioInterruptHandler {
     pub pending_interrupts: Vec<bool>,
 }
 
+impl Default for VirtioInterruptHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VirtioInterruptHandler {
     pub fn new() -> Self {
         Self {
@@ -271,7 +277,7 @@ impl VirtioInterruptHandler {
 pub fn to_bytes<T>(t: &T) -> &[u8] {
     unsafe {
         let len = core::intrinsics::size_of_val(t);
-        let ptr: *const u8 = core::intrinsics::transmute(t);
+        let ptr: *const u8 = t as *const T as *const u8;
         core::slice::from_raw_parts(ptr, len)
     }
 }
@@ -321,7 +327,7 @@ impl QueueFreeDescs {
     pub fn new(queue_size: u16) -> Self {
         let mut free = Vec::with_capacity(queue_size as usize);
         for i in 0..queue_size {
-            free.push(i as u16);
+            free.push(i);
         }
         Self { free }
     }
@@ -830,10 +836,7 @@ impl Virtio {
                     | VIRTIO_STATUS_FEATURE_OK
                     | VIRTIO_STATUS_DRIVER_OK,
             );
-
             // Store values before moving common
-            let device_features = device_features;
-            let driver_features = driver_features;
             let status = read_volatile(&cap_common.device_status);
             let config_generation = read_volatile(&cap_common.config_generation);
 
@@ -1027,6 +1030,8 @@ impl Virtio {
         }
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn next_used(&mut self) -> Option<UsedElem> {
         let queue = read_volatile(self.common.cap);
 
@@ -1133,7 +1138,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *const u8>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *const u8;
             Ok(read_volatile(config_ptr.offset(offset as isize)))
         }
     }
@@ -1145,7 +1150,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *const u16>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *const u16;
             Ok(read_volatile(config_ptr.offset((offset / 2) as isize)))
         }
     }
@@ -1157,7 +1162,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *const u32>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *const u32;
             Ok(read_volatile(config_ptr.offset((offset / 4) as isize)))
         }
     }
@@ -1169,7 +1174,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *mut u8>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *mut u8;
             write_volatile(config_ptr.offset(offset as isize), value);
         }
         Ok(())
@@ -1182,7 +1187,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *mut u16>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *mut u16;
             write_volatile(config_ptr.offset((offset / 2) as isize), value);
         }
         Ok(())
@@ -1195,7 +1200,7 @@ impl Virtio {
         }
 
         unsafe {
-            let config_ptr = core::intrinsics::transmute::<&mut (), *mut u32>(self.device.cap);
+            let config_ptr = self.device.cap as *mut () as *mut u32;
             write_volatile(config_ptr.offset((offset / 4) as isize), value);
         }
         Ok(())
@@ -1387,7 +1392,7 @@ impl Virtio {
     pub fn is_queue_enabled(&self, queue_idx: u16) -> bool {
         self.queues
             .get(queue_idx as usize)
-            .map_or(false, |q| q.enabled)
+            .is_some_and(|q| q.enabled)
     }
 
     /// Get total number of queues

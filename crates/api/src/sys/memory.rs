@@ -15,6 +15,8 @@ const BUFFER_SIZE_ADVANCE: usize = 32;
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
+/// # Safety
+/// This function is unsafe.
 pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
     OffsetPageTable::new(level_4_table, physical_memory_offset)
@@ -41,9 +43,11 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     &mut *page_table_ptr // unsafe
 }
 
+/// # Safety
+/// This function is unsafe.
 pub unsafe fn kern_phy_to_virt(physical_memory_offset: VirtAddr, target_phy: PhysAddr) -> VirtAddr {
-    let virt = VirtAddr::new(physical_memory_offset.as_u64() + target_phy.as_u64());
-    virt
+    
+    VirtAddr::new(physical_memory_offset.as_u64() + target_phy.as_u64())
 }
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
@@ -61,6 +65,8 @@ impl BootInfoFrameAllocator {
     /// This function is unsafe because the caller must guarantee that the passed
     /// memory map is valid. The main requirement is that all frames that are marked
     /// as `USABLE` in it are really unused.
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn init(memory_map: &'static MemoryRegions) -> Self {
         BootInfoFrameAllocator {
             memory_map,
@@ -85,7 +91,7 @@ impl BootInfoFrameAllocator {
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
-        if self.buf.len() == 0 {
+        if self.buf.is_empty() {
             for frame in self
                 .usable_frames()
                 .skip(self.next - 1)
@@ -105,6 +111,8 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     }
 }
 
+/// # Safety
+/// This function is unsafe.
 pub unsafe fn mapper(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
     OffsetPageTable::new(level_4_table, physical_memory_offset)

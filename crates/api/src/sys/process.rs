@@ -70,19 +70,16 @@ pub enum ProcessState {
 
 /// Process priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default)]
 pub enum Priority {
     Critical = 0, // System critical processes
     High = 1,     // High priority system processes
+    #[default]
     Normal = 2,   // Normal user processes
     Low = 3,      // Background processes
     Idle = 4,     // Idle/cleanup processes
 }
 
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Normal
-    }
-}
 
 /// Process context and metadata
 #[derive(Debug, Clone)]

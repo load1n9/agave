@@ -142,7 +142,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                             type_: VirtioGpuCtrlType::VirtioGpuCmdGetCapsetInfo,
                             ..Default::default()
                         },
-                        capset_index: i as u32,
+                        capset_index: i,
                         padding: 0,
                     },
                 )
@@ -178,7 +178,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                     ..Default::default()
                 },
                 resource_id: 1,
-                format: VirtioGpuFormats::VirtioGpuFormatR8g8b8a8Unorm,
+                format: VirtioGpuFormat::R8g8b8a8,
                 width: display_info.pmodes.rect.w,
                 height: display_info.pmodes.rect.h,
             },
@@ -237,8 +237,8 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
         let _nodata = (response_desc.addr as *const VirtioGpuCtrlHdr).read_volatile();
         // log::info!("{:?}", nodata.type_);
 
-        for i in 0..capacity {
-            framebuffer[i] = RGBA {
+        for pixel in framebuffer.iter_mut().take(capacity) {
+            *pixel = RGBA {
                 r: 24,
                 g: 27,
                 b: 36,
@@ -346,7 +346,7 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
                 let len = 5;
                 buffer.push(
                     (len << 16)
-                        | ((VirglObjectType::VirglObjectSurface as u32) << 8)
+                        | ((ObjectType::Surface as u32) << 8)
                         | (Cmd3d::VirglCcmdCreateObject as u32),
                 );
                 buffer.push(handle);
@@ -358,12 +358,13 @@ pub async fn drive(mut virtio: Virtio, spawner: Spawner, fb: *mut FB) {
 
             let res_handle = 2;
 
-            let mut args = VirglRendererResourceCreateArgs::default();
-            args.width = 256;
-            args.height = 256;
-            args.handle = res_handle;
-            // args.target = PipeTextureTarget::PIPE_BUFFER;
-            args.bind = PIPE_BIND_SAMPLER_VIEW;
+            let args = VirglRendererResourceCreateArgs {
+                width: 256,
+                height: 256,
+                handle: res_handle,
+                bind: PIPE_BIND_SAMPLER_VIEW,
+                ..Default::default()
+            };
 
             let response_desc = request(
                 Arc::clone(&virtio),
@@ -608,7 +609,7 @@ impl futures::future::Future for IdWait {
             match val {
                 IdWaker::None => {
                     let aw = AtomicWaker::new();
-                    aw.register(&cx.waker());
+                    aw.register(cx.waker());
                     *val = IdWaker::Waker(aw);
 
                     return core::task::Poll::Pending;
@@ -618,7 +619,7 @@ impl futures::future::Future for IdWait {
                     return core::task::Poll::Ready(());
                 }
                 IdWaker::Waker(e) => {
-                    e.register(&cx.waker());
+                    e.register(cx.waker());
                 }
             }
         }
@@ -755,15 +756,15 @@ struct VirtioGpuRespEdid {
 
 #[repr(u32)]
 #[derive(Clone, Debug)]
-enum VirtioGpuFormats {
-    VirtioGpuFormatB8g8r8a8Unorm = 1,
-    VirtioGpuFormatB8g8r8x8Unorm = 2,
-    VirtioGpuFormatA8r8g8b8Unorm = 3,
-    VirtioGpuFormatX8r8g8b8Unorm = 4,
-    VirtioGpuFormatR8g8b8a8Unorm = 67,
-    VirtioGpuFormatX8b8g8r8Unorm = 68,
-    VirtioGpuFormatA8b8g8r8Unorm = 121,
-    VirtioGpuFormatR8g8b8x8Unorm = 134,
+enum VirtioGpuFormat {
+    B8g8r8a8 = 1,
+    B8g8r8x8 = 2,
+    A8r8g8b8 = 3,
+    X8r8g8b8 = 4,
+    R8g8b8a8 = 67,
+    X8b8g8r8 = 85,
+    A8b8g8r8 = 87,
+    R8g8b8x8 = 134,
 }
 
 #[repr(C)]
@@ -771,7 +772,7 @@ enum VirtioGpuFormats {
 struct VirtioGpuCmdResourceCreate2d {
     header: VirtioGpuCtrlHdr,
     resource_id: u32,
-    format: VirtioGpuFormats,
+    format: VirtioGpuFormat,
     width: u32,
     height: u32,
 }
@@ -1445,18 +1446,18 @@ impl VirglFormats {
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum VirglObjectType {
-    VirglObjectNull,
-    VirglObjectBlend,
-    VirglObjectRasterizer,
-    VirglObjectDsa,
-    VirglObjectShader,
-    VirglObjectVertexElements,
-    VirglObjectSamplerView,
-    VirglObjectSamplerState,
-    VirglObjectSurface,
-    VirglObjectQuery,
-    VirglObjectStreamoutTarget,
-    VirglObjectMsaaSurface,
-    VirglMaxObjects,
+enum ObjectType {
+    Null,
+    Blend,
+    Rasterizer,
+    Dsa,
+    Shader,
+    VertexElements,
+    SamplerView,
+    SamplerState,
+    Surface,
+    Query,
+    StreamoutTarget,
+    MsaaSurface,
+    MaxObjects,
 }

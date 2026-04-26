@@ -21,6 +21,12 @@ pub struct SocketRegistry {
     next_fd: Fd,
 }
 
+impl Default for SocketRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SocketRegistry {
     pub const fn new() -> Self {
         Self {

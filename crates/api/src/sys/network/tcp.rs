@@ -84,12 +84,9 @@ impl TcpSocket {
     }
 
     pub fn close(&mut self) -> AgaveResult<()> {
-        match self.state {
-            TcpState::Established => {
-                self.state = TcpState::FinWait1;
-                // TODO: Send FIN packet
-            }
-            _ => {}
+        if self.state == TcpState::Established {
+            self.state = TcpState::FinWait1;
+            // TODO: Send FIN packet
         }
         Ok(())
     }
@@ -99,6 +96,12 @@ impl TcpSocket {
 pub struct TcpManager {
     sockets: BTreeMap<u64, TcpSocket>,
     next_socket_id: u64,
+}
+
+impl Default for TcpManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TcpManager {

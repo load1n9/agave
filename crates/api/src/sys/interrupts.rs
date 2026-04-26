@@ -26,9 +26,9 @@ lazy_static! {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.alignment_check.set_handler_fn(alignment_check);
 
-
         idt.invalid_opcode.set_handler_fn(invalid_opcode);
-        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded);
+        idt.bound_range_exceeded
+            .set_handler_fn(bound_range_exceeded);
         unsafe {
             idt.general_protection_fault
                 .set_handler_fn(general_protection_fault)
@@ -42,10 +42,11 @@ lazy_static! {
         idt.overflow.set_handler_fn(overflow_handler);
 
         idt.invalid_tss.set_handler_fn(invalid_tss_handler);
-        idt.segment_not_present.set_handler_fn(segment_not_present_handler);
-        idt.stack_segment_fault.set_handler_fn(stack_segment_fault_handler);
+        idt.segment_not_present
+            .set_handler_fn(segment_not_present_handler);
+        idt.stack_segment_fault
+            .set_handler_fn(stack_segment_fault_handler);
         idt.alignment_check.set_handler_fn(alignment_check_handler);
-
 
         unsafe {
             idt.page_fault
@@ -53,38 +54,37 @@ lazy_static! {
                 .set_stack_index(gdt::PAGE_FAULT_IST_INDEX);
         }
 
-
-        for i in 32..=255{
+        for i in 32..=255 {
             idt[i].set_handler_fn(generic_handler);
         }
 
         idt[48].set_handler_fn(lapic_timer);
         idt[49].set_handler_fn(lapic_timer2);
 
-        idt[50+0].set_handler_fn(ioapic_handler_0);
-        idt[50+1].set_handler_fn(ioapic_handler_1);
-        idt[50+2].set_handler_fn(ioapic_handler_2);
-        idt[50+3].set_handler_fn(ioapic_handler_3);
-        idt[50+4].set_handler_fn(ioapic_handler_4);
-        idt[50+5].set_handler_fn(ioapic_handler_5);
-        idt[50+6].set_handler_fn(ioapic_handler_6);
-        idt[50+7].set_handler_fn(ioapic_handler_7);
-        idt[50+8].set_handler_fn(ioapic_handler_8);
-        idt[50+9].set_handler_fn(ioapic_handler_9);
-        idt[50+10].set_handler_fn(ioapic_handler_10);
-        idt[50+11].set_handler_fn(ioapic_handler_11);
-        idt[50+12].set_handler_fn(ioapic_handler_12);
-        idt[50+13].set_handler_fn(ioapic_handler_13);
-        idt[50+14].set_handler_fn(ioapic_handler_14);
-        idt[50+15].set_handler_fn(ioapic_handler_15);
-        idt[50+16].set_handler_fn(ioapic_handler_16);
-        idt[50+17].set_handler_fn(ioapic_handler_17);
-        idt[50+18].set_handler_fn(ioapic_handler_18);
-        idt[50+19].set_handler_fn(ioapic_handler_19);
-        idt[50+20].set_handler_fn(ioapic_handler_20);
-        idt[50+21].set_handler_fn(ioapic_handler_21);
-        idt[50+22].set_handler_fn(ioapic_handler_22);
-        idt[50+23].set_handler_fn(ioapic_handler_23);
+        idt[50].set_handler_fn(ioapic_handler_0);
+        idt[50 + 1].set_handler_fn(ioapic_handler_1);
+        idt[50 + 2].set_handler_fn(ioapic_handler_2);
+        idt[50 + 3].set_handler_fn(ioapic_handler_3);
+        idt[50 + 4].set_handler_fn(ioapic_handler_4);
+        idt[50 + 5].set_handler_fn(ioapic_handler_5);
+        idt[50 + 6].set_handler_fn(ioapic_handler_6);
+        idt[50 + 7].set_handler_fn(ioapic_handler_7);
+        idt[50 + 8].set_handler_fn(ioapic_handler_8);
+        idt[50 + 9].set_handler_fn(ioapic_handler_9);
+        idt[50 + 10].set_handler_fn(ioapic_handler_10);
+        idt[50 + 11].set_handler_fn(ioapic_handler_11);
+        idt[50 + 12].set_handler_fn(ioapic_handler_12);
+        idt[50 + 13].set_handler_fn(ioapic_handler_13);
+        idt[50 + 14].set_handler_fn(ioapic_handler_14);
+        idt[50 + 15].set_handler_fn(ioapic_handler_15);
+        idt[50 + 16].set_handler_fn(ioapic_handler_16);
+        idt[50 + 17].set_handler_fn(ioapic_handler_17);
+        idt[50 + 18].set_handler_fn(ioapic_handler_18);
+        idt[50 + 19].set_handler_fn(ioapic_handler_19);
+        idt[50 + 20].set_handler_fn(ioapic_handler_20);
+        idt[50 + 21].set_handler_fn(ioapic_handler_21);
+        idt[50 + 22].set_handler_fn(ioapic_handler_22);
+        idt[50 + 23].set_handler_fn(ioapic_handler_23);
 
         idt
     };
@@ -168,7 +168,7 @@ impl futures::future::Future for Timer {
             return core::task::Poll::Ready(());
         }
 
-        let _id = add_waker(&cx.waker());
+        let _id = add_waker(cx.waker());
         // WAKER.register(&cx.waker());
 
         if global_time_ms() >= self.stop {

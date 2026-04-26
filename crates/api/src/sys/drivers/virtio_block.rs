@@ -267,7 +267,7 @@ impl VirtioBlockDevice {
             return Err(AgaveError::PermissionDenied);
         }
 
-        if data.len() % SECTOR_SIZE != 0 {
+        if !data.len().is_multiple_of(SECTOR_SIZE) {
             return Err(AgaveError::InvalidInput);
         }
 
@@ -327,7 +327,9 @@ impl VirtioBlockDevice {
         self.virtio.queue_select(0);
 
         // Get descriptors for the request (now async)
-        let desc_ids = self.get_descriptors_for_request(operation, buffer.len()).await?;
+        let desc_ids = self
+            .get_descriptors_for_request(operation, buffer.len())
+            .await?;
 
         // Set up the request
         let request_header = VirtioBlkReqHeader {
@@ -380,8 +382,11 @@ impl VirtioBlockDevice {
             }
 
             // Data descriptor(s) - only for read/write operations
-            if !failed && matches!(operation, BlockOperation::Read | BlockOperation::Write) && data_size > 0 {
-                let segments_needed = (data_size + 4095) / 4096; // Round up to page size
+            if !failed
+                && matches!(operation, BlockOperation::Read | BlockOperation::Write)
+                && data_size > 0
+            {
+                let segments_needed = data_size.div_ceil(4096); // Round up to page size
                 for _ in 0..segments_needed {
                     if let Some(desc_id) = self.virtio.get_free_desc_id() {
                         desc_ids.push(desc_id);

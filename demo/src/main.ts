@@ -186,15 +186,16 @@ async function initWasm() {
   const keyState: { [key: number]: boolean } = {};
   const keyPressed: { [key: number]: boolean } = {};
   const keyReleased: { [key: number]: boolean } = {};
-  const keyHistory: Array<{ key: number; pressed: boolean }> = [];
+  let totalKeyEvents = 0;
   const MAX_HISTORY = 64;
+  const keyHistoryRing: Array<{ key: number; pressed: boolean }> = new Array(MAX_HISTORY);
 
   globalThis.addEventListener("keydown", (e) => {
     const code = e.keyCode;
     if (!keyState[code]) {
       keyPressed[code] = true;
-      keyHistory.push({ key: code, pressed: true });
-      if (keyHistory.length > MAX_HISTORY) keyHistory.shift();
+      keyHistoryRing[totalKeyEvents % MAX_HISTORY] = { key: code, pressed: true };
+      totalKeyEvents++;
     }
     keyState[code] = true;
   });
@@ -202,8 +203,8 @@ async function initWasm() {
     const code = e.keyCode;
     keyState[code] = false;
     keyReleased[code] = true;
-    keyHistory.push({ key: code, pressed: false });
-    if (keyHistory.length > MAX_HISTORY) keyHistory.shift();
+    keyHistoryRing[totalKeyEvents % MAX_HISTORY] = { key: code, pressed: false };
+    totalKeyEvents++;
   });
 
   consumeKeyFlags = () => {
@@ -431,10 +432,10 @@ async function initWasm() {
       is_key_down: (keyCode: number) => keyState[keyCode] ? 1 : 0,
       is_key_pressed: (keyCode: number) => keyPressed[keyCode] ? 1 : 0,
       is_key_released: (keyCode: number) => keyReleased[keyCode] ? 1 : 0,
-      get_key_history_count: () => keyHistory.length,
+      get_key_history_count: () => totalKeyEvents,
       get_key_history_event: (index: number) => {
-        if (index >= 0 && index < keyHistory.length) {
-          const event = keyHistory[index];
+        if (index >= 0 && index < totalKeyEvents) {
+          const event = keyHistoryRing[index % MAX_HISTORY];
           return BigInt((event.pressed ? (1 << 32) : 0) | event.key);
         }
         return BigInt(0);

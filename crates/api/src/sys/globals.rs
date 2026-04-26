@@ -83,8 +83,8 @@ pub enum KeyState {
 
 impl Input {
     pub fn handle_incoming_state(&mut self, key: usize, b: bool) {
-        self.history_last_index += 1;
         self.history_ring[self.history_last_index % HISTORY_SIZE] = InputEvent { trigger: b, key };
+        self.history_last_index += 1;
         self.keys[key].handle_incoming_state(b);
     }
 }

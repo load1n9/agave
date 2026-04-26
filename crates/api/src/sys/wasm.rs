@@ -468,8 +468,7 @@ impl WasmApp {
 
         let get_key_history_count = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
             let input = crate::sys::globals::INPUT.read();
-            // Return the number of events we have, up to the buffer size
-            core::cmp::min(input.history_last_index, 64) as i32
+            input.history_last_index as i32
         });
 
         linker
@@ -480,11 +479,8 @@ impl WasmApp {
             &mut store,
             |_caller: Caller<'_, *mut FB>, index: i32| -> i64 {
                 let input = crate::sys::globals::INPUT.read();
-                if index >= 0
-                    && (index as usize) < 64
-                    && (index as usize) < input.history_last_index
-                {
-                    let event = input.history_ring[index as usize];
+                if index >= 0 && (index as usize) < input.history_last_index {
+                    let event = input.history_ring[(index as usize) % 64];
                     // Pack key code in low 32 bits, pressed state in high 32 bits
                     let pressed_bits = if event.trigger { 1i64 << 32 } else { 0 };
                     pressed_bits | (event.key as i64)

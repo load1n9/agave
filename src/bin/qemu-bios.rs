@@ -33,6 +33,19 @@ fn main() {
     let ovmf_path_str = ovmf_code_path.to_string_lossy().replace('\\', "/");
     println!("OVMF path for QEMU: {ovmf_path_str}");
 
+    // Pick a display backend that the local QEMU build actually supports.
+    // macOS QEMU typically ships with `cocoa`; Linux with `gtk` or `sdl`. Allow
+    // the user to override with $AGAVE_QEMU_DISPLAY (e.g. `none`, `vnc=:1`).
+    let (display_arg, vga_device) = if let Ok(d) = env::var("AGAVE_QEMU_DISPLAY") {
+        // Honour user override; pair with plain virtio-vga (no GL) since GL
+        // requires SDL+GL which may not be present.
+        (d, "virtio-vga")
+    } else if cfg!(target_os = "macos") {
+        ("cocoa".to_string(), "virtio-vga")
+    } else {
+        ("sdl,gl=on".to_string(), "virtio-vga-gl")
+    };
+
     let mut qemu = Command::new("qemu-system-x86_64");
     qemu.arg("-nodefaults");
     qemu.arg("-m").arg("600M");
@@ -40,8 +53,8 @@ fn main() {
     qemu.arg("-device").arg("virtio-mouse-pci");
     qemu.arg("-device").arg("virtio-keyboard-pci");
     qemu.arg("-nic").arg("user,model=virtio-net-pci");
-    qemu.arg("-device").arg("virtio-vga-gl");
-    qemu.arg("-display").arg("sdl,gl=on");
+    qemu.arg("-device").arg(vga_device);
+    qemu.arg("-display").arg(&display_arg);
     qemu.arg("-serial").arg("stdio");
     // Add VirtIO block device with increased queue size
     qemu.arg("-device").arg("virtio-blk-pci,drive=hd0,num-queues=1,queue-size=256");

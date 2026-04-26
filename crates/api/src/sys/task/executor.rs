@@ -15,18 +15,15 @@ lazy_static! {
 
 /// Task priority levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default)]
 pub enum TaskPriority {
     Critical = 0, // System critical tasks
     High = 1,     // Interactive/user tasks
+    #[default]
     Normal = 2,   // Background tasks
     Low = 3,      // Cleanup/maintenance tasks
 }
 
-impl Default for TaskPriority {
-    fn default() -> Self {
-        TaskPriority::Normal
-    }
-}
 
 /// Task performance metrics
 #[derive(Debug, Clone)]
@@ -35,6 +32,12 @@ pub struct TaskMetrics {
     pub tasks_completed: u64,
     pub total_execution_time_us: u64,
     pub context_switches: u64,
+}
+
+impl Default for TaskMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TaskMetrics {
@@ -104,6 +107,12 @@ pub struct PriorityQueue {
     queues: [VecDeque<PriorityTask>; 4], // One for each priority level
 }
 
+impl Default for PriorityQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PriorityQueue {
     pub fn new() -> Self {
         Self {
@@ -142,6 +151,12 @@ pub struct SimpleExecutor {
     task_queue: VecDeque<Task>,
 }
 
+impl Default for SimpleExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleExecutor {
     pub fn new() -> SimpleExecutor {
         SimpleExecutor {
@@ -161,7 +176,7 @@ fn dummy_raw_waker() -> RawWaker {
     }
 
     let vtable = &RawWakerVTable::new(clone, no_op, no_op, no_op);
-    RawWaker::new(0 as *const (), vtable)
+    RawWaker::new(core::ptr::null::<()>(), vtable)
 }
 
 fn dummy_waker() -> Waker {
@@ -214,11 +229,18 @@ pub fn qpush(queue: Arc<ArrayQueue<Task>>, f: impl Future<Output = ()> + 'static
     let _ = queue.push(Task::new(f));
 }
 
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Executor {
     pub fn new() -> Self {
         Self {
             tasks: BTreeMap::new(),
             task_queue: Arc::new(ArrayQueue::new(100)),
+            #[allow(clippy::arc_with_non_send_sync)]
             spawn_queue: Arc::new(ArrayQueue::new(100)),
             waker_cache: BTreeMap::new(),
             priority_queue: PriorityQueue::new(),
@@ -242,7 +264,7 @@ impl Executor {
             log::warn!("Task with ID {:?} already exists, replacing", task_id);
         }
 
-        if let Err(_) = self.task_queue.push(task_id) {
+        if self.task_queue.push(task_id).is_err() {
             log::error!("Task queue full, dropping task {:?}", task_id);
         }
     }
@@ -272,7 +294,7 @@ impl Executor {
             log::warn!("Task with ID {:?} already exists, replacing", task_id);
         }
 
-        if let Err(_) = self.task_queue.push(task_id) {
+        if self.task_queue.push(task_id).is_err() {
             log::error!("Task queue full, dropping task {:?}", task_id);
         }
     }
@@ -297,7 +319,7 @@ impl Executor {
             };
             let waker = waker_cache
                 .entry(task_id)
-                .or_insert_with(|| TaskWaker::new(task_id, task_queue.clone()));
+                .or_insert_with(|| TaskWaker::create(task_id, task_queue.clone()));
             let mut context = Context::from_waker(waker);
 
             match task.poll(&mut context) {
@@ -344,7 +366,7 @@ struct TaskWaker {
 
 impl TaskWaker {
     fn wake_task(&self) {
-        if let Err(_) = self.task_queue.push(self.task_id) {
+        if self.task_queue.push(self.task_id).is_err() {
             log::error!("Failed to wake task {:?}: queue full", self.task_id);
         }
     }
@@ -361,7 +383,7 @@ impl Wake for TaskWaker {
 }
 
 impl TaskWaker {
-    fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
+    fn create(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
         Waker::from(Arc::new(TaskWaker {
             task_id,
             task_queue,
@@ -385,8 +407,8 @@ impl futures::future::Future for YieldOnce {
         if !self.0 {
             self.as_mut().0 = true;
             let aw = AtomicWaker::new();
-            aw.register(&cx.waker());
-            if let Err(_) = YIELDERS.push(aw) {
+            aw.register(cx.waker());
+            if YIELDERS.push(aw).is_err() {
                 // If yielders queue is full, just continue
                 return core::task::Poll::Ready(());
             }

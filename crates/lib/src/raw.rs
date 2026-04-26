@@ -56,4 +56,17 @@ unsafe extern "C" {
 
     // memory
     pub fn grow_memory(pages: u64) -> i32;
+
+    // filesystem stats / sync
+    // Writes 48 bytes into guest memory at `out_ptr`:
+    //   u32 fs_type_tag (0 = Virtual, 1 = Persistent)
+    //   u32 _pad
+    //   u64 total_size
+    //   u64 used_size
+    //   u64 free_size
+    //   u64 total_files
+    //   u64 block_size
+    // Returns 0 on success, non-zero on error.
+    pub fn fs_stats_get(out_ptr: *mut u8) -> i32;
+    pub fn fs_sync() -> i32;
 }

@@ -348,14 +348,12 @@ impl WasmApp {
             &mut store,
             |caller: Caller<'_, *mut FB>, x: i32, y: i32, r: i32, g: i32, b: i32, a: i32| {
                 let fb = unsafe { caller.data().as_mut().unwrap() };
-                fb.pixels
-                    .get_mut((y * (fb.w as i32) + x) as usize)
-                    .map(|p| {
+                if let Some(p) = fb.pixels.get_mut((y * (fb.w as i32) + x) as usize) {
                         p.r = r as u8;
                         p.g = g as u8;
                         p.b = b as u8;
                         p.a = a as u8;
-                    });
+                    }
             },
         );
 
@@ -375,14 +373,12 @@ impl WasmApp {
                 let fb = unsafe { caller.data().as_mut().unwrap() };
                 for y in y0..y1 {
                     for x in x0..x1 {
-                        fb.pixels
-                            .get_mut((y * (fb.w as i32) + x) as usize)
-                            .map(|p| {
-                                p.r = r as u8;
-                                p.g = g as u8;
-                                p.b = b as u8;
-                                p.a = a as u8;
-                            });
+                        if let Some(p) = fb.pixels.get_mut((y * (fb.w as i32) + x) as usize) {
+                        p.r = r as u8;
+                        p.g = g as u8;
+                        p.b = b as u8;
+                        p.a = a as u8;
+                    }
                     }
                 }
             },
@@ -472,8 +468,7 @@ impl WasmApp {
 
         let get_key_history_count = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
             let input = crate::sys::globals::INPUT.read();
-            // Return the number of events we have, up to the buffer size
-            core::cmp::min(input.history_last_index, 64) as i32
+            input.history_last_index as i32
         });
 
         linker
@@ -484,11 +479,8 @@ impl WasmApp {
             &mut store,
             |_caller: Caller<'_, *mut FB>, index: i32| -> i64 {
                 let input = crate::sys::globals::INPUT.read();
-                if index >= 0
-                    && (index as usize) < 64
-                    && (index as usize) < input.history_last_index
-                {
-                    let event = input.history_ring[index as usize];
+                if index >= 0 && (index as usize) < input.history_last_index {
+                    let event = input.history_ring[(index as usize) % 64];
                     // Pack key code in low 32 bits, pressed state in high 32 bits
                     let pressed_bits = if event.trigger { 1i64 << 32 } else { 0 };
                     pressed_bits | (event.key as i64)
@@ -501,6 +493,45 @@ impl WasmApp {
         linker
             .define("agave", "get_key_history_event", get_key_history_event)
             .unwrap();
+
+        // Filesystem stats / sync host functions for the agave-lib bridge.
+        let fs_stats_get = Func::wrap(
+            &mut store,
+            |mut caller: Caller<'_, *mut FB>, out_ptr: i32| -> i32 {
+                let memory = match caller.get_export("memory") {
+                    Some(Extern::Memory(m)) => m,
+                    _ => return -1,
+                };
+                let stats = match crate::sys::fs::get_filesystem_stats() {
+                    Ok(s) => s,
+                    Err(_) => return -1,
+                };
+                let mut buf = [0u8; 48];
+                let tag: u32 = match crate::sys::fs::get_current_filesystem_type() {
+                    crate::sys::fs::FileSystemType::Virtual => 0,
+                    crate::sys::fs::FileSystemType::Persistent => 1,
+                };
+                buf[0..4].copy_from_slice(&tag.to_le_bytes());
+                buf[8..16].copy_from_slice(&stats.total_size.to_le_bytes());
+                buf[16..24].copy_from_slice(&stats.used_size.to_le_bytes());
+                buf[24..32].copy_from_slice(&stats.free_size.to_le_bytes());
+                buf[32..40].copy_from_slice(&stats.total_files.to_le_bytes());
+                buf[40..48].copy_from_slice(&stats.block_size.to_le_bytes());
+                if memory.write(&mut caller, out_ptr as usize, &buf).is_err() {
+                    return -1;
+                }
+                0
+            },
+        );
+        linker.define("agave", "fs_stats_get", fs_stats_get).unwrap();
+
+        let fs_sync = Func::wrap(&mut store, |_caller: Caller<'_, *mut FB>| -> i32 {
+            match crate::sys::fs::sync_filesystem() {
+                Ok(()) => 0,
+                Err(_) => -1,
+            }
+        });
+        linker.define("agave", "fs_sync", fs_sync).unwrap();
 
         // Link comprehensive WASI Preview 1 implementation
         wasi::preview1::link_preview1_functions(&mut linker, &mut store).unwrap();
@@ -553,12 +584,13 @@ impl WasmApp {
 
         match update {
             Ok(update) => {
-                update
-                    .call(
-                        &mut self.store,
-                        (input.mouse_x as i32, input.mouse_y as i32),
-                    )
-                    .unwrap();
+                if let Err(e) = update.call(
+                    &mut self.store,
+                    (input.mouse_x as i32, input.mouse_y as i32),
+                ) {
+                    log::error!("WASM: update() trapped: {:?}", e);
+                    panic!("WASM update trap");
+                }
             }
             Err(e) => {
                 log::trace!("WASM: No update function found: {:?}", e);

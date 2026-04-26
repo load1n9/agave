@@ -9,6 +9,12 @@ use x86_64::instructions::random::RdRand;
 #[derive(Debug, Clone)]
 pub struct Random;
 
+impl Default for Random {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Random {
     pub fn new() -> Self {
         Self {}

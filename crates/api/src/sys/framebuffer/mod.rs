@@ -241,7 +241,9 @@ impl FB {
         }
     }
 
-    pub fn update(&mut self, vec: *mut RGBA, w: usize, h: usize) {
+    /// # Safety
+    /// This function is unsafe.
+    pub unsafe fn update(&mut self, vec: *mut RGBA, w: usize, h: usize) {
         self.pixels = unsafe { Vec::from_raw_parts(vec, h * w, w * h) };
         self.w = w;
         self.h = h;
@@ -347,8 +349,8 @@ impl FB {
         let (width, height) = (self.w as isize, self.h as isize);
         blank.top_left.x = core::cmp::max(0, blank.top_left.x);
         blank.top_left.y = core::cmp::max(0, blank.top_left.y);
-        blank.bottom_right.x = core::cmp::min(blank.bottom_right.x, width as isize);
-        blank.bottom_right.y = core::cmp::min(blank.bottom_right.y, height as isize);
+        blank.bottom_right.x = core::cmp::min(blank.bottom_right.x, width);
+        blank.bottom_right.y = core::cmp::min(blank.bottom_right.y, height);
 
         if blank.top_left.x >= blank.bottom_right.x || blank.top_left.y >= blank.bottom_right.y {
             return;
@@ -378,32 +380,24 @@ impl FB {
     ) {
         let start = coordinate
             + (
-                (column * CHARACTER_WIDTH as isize) as isize,
-                (line * CHARACTER_HEIGHT as isize) as isize,
+                (column * CHARACTER_WIDTH as isize),
+                (line * CHARACTER_HEIGHT as isize),
             );
         if !self.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
             return;
         }
         let (buffer_width, buffer_height) = (self.w, self.h);
-        let off_set_x: isize = if start.x < 0 {
-            -(start.x as isize) as isize
-        } else {
-            0
-        };
-        let off_set_y: isize = if start.y < 0 {
-            -(start.y as isize) as isize
-        } else {
-            0
-        };
+        let off_set_x: isize = if start.x < 0 { -start.x } else { 0 };
+        let off_set_y: isize = if start.y < 0 { -start.y } else { 0 };
         let mut j = off_set_x;
         let mut i = off_set_y;
         loop {
-            let coordinate = start + (j as isize, i as isize);
+            let coordinate = start + (j, i);
             if self.contains(coordinate) {
                 let pixel = if j >= 1 {
                     let index = j - 1;
                     let char_font = self::font::FONT_BASIC[character as usize][i as usize];
-                    if get_bit(char_font as u8, index) != 0 {
+                    if get_bit(char_font, index) != 0 {
                         fg_pixel
                     } else {
                         bg_pixel
@@ -414,10 +408,9 @@ impl FB {
                 self.set(coordinate.x as usize, coordinate.y as usize, pixel);
             }
             j += 1;
-            if j == CHARACTER_WIDTH as isize || start.x + j as isize == buffer_width as isize {
+            if j == CHARACTER_WIDTH as isize || start.x + j == buffer_width as isize {
                 i += 1;
-                if i == CHARACTER_HEIGHT as isize || start.y + i as isize == buffer_height as isize
-                {
+                if i == CHARACTER_HEIGHT as isize || start.y + i == buffer_height as isize {
                     return;
                 }
                 j = off_set_x;
@@ -444,18 +437,18 @@ impl FB {
         let mut curr_line = line;
         let mut curr_column = column;
 
-        let top_left = Coordinate::new(0, (curr_line * CHARACTER_HEIGHT as isize) as isize);
+        let top_left = Coordinate::new(0, curr_line * CHARACTER_HEIGHT as isize);
 
         for byte in slice.bytes() {
             if byte == b'\n' {
                 let mut blank = Rectangle {
                     top_left: Coordinate::new(
-                        coordinate.x + (curr_column * CHARACTER_WIDTH as isize) as isize,
-                        coordinate.y + (curr_line * CHARACTER_HEIGHT as isize) as isize,
+                        coordinate.x + (curr_column * CHARACTER_WIDTH as isize),
+                        coordinate.y + (curr_line * CHARACTER_HEIGHT as isize),
                     ),
                     bottom_right: Coordinate::new(
-                        coordinate.x + width as isize,
-                        coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT as isize) as isize,
+                        coordinate.x + width,
+                        coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT as isize),
                     ),
                 };
                 self.fill_blank(&mut blank, bg_pixel);
@@ -486,19 +479,19 @@ impl FB {
 
         let mut blank = Rectangle {
             top_left: Coordinate::new(
-                x + (curr_column * CHARACTER_WIDTH as isize) as isize,
-                y + (curr_line * CHARACTER_HEIGHT as isize) as isize,
+                x + (curr_column * CHARACTER_WIDTH as isize),
+                y + (curr_line * CHARACTER_HEIGHT as isize),
             ),
             bottom_right: Coordinate::new(
-                x + width as isize,
-                y + ((curr_line + 1) * CHARACTER_HEIGHT as isize) as isize,
+                x + width,
+                y + ((curr_line + 1) * CHARACTER_HEIGHT as isize),
             ),
         };
         self.fill_blank(&mut blank, bg_pixel);
 
         let bottom_right = Coordinate::new(
-            (buffer_width * CHARACTER_WIDTH as isize) as isize,
-            ((curr_line + 1) * CHARACTER_HEIGHT as isize) as isize,
+            buffer_width * CHARACTER_WIDTH as isize,
+            (curr_line + 1) * CHARACTER_HEIGHT as isize,
         );
 
         let update_area = Rectangle {
@@ -507,11 +500,8 @@ impl FB {
         };
 
         blank = Rectangle {
-            top_left: Coordinate::new(
-                x,
-                y + ((curr_line + 1) * CHARACTER_HEIGHT as isize) as isize,
-            ),
-            bottom_right: Coordinate::new(x + width as isize, y + height as isize),
+            top_left: Coordinate::new(x, y + ((curr_line + 1) * CHARACTER_HEIGHT as isize)),
+            bottom_right: Coordinate::new(x + width, y + height),
         };
         self.fill_blank(&mut blank, bg_pixel);
 
@@ -703,7 +693,7 @@ impl FB {
 
     /// Blend two colors with alpha interpolation
     fn blend_colors(&self, color1: RGBA, color2: RGBA, progress: f32) -> RGBA {
-        let progress = progress.max(0.0).min(1.0);
+        let progress = progress.clamp(0.0, 1.0);
         let inv_progress = 1.0 - progress;
 
         RGBA {
@@ -974,7 +964,7 @@ impl FB {
             for j in 0..(CHARACTER_WIDTH - 1) {
                 // -1 because font is 7 pixels wide
                 let char_font = self::font::FONT_BASIC[character as usize][i];
-                if get_bit(char_font as u8, j as isize) != 0 {
+                if get_bit(char_font, j as isize) != 0 {
                     // Draw scaled pixel
                     for sy in 0..scale {
                         for sx in 0..scale {
@@ -1147,11 +1137,10 @@ impl Particle {
     }
 
     pub fn update(&mut self, delta_time: f32) {
-        self.position = self.position
-            + (
-                (self.velocity.x as f32 * delta_time) as isize,
-                (self.velocity.y as f32 * delta_time) as isize,
-            );
+        self.position += (
+            (self.velocity.x as f32 * delta_time) as isize,
+            (self.velocity.y as f32 * delta_time) as isize,
+        );
         self.life -= delta_time;
     }
 

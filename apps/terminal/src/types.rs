@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::fs::{self, read_dir};
+use std::path::Path;
 /// Terminal screen types
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
@@ -94,14 +94,14 @@ pub struct TerminalApp {
     // Only keep minimal demo processes
     pub processes: [Process; 4],
     pub process_count: usize,
-    pub current_directory: &'static str,
+    pub current_directory: String,
     pub files_scroll_offset: usize, // Scroll offset for file browser
 }
 
 impl TerminalApp {
     /// Scroll up in the file list
     pub fn files_scroll_up(&mut self, lines: usize) {
-        let path = Path::new(self.current_directory);
+        let path = Path::new(self.current_directory.as_str());
         let total_files = match read_dir(path) {
             Ok(read_dir) => read_dir.count(),
             Err(_) => 0,
@@ -121,7 +121,7 @@ impl TerminalApp {
 
     /// Jump to top of file list
     pub fn files_scroll_to_top(&mut self) {
-        let path = Path::new(self.current_directory);
+        let path = Path::new(self.current_directory.as_str());
         let total_files = match fs::read_dir(path) {
             Ok(read_dir) => read_dir.count(),
             Err(_) => 0,
@@ -155,8 +155,17 @@ impl TerminalApp {
                 Process { pid: 4, name: "filesystem", status: "running", memory: 2048 },
             ],
             process_count: 4,
-            current_directory: "/home/user",
+            // Heap allocation isn't allowed in `const fn`, so default to an
+            // empty path here and lazy-init on first frame in `lib.rs`.
+            current_directory: String::new(),
             files_scroll_offset: 0,
+        }
+    }
+
+    /// Initialise heap-backed fields. Idempotent; called once on first frame.
+    pub fn bootstrap(&mut self) {
+        if self.current_directory.is_empty() {
+            self.current_directory = "/home/user".to_string();
         }
     }
 
@@ -217,7 +226,7 @@ impl TerminalApp {
 
     /// List files in the current directory using std::fs
     pub fn list_files(&mut self) {
-        let path = Path::new(self.current_directory);
+        let path = Path::new(self.current_directory.as_str());
         match read_dir(path) {
             Ok(entries) => {
                 self.add_output_line(b"Files and directories:");

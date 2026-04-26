@@ -13,6 +13,7 @@ use state::{ANIMATION_FRAME, CURSOR_BLINK, LAST_TIME, TERMINAL};
 #[no_mangle]
 pub extern "C" fn update(_mouse_x: i32, _mouse_y: i32) {
     unsafe {
+        TERMINAL.bootstrap();
         let current_time = get_time_ms();
         TERMINAL.uptime = current_time;
 

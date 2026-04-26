@@ -149,6 +149,10 @@ impl WasiError {
         Self::new(ERRNO_ALREADY, "Connection already in progress")
     }
 
+    pub fn fault() -> Self {
+        Self::new(ERRNO_FAULT, "Bad address")
+    }
+
     pub fn to_debug_string(&self) -> String {
         format!("WasiError({}): {}", self.errno, self.message)
     }

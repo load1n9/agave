@@ -91,7 +91,7 @@ impl Pipe {
 
         if bytes_to_read == 0 {
             // No data available, check if write end is closed
-            return if self.write_end.as_ref().map_or(true, |w| w.is_closed()) {
+            return if self.write_end.as_ref().is_none_or(|w| w.is_closed()) {
                 Ok(0) // EOF - write end closed
             } else {
                 Err(AgaveError::WouldBlock) // Would block - no data but write end open
@@ -99,8 +99,8 @@ impl Pipe {
         }
 
         // Copy data from pipe buffer to user buffer
-        for i in 0..bytes_to_read {
-            buffer[i] = pipe_buffer.pop_front().unwrap();
+        for item in buffer.iter_mut().take(bytes_to_read) {
+            *item = pipe_buffer.pop_front().unwrap();
         }
 
         log::trace!("Pipe read: {} bytes", bytes_to_read);
@@ -119,7 +119,7 @@ impl Pipe {
         }
 
         // Check if read end is closed
-        if self.read_end.as_ref().map_or(true, |r| r.is_closed()) {
+        if self.read_end.as_ref().is_none_or(|r| r.is_closed()) {
             return Err(AgaveError::BrokenPipe);
         }
 
@@ -162,7 +162,7 @@ impl Pipe {
         if let Some(read_end) = &self.read_end {
             !read_end.is_closed()
                 && (read_end.available_data() > 0
-                    || self.write_end.as_ref().map_or(true, |w| w.is_closed()))
+                    || self.write_end.as_ref().is_none_or(|w| w.is_closed()))
         } else {
             false
         }
@@ -173,7 +173,7 @@ impl Pipe {
         if let Some(write_end) = &self.write_end {
             !write_end.is_closed()
                 && write_end.available_space() > 0
-                && self.read_end.as_ref().map_or(false, |r| !r.is_closed())
+                && self.read_end.as_ref().is_some_and(|r| !r.is_closed())
         } else {
             false
         }
@@ -192,8 +192,8 @@ impl Pipe {
         PipeStats {
             buffer_used,
             buffer_capacity,
-            read_end_open: self.read_end.as_ref().map_or(false, |r| !r.is_closed()),
-            write_end_open: self.write_end.as_ref().map_or(false, |w| !w.is_closed()),
+            read_end_open: self.read_end.as_ref().is_some_and(|r| !r.is_closed()),
+            write_end_open: self.write_end.as_ref().is_some_and(|w| !w.is_closed()),
             is_readable: self.is_readable(),
             is_writable: self.is_writable(),
         }

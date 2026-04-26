@@ -84,12 +84,12 @@ pub fn create_virt_from_phys(
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
     frame: PhysFrame,
 ) -> Result<Page, MapToError<Size4KiB>> {
-    let start = VirtAddr::new(OTHER_VIRT.fetch_add(4096, Ordering::Relaxed) as u64);
+    let start = VirtAddr::new(OTHER_VIRT.fetch_add(4096, Ordering::Relaxed));
     let page = Page::containing_address(start);
     let flags =
         PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
     unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
-    return Ok(page);
+    Ok(page)
 }
 
 pub fn create_identity_virt_from_phys(
@@ -102,7 +102,7 @@ pub fn create_identity_virt_from_phys(
     let flags =
         PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE;
     unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
-    return Ok(page);
+    Ok(page)
 }
 
 pub fn with_mapper_framealloc<FUNC, R>(f: FUNC) -> R
@@ -139,8 +139,8 @@ pub fn create_identity_virt_from_phys_n(pages: usize) -> Result<Page, MapToError
             unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
         }
 
-        return Ok(Page::containing_address(VirtAddr::new(
+        Ok(Page::containing_address(VirtAddr::new(
             first_frame.start_address().as_u64(),
-        )));
+        )))
     })
 }

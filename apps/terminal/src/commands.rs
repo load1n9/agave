@@ -4,6 +4,9 @@ use crate::types::{Screen, TerminalApp, Theme};
 
 impl TerminalApp {
     pub fn process_command(&mut self) {
+        // Lazy-init heap-backed fields if process_command runs before update().
+        // bootstrap() is idempotent.
+        self.bootstrap();
         if self.command_length == 0 {
             // If we're not on the main screen, pressing Enter returns to main
             if self.current_screen != Screen::Main {
@@ -65,6 +68,8 @@ impl TerminalApp {
             self.handle_ps_command();
         } else if self.command_length == 3 && &cmd_lower[0..3] == b"cat" {
             self.handle_cat_command();
+        } else if self.command_length >= 4 && &cmd_lower[0..4] == b"cat " {
+            self.handle_cat_command();
         } else if self.command_length >= 6 && &cmd_lower[0..5] == b"write" {
             self.handle_write_command();
         } else if self.command_length >= 5 && &cmd_lower[0..5] == b"mkdir" {
@@ -119,6 +124,13 @@ impl TerminalApp {
             self.handle_sync_command();
         } else if self.command_length >= 3 && &cmd_lower[0..3] == b"fs " {
             self.handle_fs_subcommand();
+        } else if self.command_length == 2 && &cmd_lower[0..2] == b"cd" {
+            self.handle_cd_command();
+        } else if self.command_length >= 3 && &cmd_lower[0..3] == b"cd " {
+            self.handle_cd_command();
+        } else if self.command_length == 3 && &cmd_lower[0..3] == b"pwd" {
+            let cwd = self.current_directory.clone();
+            self.add_output_line(cwd.as_bytes());
         } else {
             self.add_output_line(b"Command not found. Type 'help' for available commands.");
         }
@@ -212,6 +224,10 @@ impl TerminalApp {
         self.add_output_line(b"  system    - Show system information");
         self.add_output_line(b"  uname     - System name and version");
         self.add_output_line(b"  uptime    - System uptime");
+        self.add_output_line(b"  health    - System health status");
+        self.add_output_line(b"  power     - Power management status");
+        self.add_output_line(b"  security  - Security framework status");
+        self.add_output_line(b"  features  - Enhanced OS features");
         self.add_output_line(b"  clear     - Clear the screen");
         self.add_output_line(b"  reset     - Reset terminal and clear memory");
         self.add_output_line(b"  main      - Return to main screen");
@@ -225,6 +241,8 @@ impl TerminalApp {
         self.add_output_line(b"  rm <file>       - Remove file");
         self.add_output_line(b"  mkdir <dir>     - Create directory");
         self.add_output_line(b"  rmdir <dir>     - Remove directory");
+        self.add_output_line(b"  cd [dir]        - Change current directory");
+        self.add_output_line(b"  pwd             - Print current directory");
         self.add_output_line(b"");
         self.add_output_line(b"IPC commands:");
         self.add_output_line(b"  ipc       - Inter-Process Communication help");
@@ -652,14 +670,24 @@ impl TerminalApp {
 
     fn handle_fsstat_command(&mut self) {
         self.add_output_line(b"Filesystem Statistics:");
-        self.add_output_line(b"  Backend: RAM Disk (default)");
-        self.add_output_line(b"  Total Space: 1024 KB");
-        self.add_output_line(b"  Used Space: 0 KB");
-        self.add_output_line(b"  Free Space: 1024 KB");
-        self.add_output_line(b"  Inodes Total: 256");
-        self.add_output_line(b"  Inodes Used: 1 (root)");
-        self.add_output_line(b"  Inodes Free: 255");
-        self.add_output_line(b"  Filesystem: Simple FS v1.0");
+        match agave_lib::fs_stats() {
+            Some(stats) => {
+                let backend = match stats.fs_type_tag {
+                    0 => "  Backend: Virtual File System",
+                    1 => "  Backend: Persistent (VirtIO block)",
+                    _ => "  Backend: Unknown",
+                };
+                self.add_output_line(backend.as_bytes());
+                self.add_output_line(format!("  Files: {}", stats.total_files).as_bytes());
+                self.add_output_line(format!("  Used bytes: {}", stats.used_size).as_bytes());
+                if stats.fs_type_tag == 1 {
+                    self.add_output_line(format!("  Total bytes: {}", stats.total_size).as_bytes());
+                    self.add_output_line(format!("  Free bytes: {}", stats.free_size).as_bytes());
+                    self.add_output_line(format!("  Block size: {}", stats.block_size).as_bytes());
+                }
+            }
+            None => self.add_output_line(b"  fsstat: filesystem not ready"),
+        }
     }
 
     fn handle_mount_command(&mut self) {
@@ -671,10 +699,89 @@ impl TerminalApp {
     }
 
     fn handle_sync_command(&mut self) {
-        self.add_output_line(b"Synchronizing filesystem...");
-        self.add_output_line(b"+ All buffers written to disk");
-        self.add_output_line(b"+ Filesystem metadata updated");
-        self.add_output_line(b"Sync complete");
+        let rc = agave_lib::fs_sync();
+        if rc == 0 {
+            self.add_output_line(b"Sync complete");
+        } else {
+            self.add_output_line(b"Sync failed");
+        }
+    }
+
+    fn handle_cd_command(&mut self) {
+        let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
+        let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
+        let target = parts.get(1).map(|s| s.trim()).unwrap_or("").trim();
+        let resolved = if target.is_empty() || target == "~" {
+            "/home/user".to_string()
+        } else if target.starts_with('/') {
+            Self::normalize_path(target)
+        } else {
+            let mut p = self.current_directory.clone();
+            if !p.ends_with('/') {
+                p.push('/');
+            }
+            p.push_str(target);
+            Self::normalize_path(&p)
+        };
+        // Refuse to cd into a regular file. Without this check, subsequent
+        // relative paths build nonsensical strings against a file path.
+        match std::fs::metadata(&resolved) {
+            Ok(meta) if meta.is_dir() => {
+                self.current_directory = resolved.clone();
+                let mut line = std::vec::Vec::new();
+                line.extend_from_slice(b"cwd: ");
+                line.extend_from_slice(resolved.as_bytes());
+                self.add_output_line(&line);
+            }
+            Ok(_) => {
+                let mut line = std::vec::Vec::new();
+                line.extend_from_slice(b"cd: not a directory: ");
+                line.extend_from_slice(resolved.as_bytes());
+                self.add_output_line(&line);
+            }
+            Err(_) => {
+                let mut line = std::vec::Vec::new();
+                line.extend_from_slice(b"cd: no such directory: ");
+                line.extend_from_slice(resolved.as_bytes());
+                self.add_output_line(&line);
+            }
+        }
+    }
+
+    fn normalize_path(path: &str) -> String {
+        let mut parts: Vec<&str> = Vec::new();
+        for seg in path.split('/') {
+            match seg {
+                "" | "." => {}
+                ".." => {
+                    parts.pop();
+                }
+                other => parts.push(other),
+            }
+        }
+        let mut out = String::new();
+        for p in &parts {
+            out.push('/');
+            out.push_str(p);
+        }
+        if out.is_empty() {
+            "/".to_string()
+        } else {
+            out
+        }
+    }
+
+    fn resolve_arg_path(&self, arg: &str) -> String {
+        if arg.starts_with('/') {
+            Self::normalize_path(arg)
+        } else {
+            let mut p = self.current_directory.clone();
+            if !p.ends_with('/') {
+                p.push('/');
+            }
+            p.push_str(arg);
+            Self::normalize_path(&p)
+        }
     }
 
     fn handle_fs_subcommand(&mut self) {
@@ -725,21 +832,18 @@ impl TerminalApp {
     }
 
     fn handle_cat_command(&mut self) {
-        // Usage: cat <filename>
         let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             self.add_output_line(b"Usage: cat <filename>");
             return;
         }
-        let filename = parts[1];
-        match std::fs::read(filename) {
+        let path = self.resolve_arg_path(parts[1]);
+        match std::fs::read(&path) {
             Ok(data) => {
-                let mut line = [0u8; 200];
-                for chunk in data.chunks(200) {
-                    let len = chunk.len().min(200);
-                    line[..len].copy_from_slice(&chunk[..len]);
-                    self.add_output_line(&line[..len]);
+                for chunk in data.split(|b| *b == b'\n') {
+                    let len = chunk.len().min(199);
+                    self.add_output_line(&chunk[..len]);
                 }
             }
             Err(_) => self.add_output_line(b"Error: File not found or cannot be read"),
@@ -747,61 +851,57 @@ impl TerminalApp {
     }
 
     fn handle_write_command(&mut self) {
-        // Usage: write <filename> <text>
         let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
         let parts: Vec<&str> = cmd.splitn(3, ' ').collect();
         if parts.len() < 3 {
             self.add_output_line(b"Usage: write <filename> <text>");
             return;
         }
-        let filename = parts[1];
+        let path = self.resolve_arg_path(parts[1]);
         let text = parts[2].as_bytes();
-        match std::fs::write(filename, text) {
+        match std::fs::write(&path, text) {
             Ok(_) => self.add_output_line(b"File written successfully"),
             Err(_) => self.add_output_line(b"Error: Could not write file"),
         }
     }
 
     fn handle_rm_command(&mut self) {
-        // Usage: rm <filename>
         let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             self.add_output_line(b"Usage: rm <filename>");
             return;
         }
-        let filename = parts[1];
-        match std::fs::remove_file(filename) {
+        let path = self.resolve_arg_path(parts[1]);
+        match std::fs::remove_file(&path) {
             Ok(_) => self.add_output_line(b"File removed successfully"),
             Err(_) => self.add_output_line(b"Error: Could not remove file"),
         }
     }
 
     fn handle_mkdir_command(&mut self) {
-        // Usage: mkdir <dirname>
         let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             self.add_output_line(b"Usage: mkdir <dirname>");
             return;
         }
-        let dirname = parts[1];
-        match std::fs::create_dir(dirname) {
+        let path = self.resolve_arg_path(parts[1]);
+        match std::fs::create_dir(&path) {
             Ok(_) => self.add_output_line(b"Directory created successfully"),
             Err(_) => self.add_output_line(b"Error: Could not create directory"),
         }
     }
 
     fn handle_rmdir_command(&mut self) {
-        // Usage: rmdir <dirname>
         let cmd = core::str::from_utf8(&self.command_buffer[..self.command_length]).unwrap_or("");
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             self.add_output_line(b"Usage: rmdir <dirname>");
             return;
         }
-        let dirname = parts[1];
-        match std::fs::remove_dir(dirname) {
+        let path = self.resolve_arg_path(parts[1]);
+        match std::fs::remove_dir(&path) {
             Ok(_) => self.add_output_line(b"Directory removed successfully"),
             Err(_) => self.add_output_line(b"Error: Could not remove directory"),
         }

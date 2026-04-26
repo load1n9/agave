@@ -43,6 +43,8 @@ impl LockedLogger {
     ///
     /// ## Safety
     /// This method is not memory safe and should be only used when absolutely necessary.
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn force_unlock(&self) {
         if let Some(framebuffer) = &self.framebuffer {
             unsafe { framebuffer.force_unlock() };

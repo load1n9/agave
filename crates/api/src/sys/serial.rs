@@ -5,6 +5,8 @@ pub struct SerialPort {
 }
 
 impl SerialPort {
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn init() -> Self {
         let mut port = unsafe { uart_16550::SerialPort::new(0x3F8) };
         port.init();

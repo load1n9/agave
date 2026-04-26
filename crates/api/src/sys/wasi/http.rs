@@ -14,6 +14,12 @@ pub struct Fields {
     headers: BTreeMap<String, String>,
 }
 
+impl Default for Fields {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Fields {
     pub fn new() -> Self {
         Self {
@@ -30,6 +36,12 @@ pub struct HttpState {
     requests: BTreeMap<u32, HttpRequest>,
     responses: BTreeMap<u32, HttpResponse>,
     next_id: u32,
+}
+
+impl Default for HttpState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HttpState {
@@ -84,7 +96,7 @@ pub enum HttpMethod {
 }
 
 impl HttpMethod {
-    pub fn from_str(method: &str) -> WasiResult<Self> {
+    pub fn parse(method: &str) -> WasiResult<Self> {
         match method.to_uppercase().as_str() {
             "GET" => Ok(HttpMethod::Get),
             "POST" => Ok(HttpMethod::Post),
@@ -120,6 +132,12 @@ pub struct HttpClient {
     timeout: Option<Timestamp>,
     follow_redirects: bool,
     max_redirects: u32,
+}
+
+impl Default for HttpClient {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HttpClient {
@@ -163,7 +181,7 @@ pub fn create_request(
     headers: &[(String, Vec<u8>)],
     body: Option<super::io::InputStream>,
 ) -> WasiResult<u32> {
-    let method = HttpMethod::from_str(method)?;
+    let method = HttpMethod::parse(method)?;
 
     let headers = headers
         .iter()
@@ -769,7 +787,7 @@ pub fn drop_future_incoming_response(future: u32) {
     log::debug!("http::drop_future_incoming_response({})", future);
 }
 
-pub fn future_incoming_response_get(future: u32) -> Option<Result<Result<u32, u32>, ()>> {
+pub fn future_incoming_response_get(future: u32) -> Option<Result<Result<u32, u32>, u32>> {
     log::debug!("http::future_incoming_response_get({})", future);
     Some(Ok(Ok(1)))
 }

@@ -39,7 +39,16 @@ lazy_static::lazy_static! {
 const CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
     config.mappings.physical_memory = Some(Mapping::Dynamic);
-    config.kernel_stack_size = 128 * 1024;
+    // Keep all bootloader-chosen mappings (phys-mem, kernel image, stack,
+    // framebuffer, boot info, ramdisk) below 0x4000_0000_0000 so they cannot
+    // collide with the kernel heap region anchored at HEAP_START =
+    // 0x_4444_4444_0000. Required since bootloader 0.11.14's address-calc
+    // overflow fix; previously the placer happened to leave that range clear.
+    config.mappings.dynamic_range_end = Some(0x4000_0000_0000);
+    // wasmi's interpreter recurses into host fns through several Rust frames per
+    // WASM call, and the terminal app's first update tick blew the 128 KiB stack
+    // (kernel-stack overflow → page fault on guard page). Raised to 2 MiB.
+    config.kernel_stack_size = 2 * 1024 * 1024;
     config
 };
 entry_point!(main, config = &CONFIG);
@@ -49,8 +58,16 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     let framebuffer = boot_info.framebuffer.as_mut().unwrap();
     let fbinfo = framebuffer.info();
     let fbm = framebuffer.buffer_mut();
+    // Stash a raw pointer to the bootloader-supplied framebuffer before the
+    // logger takes ownership of it. The WASM main loop will copy fb.pixels
+    // into this region every frame so we get visible rendering even when the
+    // VirtIO GPU bring-up hangs (which it currently does -- the kick reaches
+    // the device but the device never updates the used ring).
+    let boot_fb_ptr: *mut u8 = fbm.as_mut_ptr();
+    let boot_fb_len: usize = fbm.len();
+    let boot_fb_pixel_format = fbinfo.pixel_format;
 
-    init_logger(fbm, fbinfo.clone(), LevelFilter::Trace, true, true);
+    init_logger(fbm, fbinfo, LevelFilter::Trace, true, true);
     log::info!("KERNEL: Starting main() function - logger initialized");
     // Now initialize GDT and IDT
     log::info!("KERNEL: Initializing GDT");
@@ -136,7 +153,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             log::info!("Initializing local APIC...");
             let lapic = local_apic::LocalApic::init(PhysAddr::new(apic.local_apic_address));
             log::info!("Local APIC initialized");
-            let mut freq = 1000_000_000;
+            let mut freq = 1_000_000_000;
             if let Some(cpuid) = local_apic::cpuid() {
                 log::info!("CPUID info obtained");
                 if let Some(tsc) = cpuid.get_tsc_info() {
@@ -146,8 +163,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                         tsc.tsc_frequency().unwrap()
                     );
                     freq = tsc.nominal_frequency();
-                } else {
-                }
+                } 
             }
             log::info!("Setting APIC timer configuration...");
             lapic.set_div_conf(0b1011);
@@ -256,7 +272,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Framebuffer created at {:?}", fb_clone);
 
     // Show loading screen now that framebuffer is available
-    show_loading_screen("Basic initialization complete...", 25, &mut *fb);
+    show_loading_screen("Basic initialization complete...", 25, &mut fb);
 
     // log::info!("fbclone {:?}", fb_clone);
 
@@ -264,31 +280,31 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     log::info!("Initializing system monitoring...");
     monitor::init_monitoring();
     log::info!("System monitoring enabled");
-    show_loading_screen("System monitoring enabled...", 35, &mut *fb);
+    show_loading_screen("System monitoring enabled...", 35, &mut fb);
 
     // Initialize enhanced diagnostics
     log::info!("Initializing enhanced diagnostics...");
     diagnostics::init_diagnostics();
     log::info!("Enhanced diagnostics enabled");
-    show_loading_screen("Enhanced diagnostics enabled...", 40, &mut *fb);
+    show_loading_screen("Enhanced diagnostics enabled...", 40, &mut fb);
 
     // Initialize security framework
     log::info!("Initializing security framework...");
     security::init_security();
     log::info!("Security framework enabled");
-    show_loading_screen("Security framework enabled...", 45, &mut *fb);
+    show_loading_screen("Security framework enabled...", 45, &mut fb);
 
     // Initialize process management
     log::info!("Initializing process management...");
     process::init_process_management();
     log::info!("Process management enabled");
-    show_loading_screen("Process management enabled...", 50, &mut *fb);
+    show_loading_screen("Process management enabled...", 50, &mut fb);
 
     // Initialize power management
     log::info!("Initializing power management...");
     power::init_power_management();
     log::info!("Power management enabled");
-    show_loading_screen("Power management enabled...", 55, &mut *fb);
+    show_loading_screen("Power management enabled...", 55, &mut fb);
 
     // Initialize filesystem with VirtIO block device if available
     log::info!("Initializing filesystem...");
@@ -314,8 +330,22 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         log::error!("Failed to initialize filesystem: {:?}", e);
     } else {
         log::info!("Filesystem initialized successfully");
+        match fs::get_filesystem_stats() {
+            Ok(stats) => log::info!(
+                "FS: {} files seeded; type={:?}",
+                stats.total_files,
+                fs::get_current_filesystem_type()
+            ),
+            Err(e) => log::warn!("FS: stats unavailable: {:?}", e),
+        }
     }
-    show_loading_screen("Filesystem initialized...", 65, &mut *fb);
+
+    // Set up WASI preopens for the WASM apps. The WASI shim shares the kernel
+    // VFS through the public `crate::sys::fs` free functions; this only adds
+    // the per-fd preopen entries (`/`, `/tmp`).
+    agave_api::sys::wasi::filesystem::init_filesystem();
+    log::info!("WASI: filesystem bridge ready (preopens=/, /tmp)");
+    show_loading_screen("Filesystem initialized...", 65, &mut fb);
 
     // Initialize IPC system
     log::info!("Initializing IPC system...");
@@ -324,7 +354,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("IPC system initialized successfully");
     }
-    show_loading_screen("IPC system ready...", 70, &mut *fb);
+    show_loading_screen("IPC system ready...", 70, &mut fb);
 
     // Initialize network stack
     log::info!("Initializing network stack...");
@@ -333,7 +363,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Network stack initialized successfully");
     }
-    show_loading_screen("Network stack ready...", 75, &mut *fb);
+    show_loading_screen("Network stack ready...", 75, &mut fb);
 
     // Initialize socket subsystem
     log::info!("Initializing socket subsystem...");
@@ -342,7 +372,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
     } else {
         log::info!("Socket subsystem initialized successfully");
     }
-    show_loading_screen("VirtIO devices ready...", 85, &mut *fb);
+    show_loading_screen("VirtIO devices ready...", 85, &mut fb);
 
     // Log initial system status
     log::info!("Logging initial system status...");
@@ -353,7 +383,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
         let mut executor = task::executor::Executor::new();
         let spawner = executor.spawner();
         log::info!("Task executor created");
-        show_loading_screen("Task executor ready...", 90, &mut *fb);
+        show_loading_screen("Task executor ready...", 90, &mut fb);
 
         log::info!("Setting up VirtIO device drivers...");
         for virtio in virtio_devices.into_iter() {
@@ -399,7 +429,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
             }
         }
         log::info!("VirtIO drivers spawned");
-        show_loading_screen("VirtIO drivers active...", 95, &mut *fb);
+        show_loading_screen("VirtIO drivers active...", 95, &mut fb);
 
         log::info!("Setting up WASM application task...");
         spawner.run(async move {
@@ -448,16 +478,41 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                     app.call_update(input);
                 }
 
+                // Push the WASM-rendered pixels straight to the bootloader's
+                // framebuffer. This bypasses the VirtIO GPU path (which is
+                // currently broken: device accepts kicks but never updates
+                // the used ring) and gives us a working display.
+                unsafe {
+                    let fb_ref = &mut *fb_clone;
+                    let pixels = &fb_ref.pixels;
+                    let count = pixels.len().min(boot_fb_len / 4);
+                    let dst = boot_fb_ptr;
+                    let src = pixels.as_ptr();
+                    use bootloader_api::info::PixelFormat;
+                    if matches!(boot_fb_pixel_format, PixelFormat::Bgr) {
+                        for i in 0..count {
+                            let p = *src.add(i);
+                            let off = i * 4;
+                            *dst.add(off) = p.b;
+                            *dst.add(off + 1) = p.g;
+                            *dst.add(off + 2) = p.r;
+                            *dst.add(off + 3) = 0;
+                        }
+                    } else {
+                        core::ptr::copy_nonoverlapping(src as *const u8, dst, count * 4);
+                    }
+                }
+
                 frame_counter += 1;
 
                 // Update power management every 10 frames (~100Hz)
-                if frame_counter % 10 == 0 {
+                if frame_counter.is_multiple_of(10) {
                     if let Err(e) = power::update_power_management() {
                         log::error!("Power management update failed: {:?}", e);
                     }
                 }
                 // Enhanced monitoring and diagnostics (every ~1000 frames, roughly once per second)
-                if frame_counter % 1000 == 0 {
+                if frame_counter.is_multiple_of(1000) {
                     let current_time = agave_api::sys::interrupts::TIME_MS
                         .load(core::sync::atomic::Ordering::Relaxed);
                     // Run periodic diagnostics every 10 seconds
@@ -475,7 +530,7 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
                         last_monitor_check = current_time;
                     }
                     // Log comprehensive system status every 30 seconds
-                    if frame_counter % 30000 == 0 {
+                    if frame_counter.is_multiple_of(30000) {
                         monitor::log_system_status();
 
                         // Log power status
@@ -505,7 +560,9 @@ fn main(boot_info: &'static mut BootInfo) -> ! {
 
 // --- Kernel-side FFI for VirtioDisk ---
 #[no_mangle]
-pub extern "C" fn virtio_block_read(
+/// # Safety
+/// This function is unsafe.
+pub unsafe extern "C" fn virtio_block_read(
     device_id: u32,
     block_num: u64,
     buffer: *mut u8,
@@ -516,7 +573,7 @@ pub extern "C" fn virtio_block_read(
     if let Some(dev) = block_devices.get(idx) {
         let mut dev = dev.lock();
         let mut block = [0u8; BLOCK_SIZE];
-        if let Err(_) = BlockDevice::read_block(&mut *dev, block_num, &mut block) {
+        if BlockDevice::read_block(&mut *dev, block_num, &mut block).is_err() {
             return -1;
         }
         unsafe {
@@ -529,7 +586,9 @@ pub extern "C" fn virtio_block_read(
 }
 
 #[no_mangle]
-pub extern "C" fn virtio_block_write(
+/// # Safety
+/// This function is unsafe.
+pub unsafe extern "C" fn virtio_block_write(
     device_id: u32,
     block_num: u64,
     buffer: *const u8,
@@ -543,7 +602,7 @@ pub extern "C" fn virtio_block_write(
         unsafe {
             core::ptr::copy_nonoverlapping(buffer, block.as_mut_ptr(), size.min(BLOCK_SIZE));
         }
-        if let Err(_) = BlockDevice::write_block(&mut *dev, block_num, &block) {
+        if BlockDevice::write_block(&mut *dev, block_num, &block).is_err() {
             return -1;
         }
         0

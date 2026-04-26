@@ -12,6 +12,10 @@ use spin::Mutex;
 pub mod disk;
 pub mod simple_fs;
 
+// Include the generated disk files
+include!(concat!(env!("OUT_DIR"), "/generated_disk.rs"));
+
+
 // use disk::RamDisk;
 use simple_fs::SimpleFileSystem;
 
@@ -163,16 +167,20 @@ pub enum VfsNode {
 
 impl VfsNode {
     pub fn new_file(content: Vec<u8>) -> Self {
-        let mut metadata = FileMetadata::default();
-        metadata.file_type = FileType::Regular;
-        metadata.size = content.len() as u64;
+        let metadata = FileMetadata {
+            file_type: FileType::Regular,
+            size: content.len() as u64,
+            ..Default::default()
+        };
 
         VfsNode::File { metadata, content }
     }
 
     pub fn new_directory() -> Self {
-        let mut metadata = FileMetadata::default();
-        metadata.file_type = FileType::Directory;
+        let mut metadata = FileMetadata {
+            file_type: FileType::Directory,
+            ..Default::default()
+        };
         metadata.permissions.owner_execute = true;
         metadata.permissions.group_execute = true;
         metadata.permissions.other_execute = true;
@@ -184,9 +192,11 @@ impl VfsNode {
     }
 
     pub fn new_symlink(target: String) -> Self {
-        let mut metadata = FileMetadata::default();
-        metadata.file_type = FileType::Symlink;
-        metadata.size = target.len() as u64;
+        let metadata = FileMetadata {
+            file_type: FileType::Symlink,
+            size: target.len() as u64,
+            ..Default::default()
+        };
 
         VfsNode::Symlink { metadata, target }
     }
@@ -365,50 +375,19 @@ impl VirtualFileSystem {
     }
 
     fn populate_demo_files(&mut self) {
-        // Demo files for the terminal
-        let files: &[(&str, &[u8])] = &[
-            ("/etc/hostname", b"agave-os\n"),
-            ("/etc/version", b"Agave OS v0.1.3\n"),
-            (
-                "/home/user/.bashrc",
-                b"# Agave OS bash configuration\necho 'Welcome to Agave OS!'\n",
-            ),
-            ("/var/log/system.log", b"System log initialized\n"),
-            ("/tmp/readme.txt", b"This is a temporary file\n"),
-            ("/proc/version", b"Agave OS v0.1.3 (x86_64)\n"),
-            ("/proc/meminfo", b"MemTotal: 104857600\nMemFree: 52428800\n"),
-            ("/proc/cpuinfo", b"processor: 0\nmodel name: Virtual CPU\n"),
-        ];
-
-        for (path, content) in files {
+        // Populate the actual disk contents from the `disk` folder at compile time
+        for (path, content) in DISK_FILES {
             if let Err(e) = self.write_file(path, content.to_vec()) {
-                log::warn!("Failed to create file {}: {:?}", path, e);
-            }
-        }
-
-        // Create some demo binary files
-        let binaries = [
-            "/bin/ls",
-            "/bin/cat",
-            "/bin/echo",
-            "/bin/grep",
-            "/bin/ps",
-            "/usr/bin/top",
-            "/usr/bin/nano",
-            "/usr/bin/vim",
-        ];
-
-        for binary in &binaries {
-            let content = format!("#!/bin/sh\necho 'Binary: {}'\n", binary).into_bytes();
-            if let Err(e) = self.write_file(binary, content) {
-                log::warn!("Failed to create binary {}: {:?}", binary, e);
+                log::warn!("Failed to create disk file {}: {:?}", path, e);
             } else {
-                // Make executable
-                if let Ok(node) = self.get_node_mut(binary) {
-                    let metadata = node.metadata_mut();
-                    metadata.permissions.owner_execute = true;
-                    metadata.permissions.group_execute = true;
-                    metadata.permissions.other_execute = true;
+                // If it's in /bin or /usr/bin or ends with .wasm, make it executable
+                if path.starts_with("/bin/") || path.starts_with("/usr/bin/") || path.ends_with(".wasm") {
+                    if let Ok(node) = self.get_node_mut(path) {
+                        let metadata = node.metadata_mut();
+                        metadata.permissions.owner_execute = true;
+                        metadata.permissions.group_execute = true;
+                        metadata.permissions.other_execute = true;
+                    }
                 }
             }
         }
@@ -642,7 +621,11 @@ impl VirtualFileSystem {
 
         let parent_path = get_parent_path(path);
         let filename = get_filename(path);
-        log::debug!("FS create_dir: parent_path={}, filename={}", parent_path, filename);
+        log::debug!(
+            "FS create_dir: parent_path={}, filename={}",
+            parent_path,
+            filename
+        );
 
         match self.get_node_mut(&parent_path) {
             Ok(parent) => match parent {
@@ -657,7 +640,11 @@ impl VirtualFileSystem {
                 }
             },
             Err(e) => {
-                log::error!("FS create_dir: failed to get parent node: {}: {:?}", parent_path, e);
+                log::error!(
+                    "FS create_dir: failed to get parent node: {}: {:?}",
+                    parent_path,
+                    e
+                );
                 Err(e)
             }
         }
@@ -808,9 +795,9 @@ impl VirtualFileSystem {
 /// Global file system instance
 static mut FILESYSTEM: Option<Mutex<VirtualFileSystem>> = None;
 
+use crate::sys::drivers::virtio_block::VirtioBlockDevice;
 /// Global persistent file system instance
 use crate::sys::fs::disk::VirtioBlockDisk;
-use crate::sys::drivers::virtio_block::VirtioBlockDevice;
 static mut PERSISTENT_FS: Option<Mutex<SimpleFileSystem<VirtioBlockDisk>>> = None;
 
 static mut CURRENT_FS_TYPE: FileSystemType = FileSystemType::Virtual;
@@ -822,7 +809,10 @@ pub fn init_filesystem() -> AgaveResult<()> {
 
 /// Initialize filesystem with specific type
 /// Provide a VirtioBlockDevice to initialize persistent filesystem
-pub fn init_filesystem_with_type(fs_type: FileSystemType, virtio_block_device: Option<VirtioBlockDevice>) -> AgaveResult<()> {
+pub fn init_filesystem_with_type(
+    fs_type: FileSystemType,
+    virtio_block_device: Option<VirtioBlockDevice>,
+) -> AgaveResult<()> {
     log::info!("Initializing file system (type: {:?})...", fs_type);
 
     unsafe {
@@ -834,11 +824,27 @@ pub fn init_filesystem_with_type(fs_type: FileSystemType, virtio_block_device: O
                 log::info!("Virtual file system initialized");
             }
             FileSystemType::Persistent => {
-                let virtio_block_device = virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
+                let virtio_block_device =
+                    virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
                 let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
-                let persistent_fs = SimpleFileSystem::format(virtio_disk)?;
+                
+                // Try to mount first, if it fails, format
+                let persistent_fs = match SimpleFileSystem::mount(virtio_disk.clone()) {
+                    Ok(fs) => {
+                        log::info!("Persistent file system mounted successfully");
+                        fs
+                    },
+                    Err(_) => {
+                        log::info!("Mount failed, formatting persistent file system...");
+                        SimpleFileSystem::format(virtio_disk)?
+                    }
+                };
+                
                 PERSISTENT_FS = Some(Mutex::new(persistent_fs));
-                log::info!("Persistent file system initialized and formatted (VirtioBlockDisk)");
+                
+                // If we formatted, we need to populate demo files because the SimpleFileSystem doesn't have them
+                // But wait, SimpleFileSystem doesn't implement populate_demo_files yet, or does it?
+                // Actually, the simple_fs is raw, we should probably wrap it or populate it.
             }
         }
     }
@@ -848,21 +854,21 @@ pub fn init_filesystem_with_type(fs_type: FileSystemType, virtio_block_device: O
 
 /// Switch between file system types
 /// Provide a VirtioBlockDevice to switch persistent filesystem type
-pub fn switch_filesystem_type(fs_type: FileSystemType, virtio_block_device: Option<VirtioBlockDevice>) -> AgaveResult<()> {
+pub fn switch_filesystem_type(
+    fs_type: FileSystemType,
+    virtio_block_device: Option<VirtioBlockDevice>,
+) -> AgaveResult<()> {
     unsafe {
         if CURRENT_FS_TYPE == fs_type {
             return Ok(()); // Already using this type
         }
 
         // Sync current filesystem if needed
-        match CURRENT_FS_TYPE {
-            FileSystemType::Persistent => {
-                if let Some(ref fs) = PERSISTENT_FS {
-                    let mut guard = fs.lock();
-                    guard.sync()?;
-                }
+        if CURRENT_FS_TYPE == FileSystemType::Persistent {
+            if let Some(ref fs) = PERSISTENT_FS {
+                let mut guard = fs.lock();
+                guard.sync()?;
             }
-            _ => {}
         }
 
         let current_fs_type = CURRENT_FS_TYPE;
@@ -874,16 +880,19 @@ pub fn switch_filesystem_type(fs_type: FileSystemType, virtio_block_device: Opti
 
         // Initialize new filesystem if not already done
         match fs_type {
-            FileSystemType::Virtual => {
+            FileSystemType::Virtual =>
+            {
                 #[allow(static_mut_refs)]
                 if FILESYSTEM.is_none() {
                     FILESYSTEM = Some(Mutex::new(VirtualFileSystem::new()));
                 }
             }
-            FileSystemType::Persistent => {
+            FileSystemType::Persistent =>
+            {
                 #[allow(static_mut_refs)]
                 if PERSISTENT_FS.is_none() {
-                    let virtio_block_device = virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
+                    let virtio_block_device =
+                        virtio_block_device.ok_or(AgaveError::InvalidParameter)?;
                     let virtio_disk = VirtioBlockDisk::new(virtio_block_device);
                     let persistent_fs = SimpleFileSystem::format(virtio_disk)?;
                     PERSISTENT_FS = Some(Mutex::new(persistent_fs));
@@ -1015,7 +1024,7 @@ where
                 #[allow(static_mut_refs)]
                 if let Some(fs) = &FILESYSTEM {
                     let mut guard = fs.lock();
-                    f(&mut *guard)
+                    f(&mut guard)
                 } else {
                     Err(AgaveError::NotReady)
                 }
@@ -1156,5 +1165,11 @@ fn get_filename(path: &str) -> &str {
         &path[pos + 1..]
     } else {
         path
+    }
+}
+
+impl Default for VirtualFileSystem {
+    fn default() -> Self {
+        Self::new()
     }
 }

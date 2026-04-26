@@ -18,6 +18,12 @@ pub struct CliState {
     stderr: super::io::OutputStream,
 }
 
+impl Default for CliState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CliState {
     pub const fn new() -> Self {
         Self {

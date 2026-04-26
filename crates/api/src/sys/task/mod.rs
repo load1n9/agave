@@ -28,6 +28,12 @@ impl Task {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TaskId(u64);
 
+impl Default for TaskId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskId {
     pub fn new() -> Self {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);

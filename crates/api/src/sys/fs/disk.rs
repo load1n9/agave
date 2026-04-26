@@ -1,8 +1,8 @@
 use crate::sys::drivers::virtio_block::{BlockDevice, VirtioBlockDevice};
 use crate::sys::error::{AgaveError, AgaveResult};
-use alloc::vec::Vec;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use spin::Mutex;
 
 pub struct VirtioBlockDisk {
@@ -139,7 +139,7 @@ impl RamDisk {
         if self.read_only {
             return Err(AgaveError::PermissionDenied);
         }
-        let new_block_count = (data.len() + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        let new_block_count = data.len().div_ceil(BLOCK_SIZE);
         if new_block_count == 0 || new_block_count > MAX_BLOCKS as usize {
             return Err(AgaveError::InvalidParameter);
         }
@@ -219,7 +219,7 @@ impl RamDisk {
 
     /// Create a read-only RAM disk from existing data
     pub fn from_data(data: Vec<u8>) -> AgaveResult<Self> {
-        let block_count = (data.len() + BLOCK_SIZE - 1) / BLOCK_SIZE;
+        let block_count = data.len().div_ceil(BLOCK_SIZE);
         let mut blocks = Vec::with_capacity(block_count);
 
         // Convert data into blocks
@@ -298,7 +298,7 @@ impl RamDisk {
         let blocks = self.blocks.lock();
         buffer.copy_from_slice(&blocks[block_num as usize]);
         // Insert into cache
-        cache.insert(block_num, buffer.clone());
+        cache.insert(block_num, *buffer);
         // Enforce cache size
         if cache.len() > CACHE_SIZE {
             let first_key = *cache.keys().next().unwrap();
@@ -319,7 +319,7 @@ impl RamDisk {
         blocks[block_num as usize].copy_from_slice(buffer);
         // Update cache
         let mut cache = self.cache.lock();
-        cache.insert(block_num, buffer.clone());
+        cache.insert(block_num, *buffer);
         if cache.len() > CACHE_SIZE {
             let first_key = *cache.keys().next().unwrap();
             cache.remove(&first_key);
@@ -435,9 +435,16 @@ impl DiskBackend for VirtioDisk {
         // NOTE: This is a stub, you must wire this to your VirtioBlockDevice
         // For demonstration, we'll assume a global device instance
         extern "Rust" {
-            fn virtio_block_read(device_id: u32, block_num: u64, buffer: *mut u8, size: usize) -> i32;
+            fn virtio_block_read(
+                device_id: u32,
+                block_num: u64,
+                buffer: *mut u8,
+                size: usize,
+            ) -> i32;
         }
-        let res = unsafe { virtio_block_read(self.device_id, block_num, buffer.as_mut_ptr(), buffer.len()) };
+        let res = unsafe {
+            virtio_block_read(self.device_id, block_num, buffer.as_mut_ptr(), buffer.len())
+        };
         if res != 0 {
             return Err(AgaveError::IoError);
         }
@@ -454,9 +461,15 @@ impl DiskBackend for VirtioDisk {
         }
         // Real VirtIO block device communication
         extern "Rust" {
-            fn virtio_block_write(device_id: u32, block_num: u64, buffer: *const u8, size: usize) -> i32;
+            fn virtio_block_write(
+                device_id: u32,
+                block_num: u64,
+                buffer: *const u8,
+                size: usize,
+            ) -> i32;
         }
-        let res = unsafe { virtio_block_write(self.device_id, block_num, buffer.as_ptr(), buffer.len()) };
+        let res =
+            unsafe { virtio_block_write(self.device_id, block_num, buffer.as_ptr(), buffer.len()) };
         if res != 0 {
             return Err(AgaveError::IoError);
         }
@@ -580,6 +593,12 @@ pub struct CompoundDisk {
     backends: Vec<Box<dyn DiskBackend>>,
     block_offsets: Vec<u64>,
     total_blocks: u64,
+}
+
+impl Default for CompoundDisk {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CompoundDisk {

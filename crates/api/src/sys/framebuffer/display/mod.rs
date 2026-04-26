@@ -9,7 +9,7 @@ pub trait Displayable {
     /// Displays this `Displayable`'s content in the given framebuffer.
     /// # Arguments
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself.
-    ///    The `coordinate` is relative to the top-left point of the `framebuffer`.
+    ///   The `coordinate` is relative to the top-left point of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a rectangle that represents the region of the framebuffer that was updated.

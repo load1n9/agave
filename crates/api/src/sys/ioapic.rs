@@ -25,6 +25,8 @@ impl IoApic {
         this
     }
 
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn set_sel(&self, reg: u32) {
         volatile_store(self.virt_address.as_u64() as *mut u32, reg);
     }
@@ -52,8 +54,8 @@ impl IoApic {
     }
 
     pub fn write_redtlb(&self, index: u32, redtlb: u64) {
-        let _low = self.write(0x10 + 2 * index, (redtlb & 0xffff) as u32);
-        let _high = self.write(0x10 + 2 * index + 1, (redtlb >> 32) as u32);
+        self.write(0x10 + 2 * index, (redtlb & 0xffff) as u32);
+        self.write(0x10 + 2 * index + 1, (redtlb >> 32) as u32);
     }
 }
 

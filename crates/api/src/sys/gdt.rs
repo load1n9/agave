@@ -15,7 +15,10 @@ use x86_64::VirtAddr;
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 pub const PAGE_FAULT_IST_INDEX: u16 = 1;
 pub const GENERAL_PROTECTION_FAULT_IST_INDEX: u16 = 2;
-const STACK_SIZE: usize = 4 * 1024; //4096 * 5; other option: const STACK_SIZE: usize = 1024 * 8;
+// 4 KiB was too small for the panic handler to print without itself faulting,
+// which is what previously turned a recoverable page fault into a silent
+// triple fault during the first WASM update tick.
+const STACK_SIZE: usize = 32 * 1024;
 
 lazy_static! {
     pub static ref GDT: (GlobalDescriptorTable, Selectors) = {
@@ -52,8 +55,19 @@ lazy_static! {
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
             #[allow(static_mut_refs)]
             let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
-            let stack_end = stack_start + STACK_SIZE as u64;
-            stack_end
+            stack_start + STACK_SIZE as u64
+        };
+        tss.interrupt_stack_table[PAGE_FAULT_IST_INDEX as usize] = {
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            #[allow(static_mut_refs)]
+            let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+            stack_start + STACK_SIZE as u64
+        };
+        tss.interrupt_stack_table[GENERAL_PROTECTION_FAULT_IST_INDEX as usize] = {
+            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            #[allow(static_mut_refs)]
+            let stack_start = VirtAddr::from_ptr(unsafe { &STACK });
+            stack_start + STACK_SIZE as u64
         };
         tss
     };

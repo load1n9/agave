@@ -26,6 +26,12 @@ pub struct MemoryStats {
     pub failed_allocations: u64,
 }
 
+impl Default for MemoryStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryStats {
     pub fn new() -> Self {
         Self {
@@ -292,6 +298,12 @@ pub fn allocate_aligned(size: usize, align: usize) -> AgaveResult<*mut u8> {
 }
 
 /// Safely deallocate aligned memory
+///
+/// # Safety
+///
+/// The pointer must have been allocated using `allocate_aligned` with the same `size` and `align`.
+/// # Safety
+/// This function is unsafe.
 pub unsafe fn deallocate_aligned(ptr: *mut u8, size: usize, align: usize) -> AgaveResult<()> {
     use core::alloc::{GlobalAlloc, Layout};
 

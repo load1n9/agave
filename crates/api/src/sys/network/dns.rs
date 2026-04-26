@@ -32,6 +32,12 @@ pub struct DnsCache {
     records: BTreeMap<String, Vec<DnsRecord>>,
 }
 
+impl Default for DnsCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DnsCache {
     pub fn new() -> Self {
         Self {
@@ -50,7 +56,7 @@ impl DnsCache {
     pub fn insert(&mut self, record: DnsRecord) {
         self.records
             .entry(record.name.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(record);
     }
 

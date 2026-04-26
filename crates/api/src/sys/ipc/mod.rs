@@ -14,6 +14,12 @@ pub mod signals;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct IpcHandle(u64);
 
+impl Default for IpcHandle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IpcHandle {
     pub fn new() -> Self {
         static NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
@@ -108,11 +114,11 @@ impl IpcManager {
         // Track resources for the process
         self.process_resources
             .entry(owner)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(read_handle);
         self.process_resources
             .entry(owner)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(write_handle);
 
         log::debug!(
@@ -139,7 +145,7 @@ impl IpcManager {
             .insert(handle, IpcResource::SharedMemory(shmem));
         self.process_resources
             .entry(owner)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(handle);
 
         if let Some(name) = name {
@@ -175,7 +181,7 @@ impl IpcManager {
         self.resources.insert(handle, IpcResource::MessageQueue(mq));
         self.process_resources
             .entry(owner)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(handle);
 
         if let Some(name) = name {

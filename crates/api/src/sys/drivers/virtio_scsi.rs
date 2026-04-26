@@ -626,7 +626,7 @@ impl VirtioScsi {
 
                 // If our descriptors completed, read the response
                 if completion_found {
-                    let resp_desc = self.virtio.read_desc(desc_ids.last().unwrap().clone());
+                    let resp_desc = self.virtio.read_desc(*desc_ids.last().unwrap());
                     let result = unsafe {
                         let response = read_volatile(resp_desc.addr as *const VirtioScsiRespHeader);
 
@@ -721,7 +721,7 @@ impl VirtioScsi {
             return Err(AgaveError::InvalidInput);
         }
 
-        if data.len() % device.block_size as usize != 0 {
+        if !data.len().is_multiple_of(device.block_size as usize) {
             return Err(AgaveError::InvalidInput);
         }
 
@@ -875,10 +875,9 @@ pub async fn drive(virtio: Virtio) {
 }
 
 /// Public API functions
-
 /// Get SCSI device list
 pub fn get_scsi_devices() -> Vec<ScsiDevice> {
-    if let Some(ref scsi) = SCSI_DEVICE.lock().as_ref() {
+    if let Some(scsi) = SCSI_DEVICE.lock().as_ref() {
         scsi.get_devices().clone()
     } else {
         Vec::new()
@@ -910,7 +909,7 @@ pub fn is_scsi_available() -> bool {
 
 /// Get SCSI device count
 pub fn get_scsi_device_count() -> usize {
-    if let Some(ref scsi) = SCSI_DEVICE.lock().as_ref() {
+    if let Some(scsi) = SCSI_DEVICE.lock().as_ref() {
         scsi.device_count()
     } else {
         0

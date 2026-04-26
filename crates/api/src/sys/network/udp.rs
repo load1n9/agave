@@ -50,6 +50,12 @@ pub struct UdpManager {
     next_socket_id: u64,
 }
 
+impl Default for UdpManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UdpManager {
     pub fn new() -> Self {
         Self {

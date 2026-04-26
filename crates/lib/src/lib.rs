@@ -436,3 +436,53 @@ pub fn get_time_ms() -> u64 {
 pub fn grow_memory(pages: u64) -> i32 {
     unsafe { raw::grow_memory(pages) }
 }
+
+/// Filesystem statistics returned by [`fs_stats`].
+#[derive(Debug, Clone, Copy)]
+pub struct FsStats {
+    /// 0 = Virtual, 1 = Persistent
+    pub fs_type_tag: u32,
+    pub total_size: u64,
+    pub used_size: u64,
+    pub free_size: u64,
+    pub total_files: u64,
+    pub block_size: u64,
+}
+
+/// Read filesystem statistics from the host.
+pub fn fs_stats() -> Option<FsStats> {
+    let mut buf = [0u8; 48];
+    let rc = unsafe { raw::fs_stats_get(buf.as_mut_ptr()) };
+    if rc != 0 {
+        return None;
+    }
+    let fs_type_tag = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]);
+    let total_size = u64::from_le_bytes([
+        buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15],
+    ]);
+    let used_size = u64::from_le_bytes([
+        buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23],
+    ]);
+    let free_size = u64::from_le_bytes([
+        buf[24], buf[25], buf[26], buf[27], buf[28], buf[29], buf[30], buf[31],
+    ]);
+    let total_files = u64::from_le_bytes([
+        buf[32], buf[33], buf[34], buf[35], buf[36], buf[37], buf[38], buf[39],
+    ]);
+    let block_size = u64::from_le_bytes([
+        buf[40], buf[41], buf[42], buf[43], buf[44], buf[45], buf[46], buf[47],
+    ]);
+    Some(FsStats {
+        fs_type_tag,
+        total_size,
+        used_size,
+        free_size,
+        total_files,
+        block_size,
+    })
+}
+
+/// Sync the filesystem to backing storage. Returns 0 on success.
+pub fn fs_sync() -> i32 {
+    unsafe { raw::fs_sync() }
+}

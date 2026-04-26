@@ -405,7 +405,7 @@ impl SecurityMonitor {
     }
 
     fn check_security_policies(&mut self, timestamp: u64, event: &SecurityEvent) {
-        let policies: Vec<_> = self.security_policies.iter().cloned().collect();
+        let policies: Vec<_> = self.security_policies.to_vec();
         for policy in policies {
             if self.policy_matches(&policy, event) {
                 let count =

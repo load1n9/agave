@@ -170,6 +170,8 @@ impl SharedMemorySegment {
 
     /// Get a direct reference to the underlying data (unsafe)
     /// This is for advanced use cases where zero-copy access is needed
+    /// # Safety
+    /// This function is unsafe.
     pub unsafe fn get_raw_ptr(&self) -> *mut u8 {
         let data = self.data.lock();
         data.as_ptr() as *mut u8
@@ -222,21 +224,13 @@ pub struct SysVSharedMemory {
 
 /// Shared memory flags (System V style)
 #[derive(Debug, Clone, Copy)]
+#[derive(Default)]
 pub struct ShmFlags {
     pub create: bool,
     pub exclusive: bool,
     pub read_only: bool,
 }
 
-impl Default for ShmFlags {
-    fn default() -> Self {
-        Self {
-            create: false,
-            exclusive: false,
-            read_only: false,
-        }
-    }
-}
 
 /// Memory mapping information for shared memory
 #[derive(Debug)]
